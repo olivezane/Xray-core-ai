@@ -101,9 +101,12 @@ func (t *Handler) Start() error {
 		updater = &InterfaceUpdater{tunIndex: tunIndex, fixedName: t.config.AutoOutboundsInterface}
 		updater.Update()
 		internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
-			iface := updater.Get()
+			u := updater
+			if u == nil {
+				return nil
+			}
+			iface := u.Get()
 			if iface == nil {
-				errors.LogInfo(context.Background(), "[tun] falied to set interface > iface == nil")
 				return nil
 			}
 			return c.Control(func(fd uintptr) {
@@ -214,7 +217,9 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 
 // Close implements common.Closable.
 func (t *Handler) Close() error {
-	return errors.Combine(common.CloseIfExists(t.stack), common.CloseIfExists(t.tun))
+	err := errors.Combine(common.CloseIfExists(t.stack), common.CloseIfExists(t.tun))
+	Reset()
+	return err
 }
 
 // Network implements proxy.Inbound

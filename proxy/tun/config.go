@@ -49,3 +49,9 @@ func (updater *InterfaceUpdater) Update() {
 	updater.iface = got
 	errors.LogInfo(context.Background(), "[tun] update interface ", got.Name, " ", got.Index)
 }
+
+// Reset clears the global updater, preventing stale interface references
+// from persisting after TUN shutdown.
+func Reset() {
+	updater = nil
+}

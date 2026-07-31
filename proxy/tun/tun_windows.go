@@ -38,6 +38,9 @@ type WindowsTun struct {
 	luid           winipcfg.LUID
 	changeCallback winipcfg.ChangeCallback
 	closed         bool
+
+	// Track address families configured during Start() so Close() can clean them up.
+	hasIPv4, hasIPv6 bool
 }
 
 // WindowsTun implements Tun
@@ -86,7 +89,6 @@ func open(name, desc string) (*wintun.Adapter, error) {
 }
 
 func (t *WindowsTun) Start() error {
-	var has4, has6 bool
 	allowedIPs := make([]netip.Prefix, 0, len(t.options.AutoSystemRoutingTable))
 	for _, route := range t.options.AutoSystemRoutingTable {
 		allowedIPs = append(allowedIPs, netip.MustParsePrefix(route))
@@ -98,10 +100,10 @@ func (t *WindowsTun) Start() error {
 			Metric:      0,
 		}
 		if ip.Addr().Is4() {
-			has4 = true
+			t.hasIPv4 = true
 			route.NextHop = netip.IPv4Unspecified()
 		} else {
-			has6 = true
+			t.hasIPv6 = true
 			route.NextHop = netip.IPv6Unspecified()
 		}
 		routesMap[route] = struct{}{}
@@ -127,7 +129,7 @@ func (t *WindowsTun) Start() error {
 		}
 	}
 
-	if has4 {
+	if t.hasIPv4 {
 		ipif, err := t.luid.IPInterface(windows.AF_INET)
 		if err != nil {
 			return err
@@ -144,7 +146,7 @@ func (t *WindowsTun) Start() error {
 			return err
 		}
 	}
-	if has6 {
+	if t.hasIPv6 {
 		ipif, err := t.luid.IPInterface(windows.AF_INET6)
 		if err != nil {
 			return err
@@ -200,10 +202,32 @@ func (t *WindowsTun) Close() error {
 	if t.changeCallback != nil {
 		t.changeCallback.Unregister()
 	}
+
+	// Flush routes, IP addresses, and DNS before closing the adapter.
+	// This prevents stale network configuration from lingering after TUN shutdown,
+	// which would cause slow network access on restart or after idle periods.
+	var errs []error
+	if err := t.luid.FlushRoutes(windows.AF_UNSPEC); err != nil {
+		errs = append(errs, errors.New("failed to flush routes").Base(err))
+	}
+	if err := t.luid.FlushIPAddresses(windows.AF_UNSPEC); err != nil {
+		errs = append(errs, errors.New("failed to flush IP addresses").Base(err))
+	}
+	if t.hasIPv4 {
+		if err := t.luid.FlushDNS(windows.AF_INET); err != nil {
+			errs = append(errs, errors.New("failed to flush IPv4 DNS").Base(err))
+		}
+	}
+	if t.hasIPv6 {
+		if err := t.luid.FlushDNS(windows.AF_INET6); err != nil {
+			errs = append(errs, errors.New("failed to flush IPv6 DNS").Base(err))
+		}
+	}
+
 	t.session.End()
 	_ = t.adapter.Close()
 
-	return nil
+	return errors.Combine(errs...)
 }
 
 func (t *WindowsTun) Name() (string, error) {
