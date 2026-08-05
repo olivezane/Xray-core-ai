@@ -52,17 +52,7 @@ func dialWebSocket(ctx context.Context, dest net.Destination, streamSettings *in
 			if err != nil {
 				return nil, err
 			}
-
-			if streamSettings.TcpmaskManager != nil {
-				newConn, err := streamSettings.TcpmaskManager.WrapConnClient(conn)
-				if err != nil {
-					conn.Close()
-					return nil, errors.New("mask err").Base(err)
-				}
-				conn = newConn
-			}
-
-			return conn, err
+			return internet.WrapConnClient(streamSettings, conn, nil)
 		},
 		ReadBufferSize:   4 * 1024,
 		WriteBufferSize:  4 * 1024,
@@ -84,29 +74,21 @@ func dialWebSocket(ctx context.Context, dest net.Destination, streamSettings *in
 					errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
 					return nil, err
 				}
-
-				if streamSettings.TcpmaskManager != nil {
-					newConn, err := streamSettings.TcpmaskManager.WrapConnClient(pconn)
-					if err != nil {
-						pconn.Close()
-						return nil, errors.New("mask err").Base(err)
-					}
-					pconn = newConn
-				}
-
-				// TLS and apply the handshake
-				cn := tls.UClient(pconn, tlsConfig, fingerprint).(*tls.UConn)
-				if err := cn.WebsocketHandshakeContext(ctx); err != nil {
-					errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
-					return nil, err
-				}
-				if !tlsConfig.InsecureSkipVerify {
-					if err := cn.VerifyHostname(tlsConfig.ServerName); err != nil {
+				return internet.WrapConnClient(streamSettings, pconn, func(conn net.Conn) (net.Conn, error) {
+					// TLS and apply the handshake
+					cn := tls.UClient(conn, tlsConfig, fingerprint).(*tls.UConn)
+					if err := cn.WebsocketHandshakeContext(ctx); err != nil {
 						errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
 						return nil, err
 					}
-				}
-				return cn, nil
+					if !tlsConfig.InsecureSkipVerify {
+						if err := cn.VerifyHostname(tlsConfig.ServerName); err != nil {
+							errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
+							return nil, err
+						}
+					}
+					return cn, nil
+				})
 			}
 		}
 	}

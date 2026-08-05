@@ -12,6 +12,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/xtls/xray-core/transport/internet/finalmask"
 )
 
 // Response by vanilla 26.1.2 server.
@@ -40,7 +42,7 @@ type serverConn struct {
 	rsaPublicKey    []byte
 	paddingSchedule []paddingTurn
 	packet          *packetStream
-	deadlines       *connectionDeadlines
+	deadlines       *finalmask.HandshakeDeadlines
 }
 
 func (c *serverConn) handshake() error {
@@ -51,10 +53,10 @@ func (c *serverConn) handshake() error {
 		return nil
 	}
 
-	if err := c.deadlines.beginHandshake(); err != nil {
+	if err := c.deadlines.BeginHandshake(); err != nil {
 		return fmt.Errorf("set deadline: %w", err)
 	}
-	defer func() { _ = c.deadlines.endHandshake() }()
+	defer func() { _ = c.deadlines.EndHandshake() }()
 
 	var (
 		protocolVersion Varint
@@ -317,15 +319,15 @@ func (c *serverConn) RemoteAddr() net.Addr {
 }
 
 func (c *serverConn) SetDeadline(t time.Time) error {
-	return c.deadlines.setDeadline(t)
+	return c.deadlines.SetDeadline(t)
 }
 
 func (c *serverConn) SetReadDeadline(t time.Time) error {
-	return c.deadlines.setReadDeadline(t)
+	return c.deadlines.SetReadDeadline(t)
 }
 
 func (c *serverConn) SetWriteDeadline(t time.Time) error {
-	return c.deadlines.setWriteDeadline(t)
+	return c.deadlines.SetWriteDeadline(t)
 }
 
 func wrapConnServer(c net.Conn, profiles []loginProfile, password string, rsaPrivateKeyDER []byte, rsaPublicKey []byte) (*serverConn, error) {
@@ -357,7 +359,7 @@ func wrapConnServer(c net.Conn, profiles []loginProfile, password string, rsaPri
 		rsaPrivateKey:   rsaPrivateKey,
 		rsaPublicKey:    rsaPublicKey,
 		paddingSchedule: paddingSchedule,
-		deadlines:       newConnectionDeadlines(c),
+		deadlines:       finalmask.NewHandshakeDeadlines(c),
 	}
 
 	return s, nil

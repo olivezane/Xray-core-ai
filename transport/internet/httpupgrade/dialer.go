@@ -52,32 +52,29 @@ func dialhttpUpgrade(ctx context.Context, dest net.Destination, streamSettings *
 		return nil, err
 	}
 
-	if streamSettings.TcpmaskManager != nil {
-		newConn, err := streamSettings.TcpmaskManager.WrapConnClient(pconn)
-		if err != nil {
-			pconn.Close()
-			return nil, errors.New("mask err").Base(err)
-		}
-		pconn = newConn
-	}
-
-	var conn net.Conn
 	var requestURL url.URL
 	tConfig := tls.ConfigFromStreamSettings(streamSettings)
-	if tConfig != nil {
-		tlsConfig := tConfig.GetTLSConfig(tls.WithDestination(dest), tls.WithNextProto("http/1.1"))
-		if fingerprint := tls.GetFingerprint(tConfig.Fingerprint); fingerprint != nil {
-			conn = tls.UClient(pconn, tlsConfig, fingerprint)
-			if err := conn.(*tls.UConn).WebsocketHandshakeContext(ctx); err != nil {
-				return nil, err
+	conn, err := internet.WrapConnClient(streamSettings, pconn, func(pconn net.Conn) (net.Conn, error) {
+		var conn net.Conn
+		if tConfig != nil {
+			tlsConfig := tConfig.GetTLSConfig(tls.WithDestination(dest), tls.WithNextProto("http/1.1"))
+			if fingerprint := tls.GetFingerprint(tConfig.Fingerprint); fingerprint != nil {
+				conn = tls.UClient(pconn, tlsConfig, fingerprint)
+				if err := conn.(*tls.UConn).WebsocketHandshakeContext(ctx); err != nil {
+					return nil, err
+				}
+			} else {
+				conn = tls.Client(pconn, tlsConfig)
 			}
+			requestURL.Scheme = "https"
 		} else {
-			conn = tls.Client(pconn, tlsConfig)
+			conn = pconn
+			requestURL.Scheme = "http"
 		}
-		requestURL.Scheme = "https"
-	} else {
-		conn = pconn
-		requestURL.Scheme = "http"
+		return conn, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	requestURL.Host = transportConfiguration.Host

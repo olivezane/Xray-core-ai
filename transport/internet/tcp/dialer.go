@@ -24,15 +24,32 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		return nil, err
 	}
 
-	if streamSettings.TcpmaskManager != nil {
-		newConn, err := streamSettings.TcpmaskManager.WrapConnClient(conn)
-		if err != nil {
-			conn.Close()
-			return nil, errors.New("mask err").Base(err)
-		}
-		conn = newConn
+	conn, err = internet.WrapConnClient(streamSettings, conn, func(conn net.Conn) (net.Conn, error) {
+		return wrapTLS(ctx, dest, streamSettings, conn)
+	})
+	if err != nil {
+		return nil, err
 	}
 
+	tcpSettings := streamSettings.ProtocolSettings.(*Config)
+	if tcpSettings.HeaderSettings != nil {
+		headerConfig, err := tcpSettings.HeaderSettings.GetInstance()
+		if err != nil {
+			return nil, errors.New("failed to get header settings").Base(err).AtError()
+		}
+		auth, err := internet.CreateConnectionAuthenticator(headerConfig)
+		if err != nil {
+			return nil, errors.New("failed to create header authenticator").Base(err).AtError()
+		}
+		conn = auth.Client(conn)
+	}
+	return stat.Connection(conn), nil
+}
+
+// wrapTLS layers TLS or reality on top of the given connection. It runs after
+// the mask wrap, inside internet.WrapConnClient, which enforces the
+// mask-before-TLS order.
+func wrapTLS(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig, conn net.Conn) (net.Conn, error) {
 	if config := tls.ConfigFromStreamSettings(streamSettings); config != nil {
 		mitmServerName := session.MitmServerNameFromContext(ctx)
 		mitmAlpn11 := session.MitmAlpn11FromContext(ctx)
@@ -73,22 +90,23 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 				tlsConfig.NextProtos = []string{"h2", "http/1.1"}
 			}
 		}
+		var handshakeErr error
 		if fingerprint := tls.GetFingerprint(config.Fingerprint); fingerprint != nil {
 			conn = tls.UClient(conn, tlsConfig, fingerprint)
 			if len(tlsConfig.NextProtos) == 1 && tlsConfig.NextProtos[0] == "http/1.1" { // allow manually specify
-				err = conn.(*tls.UConn).WebsocketHandshakeContext(ctx)
+				handshakeErr = conn.(*tls.UConn).WebsocketHandshakeContext(ctx)
 			} else {
-				err = conn.(*tls.UConn).HandshakeContext(ctx)
+				handshakeErr = conn.(*tls.UConn).HandshakeContext(ctx)
 			}
 		} else {
 			conn = tls.Client(conn, tlsConfig)
-			err = conn.(*tls.Conn).HandshakeContext(ctx)
+			handshakeErr = conn.(*tls.Conn).HandshakeContext(ctx)
 		}
-		if err != nil {
+		if handshakeErr != nil {
 			if isFromMitmVerify {
-				return nil, errors.New("MITM freedom RAW TLS: failed to verify Domain Fronting certificate from " + mitmServerName).Base(err).AtWarning()
+				return nil, errors.New("MITM freedom RAW TLS: failed to verify Domain Fronting certificate from " + mitmServerName).Base(handshakeErr).AtWarning()
 			}
-			return nil, err
+			return nil, handshakeErr
 		}
 		negotiatedProtocol := conn.(tls.Interface).NegotiatedProtocol()
 		if isFromMitmAlpn && !mitmAlpn11 && negotiatedProtocol != "h2" {
@@ -96,24 +114,13 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 			return nil, errors.New("MITM freedom RAW TLS: unexpected Negotiated Protocol (" + negotiatedProtocol + ") with " + mitmServerName).AtWarning()
 		}
 	} else if config := reality.ConfigFromStreamSettings(streamSettings); config != nil {
-		if conn, err = reality.UClient(conn, config, ctx, dest); err != nil {
+		var err error
+		conn, err = reality.UClient(conn, config, ctx, dest)
+		if err != nil {
 			return nil, err
 		}
 	}
-
-	tcpSettings := streamSettings.ProtocolSettings.(*Config)
-	if tcpSettings.HeaderSettings != nil {
-		headerConfig, err := tcpSettings.HeaderSettings.GetInstance()
-		if err != nil {
-			return nil, errors.New("failed to get header settings").Base(err).AtError()
-		}
-		auth, err := internet.CreateConnectionAuthenticator(headerConfig)
-		if err != nil {
-			return nil, errors.New("failed to create header authenticator").Base(err).AtError()
-		}
-		conn = auth.Client(conn)
-	}
-	return stat.Connection(conn), nil
+	return conn, nil
 }
 
 func init() {

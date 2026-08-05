@@ -144,9 +144,7 @@ func ListenHTTPUpgrade(ctx context.Context, address net.Address, port net.Port, 
 		errors.LogInfo(ctx, "listening TCP(for HttpUpgrade) on ", address, ":", port)
 	}
 
-	if streamSettings.TcpmaskManager != nil {
-		listener, _ = streamSettings.TcpmaskManager.WrapListener(listener)
-	}
+	listener, _ = internet.WrapListener(streamSettings, listener)
 
 	if streamSettings.SocketSettings != nil && streamSettings.SocketSettings.AcceptProxyProtocol {
 		errors.LogWarning(ctx, "accepting PROXY protocol")

@@ -126,26 +126,20 @@ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *in
 
 			c, err := internet.DialSystem(gctx, net.TCPDestination(address, port), sockopt)
 			if err == nil {
-				if streamSettings.TcpmaskManager != nil {
-					newConn, err := streamSettings.TcpmaskManager.WrapConnClient(c)
-					if err != nil {
-						c.Close()
-						return nil, errors.New("mask err").Base(err)
+				c, err = internet.WrapConnClient(streamSettings, c, func(conn net.Conn) (net.Conn, error) {
+					if tlsConfig != nil {
+						config := tlsConfig.GetTLSConfig(tls.WithDestination(dest))
+						if fingerprint := tls.GetFingerprint(tlsConfig.Fingerprint); fingerprint != nil {
+							return tls.UClient(conn, config, fingerprint), nil
+						} else { // Fallback to normal gRPC TLS
+							return tls.Client(conn, config), nil
+						}
 					}
-					c = newConn
-				}
-
-				if tlsConfig != nil {
-					config := tlsConfig.GetTLSConfig(tls.WithDestination(dest))
-					if fingerprint := tls.GetFingerprint(tlsConfig.Fingerprint); fingerprint != nil {
-						return tls.UClient(c, config, fingerprint), nil
-					} else { // Fallback to normal gRPC TLS
-						return tls.Client(c, config), nil
+					if realityConfig != nil {
+						return reality.UClient(conn, realityConfig, gctx, dest)
 					}
-				}
-				if realityConfig != nil {
-					return reality.UClient(c, realityConfig, gctx, dest)
-				}
+					return conn, nil
+				})
 			}
 			return c, err
 		}),
