@@ -28,6 +28,21 @@ func (s SniffHeader) Domain() string {
 	return s.domain
 }
 
+// ProtocolForDomainResult implements dispatcher.SnifferResult.
+func (s SniffHeader) ProtocolForDomainResult() string {
+	return s.Protocol()
+}
+
+// IsProtoSubsetOf implements dispatcher.SnifferResult.
+func (SniffHeader) IsProtoSubsetOf(string) bool {
+	return false
+}
+
+// IsFakeDNS implements dispatcher.SnifferResult.
+func (SniffHeader) IsFakeDNS() bool {
+	return false
+}
+
 const (
 	versionDraft29 uint32 = 0xff00001d
 	version1       uint32 = 0x1

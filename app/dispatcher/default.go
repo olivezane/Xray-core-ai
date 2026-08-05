@@ -229,7 +229,7 @@ func trackOnlineIP(ctx context.Context, sm stats.Manager, email, ip string) {
 	}
 }
 
-func (d *DefaultDispatcher) shouldOverride(ctx context.Context, result SniffResult, request session.SniffingRequest, destination net.Destination) bool {
+func (d *DefaultDispatcher) shouldOverride(ctx context.Context, result SnifferResult, request session.SniffingRequest, destination net.Destination) bool {
 	domain := result.Domain()
 	if domain == "" {
 		return false
@@ -240,23 +240,19 @@ func (d *DefaultDispatcher) shouldOverride(ctx context.Context, result SniffResu
 	if request.ExcludeForIP != nil && destination.Address.Family().IsIP() && request.ExcludeForIP.Match(destination.Address.IP()) {
 		return false
 	}
-	protocolString := result.Protocol()
-	if resComp, ok := result.(SnifferResultComposite); ok {
-		protocolString = resComp.ProtocolForDomainResult()
-	}
+	protocolString := result.ProtocolForDomainResult()
 	for _, p := range request.OverrideDestinationForProtocol {
 		if strings.HasPrefix(protocolString, p) || strings.HasPrefix(p, protocolString) {
 			return true
 		}
-		if fkr0, ok := d.fdns.(dns.FakeDNSEngineRev0); ok && protocolString != "bittorrent" && p == "fakedns" &&
-			fkr0.IsIPInIPPool(destination.Address) {
-			errors.LogInfo(ctx, "Using sniffer ", protocolString, " since the fake DNS missed")
-			return true
-		}
-		if resultSubset, ok := result.(SnifferIsProtoSubsetOf); ok {
-			if resultSubset.IsProtoSubsetOf(p) {
+		if protocolString != "bittorrent" && p == "fakedns" {
+			if inPool, ok := isIPInFakeDNSPool(d.fdns, destination.Address); ok && inPool {
+				errors.LogInfo(ctx, "Using sniffer ", protocolString, " since the fake DNS missed")
 				return true
 			}
+		}
+		if result.IsProtoSubsetOf(p) {
+			return true
 		}
 	}
 
@@ -287,7 +283,7 @@ func (d *DefaultDispatcher) Dispatch(ctx context.Context, destination net.Destin
 	if !sniffingRequest.Enabled {
 		go d.routedDispatch(ctx, outbound, destination)
 	} else {
-		go d.sniffAndDispatch(ctx, outbound, destination, sniffingRequest)
+		go d.sniffAndDispatch(ctx, NewSniffer(ctx), outbound, destination, sniffingRequest)
 	}
 	return inbound, nil
 }
@@ -315,25 +311,23 @@ func (d *DefaultDispatcher) DispatchLink(ctx context.Context, destination net.De
 	if !sniffingRequest.Enabled {
 		d.routedDispatch(ctx, outbound, destination)
 	} else {
-		d.sniffAndDispatch(ctx, outbound, destination, sniffingRequest)
+		d.sniffAndDispatch(ctx, NewSniffer(ctx), outbound, destination, sniffingRequest)
 	}
 
 	return nil
 }
 
-func sniffer(ctx context.Context, cReader *cachedReader, metadataOnly bool, network net.Network) (SniffResult, error) {
+func sniffer(ctx context.Context, s *Sniffer, cReader *cachedReader, metadataOnly bool, network net.Network) (SnifferResult, error) {
 	payload := buf.NewWithSize(32767)
 	defer payload.Release()
 
-	sniffer := NewSniffer(ctx)
-
-	metaresult, metadataErr := sniffer.SniffMetadata(ctx)
+	metaresult, metadataErr := s.SniffMetadata(ctx)
 
 	if metadataOnly {
 		return metaresult, metadataErr
 	}
 
-	contentResult, contentErr := func() (SniffResult, error) {
+	contentResult, contentErr := func() (SnifferResult, error) {
 		cacheDeadline := 200 * time.Millisecond
 		totalAttempt := 0
 		for {
@@ -350,7 +344,7 @@ func sniffer(ctx context.Context, cReader *cachedReader, metadataOnly bool, netw
 				cacheDeadline -= cachingTimeElapsed
 
 				if !payload.IsEmpty() {
-					result, err := sniffer.Sniff(ctx, payload.Bytes(), network)
+					result, err := s.Sniff(ctx, payload.Bytes(), network)
 					switch err {
 					case common.ErrNoClue: // No Clue: protocol not matches, and sniffer cannot determine whether there will be a match or not
 						totalAttempt++
@@ -377,12 +371,12 @@ func sniffer(ctx context.Context, cReader *cachedReader, metadataOnly bool, netw
 	return contentResult, contentErr
 }
 
-func (d *DefaultDispatcher) sniffAndDispatch(ctx context.Context, outbound *transport.Link, destination net.Destination, sniffingRequest session.SniffingRequest) {
+func (d *DefaultDispatcher) sniffAndDispatch(ctx context.Context, s *Sniffer, outbound *transport.Link, destination net.Destination, sniffingRequest session.SniffingRequest) {
 	cReader := &cachedReader{
 		reader: outbound.Reader.(buf.TimeoutReader),
 	}
 	outbound.Reader = cReader
-	result, err := sniffer(ctx, cReader, sniffingRequest.MetadataOnly, destination.Network)
+	result, err := sniffer(ctx, s, cReader, sniffingRequest.MetadataOnly, destination.Network)
 	if err == nil {
 		content := session.ContentFromContext(ctx)
 		if content != nil {
@@ -395,15 +389,8 @@ func (d *DefaultDispatcher) sniffAndDispatch(ctx context.Context, outbound *tran
 		domain := result.Domain()
 		errors.LogInfo(ctx, "sniffed domain: ", domain)
 		destination.Address = net.ParseAddress(domain)
-		protocol := result.Protocol()
-		if resComp, ok := result.(SnifferResultComposite); ok {
-			protocol = resComp.ProtocolForDomainResult()
-		}
-		isFakeIP := false
-		if fkr0, ok := d.fdns.(dns.FakeDNSEngineRev0); ok && fkr0.IsIPInIPPool(ob.Target.Address) {
-			isFakeIP = true
-		}
-		if sniffingRequest.RouteOnly && protocol != "fakedns" && protocol != "fakedns+others" && !isFakeIP {
+		inPool, _ := isIPInFakeDNSPool(d.fdns, ob.Target.Address)
+		if sniffingRequest.RouteOnly && !result.IsFakeDNS() && !inPool {
 			ob.RouteTarget = destination
 		} else {
 			ob.Target = destination
