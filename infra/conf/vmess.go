@@ -15,6 +15,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("vmess", func() interface{} { return new(VMessInboundConfig) })
+	outboundConfigLoader.MustRegister("vmess", func() interface{} { return new(VMessOutboundConfig) })
+}
+
 type VMessAccount struct {
 	ID          string `json:"id"`
 	Security    string `json:"security"`

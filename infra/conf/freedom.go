@@ -16,6 +16,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	outboundConfigLoader.MustRegister("direct", func() interface{} { return new(FreedomConfig) })
+	outboundConfigLoader.MustRegister("freedom", func() interface{} { return new(FreedomConfig) })
+}
+
 type FreedomConfig struct {
 	TargetStrategy string                    `json:"targetStrategy"`
 	DomainStrategy string                    `json:"domainStrategy"`

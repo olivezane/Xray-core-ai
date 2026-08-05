@@ -11,37 +11,28 @@ import (
 
 type ConfigCreator func() interface{}
 
-type ConfigCreatorCache map[string]ConfigCreator
-
-func (v ConfigCreatorCache) RegisterCreator(id string, creator ConfigCreator) error {
-	if _, found := v[id]; found {
-		return errors.New(id, " already registered.").AtError()
-	}
-
-	v[id] = creator
-	return nil
-}
-
-func (v ConfigCreatorCache) CreateConfig(id string) (interface{}, error) {
-	creator, found := v[id]
-	if !found {
-		return nil, errors.New("unknown config id: ", id)
-	}
-	return creator(), nil
-}
-
 type JSONConfigLoader struct {
-	cache     ConfigCreatorCache
+	cache     *ConfigRegistry
 	idKey     string
 	configKey string
 }
 
-func NewJSONConfigLoader(cache ConfigCreatorCache, idKey string, configKey string) *JSONConfigLoader {
+func NewJSONConfigLoader(cache *ConfigRegistry, idKey string, configKey string) *JSONConfigLoader {
 	return &JSONConfigLoader{
 		idKey:     idKey,
 		configKey: configKey,
 		cache:     cache,
 	}
+}
+
+// Register adds a creator; see ConfigRegistry.Register.
+func (v *JSONConfigLoader) Register(id string, creator ConfigCreator) error {
+	return v.cache.Register(id, creator)
+}
+
+// MustRegister panics on registration failure; see ConfigRegistry.MustRegister.
+func (v *JSONConfigLoader) MustRegister(id string, creator ConfigCreator) {
+	v.cache.MustRegister(id, creator)
 }
 
 func rejectUnknownFields() bool {
@@ -50,7 +41,7 @@ func rejectUnknownFields() bool {
 
 func (v *JSONConfigLoader) LoadWithID(raw []byte, id string) (interface{}, error) {
 	id = strings.ToLower(id)
-	config, err := v.cache.CreateConfig(id)
+	config, err := v.cache.Create(id)
 	if err != nil {
 		return nil, err
 	}

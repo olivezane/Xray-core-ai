@@ -10,6 +10,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("mixed", func() interface{} { return new(SocksServerConfig) })
+	inboundConfigLoader.MustRegister("socks", func() interface{} { return new(SocksServerConfig) })
+	outboundConfigLoader.MustRegister("socks", func() interface{} { return new(SocksClientConfig) })
+}
+
 type SocksAccount struct {
 	Username string `json:"user"`
 	Password string `json:"pass"`

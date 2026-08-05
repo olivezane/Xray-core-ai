@@ -42,11 +42,11 @@ func (v *BlackholeConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
-var configLoader = NewJSONConfigLoader(
-	ConfigCreatorCache{
-		"none": func() interface{} { return new(NoneResponse) },
-		"http": func() interface{} { return new(HTTPResponse) },
-	},
-	"type",
-	"",
-)
+var configLoader = NewJSONConfigLoader(NewConfigRegistry(), "type", "")
+
+func init() {
+	configLoader.MustRegister("none", func() interface{} { return new(NoneResponse) })
+	configLoader.MustRegister("http", func() interface{} { return new(HTTPResponse) })
+	outboundConfigLoader.MustRegister("block", func() interface{} { return new(BlackholeConfig) })
+	outboundConfigLoader.MustRegister("blackhole", func() interface{} { return new(BlackholeConfig) })
+}

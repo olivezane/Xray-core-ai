@@ -8,8 +8,8 @@ import (
 )
 
 func TestJSONConfigLoader_RejectsUnknownSettings(t *testing.T) {
-	cache := make(ConfigCreatorCache)
-	if err := cache.RegisterCreator("freedom", func() interface{} {
+	cache := NewConfigRegistry()
+	if err := cache.Register("freedom", func() interface{} {
 		return new(FreedomConfig)
 	}); err != nil {
 		t.Fatal(err)
@@ -27,8 +27,8 @@ func TestJSONConfigLoader_RejectsUnknownSettings(t *testing.T) {
 }
 
 func TestJSONConfigLoader_AcceptsValidSettings(t *testing.T) {
-	cache := make(ConfigCreatorCache)
-	if err := cache.RegisterCreator("freedom", func() interface{} {
+	cache := NewConfigRegistry()
+	if err := cache.Register("freedom", func() interface{} {
 		return new(FreedomConfig)
 	}); err != nil {
 		t.Fatal(err)
@@ -42,9 +42,36 @@ func TestJSONConfigLoader_AcceptsValidSettings(t *testing.T) {
 	}
 }
 
+func TestConfigRegistry_FailureSurfacesWithKey(t *testing.T) {
+	registry := NewConfigRegistry()
+	if err := registry.Register("freedom", func() interface{} { return new(FreedomConfig) }); err != nil {
+		t.Fatal(err)
+	}
+	// Duplicate registration fails with the offending key.
+	err := registry.Register("freedom", func() interface{} { return new(FreedomConfig) })
+	if err == nil || !strings.Contains(err.Error(), "freedom") {
+		t.Fatalf("expected duplicate-registration error naming the key, got: %v", err)
+	}
+	// A non-lowercase key can never be matched by the lowercasing loader;
+	// reject it at registration time, naming the key.
+	err = registry.Register("Freedom", func() interface{} { return new(FreedomConfig) })
+	if err == nil || !strings.Contains(err.Error(), "Freedom") {
+		t.Fatalf("expected non-lowercase registration error naming the key, got: %v", err)
+	}
+	// MustRegister panics (init-time), carrying the offending key.
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected MustRegister to panic on duplicate")
+		} else if !strings.Contains(r.(error).Error(), "freedom") {
+			t.Fatalf("expected panic naming the key, got: %v", r)
+		}
+	}()
+	registry.MustRegister("freedom", func() interface{} { return new(FreedomConfig) })
+}
+
 func TestJSONConfigLoader_RejectsUnknownInPlainSettings(t *testing.T) {
-	cache := make(ConfigCreatorCache)
-	if err := cache.RegisterCreator("freedom", func() interface{} {
+	cache := NewConfigRegistry()
+	if err := cache.Register("freedom", func() interface{} {
 		return new(FreedomConfig)
 	}); err != nil {
 		t.Fatal(err)

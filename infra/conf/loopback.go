@@ -6,6 +6,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	outboundConfigLoader.MustRegister("loopback", func() interface{} { return new(LoopbackConfig) })
+}
+
 type LoopbackConfig struct {
 	InboundTag string          `json:"inboundTag"`
 	Sniffing   *SniffingConfig `json:"sniffing"`

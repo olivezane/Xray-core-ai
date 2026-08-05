@@ -67,24 +67,26 @@ func PraseByteSlice(data json.RawMessage, typ string) ([]byte, error) {
 var (
 	customVarNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-	tcpmaskLoader = NewJSONConfigLoader(ConfigCreatorCache{
-		"header-custom": func() interface{} { return new(HeaderCustomTCP) },
-		"fragment":      func() interface{} { return new(FragmentMask) },
-		"sudoku":        func() interface{} { return new(Sudoku) },
-		"xmc":           func() interface{} { return new(XMC) },
-	}, "type", "settings")
+	tcpmaskLoader = NewJSONConfigLoader(NewConfigRegistry(), "type", "settings")
 
-	udpmaskLoader = NewJSONConfigLoader(ConfigCreatorCache{
-		"header-custom": func() interface{} { return new(HeaderCustomUDP) },
-		"mkcp-legacy":   func() interface{} { return new(MkcpLegacy) },
-		"noise":         func() interface{} { return new(NoiseMask) },
-		"salamander":    func() interface{} { return new(Salamander) },
-		"sudoku":        func() interface{} { return new(Sudoku) },
-		"xdns":          func() interface{} { return new(Xdns) },
-		"xicmp":         func() interface{} { return new(Xicmp) },
-		"realm":         func() interface{} { return new(Realm) },
-	}, "type", "settings")
+	udpmaskLoader = NewJSONConfigLoader(NewConfigRegistry(), "type", "settings")
 )
+
+func init() {
+	tcpmaskLoader.MustRegister("header-custom", func() interface{} { return new(HeaderCustomTCP) })
+	tcpmaskLoader.MustRegister("fragment", func() interface{} { return new(FragmentMask) })
+	tcpmaskLoader.MustRegister("sudoku", func() interface{} { return new(Sudoku) })
+	tcpmaskLoader.MustRegister("xmc", func() interface{} { return new(XMC) })
+
+	udpmaskLoader.MustRegister("header-custom", func() interface{} { return new(HeaderCustomUDP) })
+	udpmaskLoader.MustRegister("mkcp-legacy", func() interface{} { return new(MkcpLegacy) })
+	udpmaskLoader.MustRegister("noise", func() interface{} { return new(NoiseMask) })
+	udpmaskLoader.MustRegister("salamander", func() interface{} { return new(Salamander) })
+	udpmaskLoader.MustRegister("sudoku", func() interface{} { return new(Sudoku) })
+	udpmaskLoader.MustRegister("xdns", func() interface{} { return new(Xdns) })
+	udpmaskLoader.MustRegister("xicmp", func() interface{} { return new(Xicmp) })
+	udpmaskLoader.MustRegister("realm", func() interface{} { return new(Realm) })
+}
 
 type TCPItem struct {
 	Delay     Int32Range       `json:"delay"`

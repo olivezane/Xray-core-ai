@@ -10,6 +10,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	outboundConfigLoader.MustRegister("dns", func() interface{} { return new(DNSOutboundConfig) })
+}
+
 type DNSOutboundRuleConfig struct {
 	Action string      `json:"action"`
 	QType  *PortList   `json:"qType"`
