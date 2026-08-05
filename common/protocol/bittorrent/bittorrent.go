@@ -20,6 +20,21 @@ func (h *SniffHeader) Domain() string {
 	return ""
 }
 
+// ProtocolForDomainResult implements dispatcher.SnifferResult.
+func (h *SniffHeader) ProtocolForDomainResult() string {
+	return h.Protocol()
+}
+
+// IsProtoSubsetOf implements dispatcher.SnifferResult.
+func (*SniffHeader) IsProtoSubsetOf(string) bool {
+	return false
+}
+
+// IsFakeDNS implements dispatcher.SnifferResult.
+func (*SniffHeader) IsFakeDNS() bool {
+	return false
+}
+
 var errNotBittorrent = errors.New("not bittorrent header")
 
 func SniffBittorrent(b []byte) (*SniffHeader, error) {

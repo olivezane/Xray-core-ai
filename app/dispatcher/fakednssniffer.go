@@ -26,7 +26,7 @@ func newFakeDNSSniffer(ctx context.Context) (protocolSnifferWithMetadata, error)
 		errNotInit := errors.New("FakeDNSEngine is not initialized, but such a sniffer is used").AtError()
 		return protocolSnifferWithMetadata{}, errNotInit
 	}
-	return protocolSnifferWithMetadata{protocolSniffer: func(ctx context.Context, bytes []byte) (SniffResult, error) {
+	return protocolSnifferWithMetadata{protocolSniffer: func(ctx context.Context, bytes []byte) (SnifferResult, error) {
 		outbounds := session.OutboundsFromContext(ctx)
 		ob := outbounds[len(outbounds)-1]
 		if ob.Target.Network == net.Network_TCP || ob.Target.Network == net.Network_UDP {
@@ -39,8 +39,7 @@ func newFakeDNSSniffer(ctx context.Context) (protocolSnifferWithMetadata, error)
 
 		if ipAddressInRangeValueI := ctx.Value(ipAddressInRange); ipAddressInRangeValueI != nil {
 			ipAddressInRangeValue := ipAddressInRangeValueI.(*ipAddressInRangeOpt)
-			if fkr0, ok := fakeDNSEngine.(dns.FakeDNSEngineRev0); ok {
-				inPool := fkr0.IsIPInIPPool(ob.Target.Address)
+			if inPool, ok := isIPInFakeDNSPool(fakeDNSEngine, ob.Target.Address); ok {
 				ipAddressInRangeValue.addressInRange = &inPool
 			}
 		}
@@ -59,6 +58,18 @@ func (fakeDNSSniffResult) Protocol() string {
 
 func (f fakeDNSSniffResult) Domain() string {
 	return f.domainName
+}
+
+func (f fakeDNSSniffResult) ProtocolForDomainResult() string {
+	return f.Protocol()
+}
+
+func (fakeDNSSniffResult) IsProtoSubsetOf(string) bool {
+	return false
+}
+
+func (fakeDNSSniffResult) IsFakeDNS() bool {
+	return true
 }
 
 type fakeDNSExtraOpts int
@@ -86,13 +97,21 @@ func (f DNSThenOthersSniffResult) Domain() string {
 	return f.domainName
 }
 
+func (f DNSThenOthersSniffResult) ProtocolForDomainResult() string {
+	return f.Protocol()
+}
+
+func (DNSThenOthersSniffResult) IsFakeDNS() bool {
+	return true
+}
+
 func newFakeDNSThenOthers(ctx context.Context, fakeDNSSniffer protocolSnifferWithMetadata, others []protocolSnifferWithMetadata) (
 	protocolSnifferWithMetadata, error,
 ) { // nolint: unparam
 	// ctx may be used in the future
 	_ = ctx
 	return protocolSnifferWithMetadata{
-		protocolSniffer: func(ctx context.Context, bytes []byte) (SniffResult, error) {
+		protocolSniffer: func(ctx context.Context, bytes []byte) (SnifferResult, error) {
 			ipAddressInRangeValue := &ipAddressInRangeOpt{}
 			ctx = context.WithValue(ctx, ipAddressInRange, ipAddressInRangeValue)
 			result, err := fakeDNSSniffer.protocolSniffer(ctx, bytes)
