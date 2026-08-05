@@ -3,13 +3,11 @@
 package tun
 
 import (
-	"bufio"
 	"context"
 	"net"
 	"net/netip"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,8 +15,6 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/platform"
 	"golang.org/x/sys/unix"
-	"gvisor.dev/gvisor/pkg/tcpip/link/fdbased"
-	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 
 const (
@@ -34,7 +30,7 @@ type AndroidTun struct {
 	tunFd   int
 	tunName string
 	options *Config
-	ownsTun bool               // self-created vs FD-provided
+	ownsTun bool // self-created vs FD-provided
 	tunLink netlink.Link
 
 	ifAddrs []netlink.Addr
@@ -42,6 +38,8 @@ type AndroidTun struct {
 
 	routeMonitorStop chan struct{}
 	routeMonitorOnce sync.Once
+
+	updater *InterfaceUpdater
 }
 
 var _ Tun = (*AndroidTun)(nil)
@@ -147,7 +145,7 @@ func (t *AndroidTun) Start() error {
 		return err
 	}
 
-	if updater != nil {
+	if t.updater != nil {
 		t.routeMonitorStop = make(chan struct{})
 		go t.monitorRouteChanges()
 	}
@@ -203,13 +201,14 @@ func (t *AndroidTun) Index() (int, error) {
 	return iface.Index, nil
 }
 
-// newEndpoint returns a gVisor fdbased link endpoint wrapping the TUN fd.
-func (t *AndroidTun) newEndpoint() (stack.LinkEndpoint, error) {
-	return fdbased.New(&fdbased.Options{
-		FDs:               []int{t.tunFd},
-		MTU:               t.options.MTU,
-		RXChecksumOffload: true,
-	})
+func (t *AndroidTun) SetUpdater(updater *InterfaceUpdater) {
+	t.updater = updater
+}
+
+// FDs returns the file descriptor backing the tun device, used by the stack
+// module to build its fdbased endpoint.
+func (t *AndroidTun) FDs() []int {
+	return []int{t.tunFd}
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +376,7 @@ func (t *AndroidTun) monitorRouteChanges() {
 			}
 			timer.Reset(time.Second)
 		case <-timer.C:
-			t.updateOutboundInterface()
+			t.updater.Update()
 		case <-t.routeMonitorStop:
 			if !timer.Stop() {
 				<-timer.C
@@ -394,34 +393,11 @@ func (t *AndroidTun) pollRouteChanges() {
 	for {
 		select {
 		case <-ticker.C:
-			t.updateOutboundInterface()
+			t.updater.Update()
 		case <-t.routeMonitorStop:
 			return
 		}
 	}
-}
-
-// updateOutboundInterface updates the shared InterfaceUpdater directly,
-// avoiding double-query that happens via updater.Update().
-func (t *AndroidTun) updateOutboundInterface() {
-	if updater == nil {
-		return
-	}
-	var iface *net.Interface
-	var err error
-	if updater.fixedName != "" {
-		iface, err = findOutboundByName(updater.fixedName, updater.tunIndex)
-	} else {
-		iface, err = findOutboundAuto(updater.tunIndex)
-	}
-	if err != nil || iface == nil {
-		return
-	}
-	updater.Lock()
-	if updater.iface == nil || updater.iface.Index != iface.Index || updater.iface.Name != iface.Name {
-		updater.iface = iface
-	}
-	updater.Unlock()
 }
 
 // netlinkBanned checks whether Android 14+ has banned netlink for this process.
@@ -440,119 +416,4 @@ func netlinkBanned() bool {
 
 func setinterface(network, address string, fd uintptr, iface *net.Interface) error {
 	return unix.BindToDevice(int(fd), iface.Name)
-}
-
-func findOutboundInterface(tunIndex int, fixedName string) (*net.Interface, error) {
-	if fixedName != "" {
-		return findOutboundByName(fixedName, tunIndex)
-	}
-	return findOutboundAuto(tunIndex)
-}
-
-func findOutboundByName(name string, tunIndex int) (*net.Interface, error) {
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		return nil, errors.New("outbound interface ", name, " not found").Base(err)
-	}
-	if iface.Index == tunIndex {
-		return nil, errors.New("outbound interface cannot be the TUN interface")
-	}
-	return iface, nil
-}
-
-// findOutboundAuto finds the physical interface that has the default route.
-// On Android the default route lives in a per-network table, not RT_TABLE_MAIN.
-// We scan ip rules to find which table that is, then read routes from it.
-func findOutboundAuto(tunIndex int) (*net.Interface, error) {
-	table, err := androidDefaultRouteTable(unix.AF_INET)
-	if err != nil {
-		table, err = androidDefaultRouteTable(unix.AF_INET6)
-	}
-	if err != nil {
-		return nil, errors.New("no default route table found via ip rule")
-	}
-
-	iface, err := findInterfaceInTable(table, tunIndex)
-	if err == nil {
-		return iface, nil
-	}
-
-	return findDefaultRouteFromProc(tunIndex)
-}
-
-// androidDefaultRouteTable scans ip rules to find the routing table
-// Android uses for the physical default route.
-//
-// On Android the default route lives in a per-network table (e.g. wlan0),
-// not RT_TABLE_MAIN. The ip rules entry for it has Mask=0xFFFF.
-// This matches sing-tun's detection logic.
-func androidDefaultRouteTable(family int) (int, error) {
-	rules, err := netlink.RuleList(family)
-	if err != nil {
-		return 0, errors.New("netlink rule list failed").Base(err)
-	}
-	for _, r := range rules {
-		if r.Table != unix.RT_TABLE_MAIN && r.Table != unix.RT_TABLE_LOCAL && r.Mask != nil && *r.Mask == 0xFFFF {
-			return r.Table, nil
-		}
-	}
-	return 0, errors.New("no Android default route table found")
-}
-
-// findInterfaceInTable reads routes from a given table and returns the first
-// non-loopback, non-TUN physical interface with a default route.
-func findInterfaceInTable(table, tunIndex int) (*net.Interface, error) {
-	routes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL,
-		&netlink.Route{Table: table}, netlink.RT_FILTER_TABLE)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range routes {
-		if r.LinkIndex == 0 {
-			continue
-		}
-		iface, err := net.InterfaceByIndex(r.LinkIndex)
-		if err != nil {
-			continue
-		}
-		if iface.Index == tunIndex || iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		if iface.Flags&net.FlagUp == 0 {
-			continue
-		}
-		if r.Dst == nil || r.Dst.IP.Equal(net.IPv4zero) {
-			return iface, nil
-		}
-	}
-	return nil, errors.New("no usable interface in table ", table)
-}
-
-func findDefaultRouteFromProc(tunIndex int) (*net.Interface, error) {
-	f, err := os.Open("/proc/net/route")
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "Iface") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 3 || fields[1] != "00000000" {
-			continue
-		}
-		iface, err := net.InterfaceByName(fields[0])
-		if err != nil {
-			continue
-		}
-		if iface.Index == tunIndex || iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		return iface, nil
-	}
-	return nil, errors.New("no default route in /proc/net/route")
 }

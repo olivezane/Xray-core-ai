@@ -51,6 +51,8 @@ type DarwinTun struct {
 	routeMonitorOnce sync.Once
 	systemRoutes     []netip.Prefix
 	gateway          netip.Prefix
+
+	updater *InterfaceUpdater
 }
 
 var (
@@ -116,7 +118,7 @@ func (t *DarwinTun) Start() error {
 		return err
 	}
 
-	if updater != nil {
+	if t.updater != nil {
 		fd, err := unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW, 0)
 		if err != nil {
 			_ = t.unsetSystemRoutes()
@@ -151,9 +153,7 @@ func (t *DarwinTun) monitorRouteChanges() {
 			}
 			return
 		}
-		if updater != nil {
-			updater.Update()
-		}
+		t.updater.Update()
 	}
 }
 
@@ -171,6 +171,10 @@ func (t *DarwinTun) Index() (int, error) {
 		return 0, err
 	}
 	return iface.Index, nil
+}
+
+func (t *DarwinTun) SetUpdater(updater *InterfaceUpdater) {
+	t.updater = updater
 }
 
 // WritePacket implements GVisorDevice method to write one packet to the tun device
@@ -245,10 +249,6 @@ func (t *DarwinTun) ReadPacket() (byte, *stack.PacketBuffer, error) {
 // Wait some cpu cycles
 func (t *DarwinTun) Wait() {
 	procyield(1)
-}
-
-func (t *DarwinTun) newEndpoint() (stack.LinkEndpoint, error) {
-	return &LinkEndpoint{deviceMTU: t.options.MTU, device: t}, nil
 }
 
 // open the interface, by creating new utunN if in the system and returning its file descriptor
@@ -476,91 +476,6 @@ func setinterface(network, address string, fd uintptr, iface *net.Interface) err
 	}
 
 	return errors.Join(err1, err2)
-}
-
-func findOutboundInterface(tunIndex int, fixedName string) (*net.Interface, error) {
-	if fixedName != "" {
-		iface, err := net.InterfaceByName(fixedName)
-		if err != nil {
-			return nil, err
-		}
-		if iface.Index == tunIndex {
-			return nil, errors.New("outbound interface cannot be the TUN interface")
-		}
-		return iface, nil
-	}
-
-	rib, err := route.FetchRIB(unix.AF_UNSPEC, route.RIBTypeRoute, 0)
-	if err != nil {
-		return nil, err
-	}
-	messages, err := route.ParseRIB(route.RIBTypeRoute, rib)
-	if err != nil {
-		return nil, err
-	}
-
-	var ipv6Index int
-	for _, message := range messages {
-		routeMessage, ok := message.(*route.RouteMessage)
-		if !ok || routeMessage.Index == tunIndex {
-			continue
-		}
-		if routeMessage.Flags&unix.RTF_UP == 0 || routeMessage.Flags&unix.RTF_GATEWAY == 0 {
-			continue
-		}
-
-		family, ok := defaultRouteFamily(routeMessage)
-		if !ok {
-			continue
-		}
-		if family == unix.AF_INET {
-			return usableDarwinInterface(routeMessage.Index)
-		}
-		if family == unix.AF_INET6 && ipv6Index == 0 {
-			ipv6Index = routeMessage.Index
-		}
-	}
-
-	if ipv6Index != 0 {
-		return usableDarwinInterface(ipv6Index)
-	}
-	return nil, errors.New("default route not found")
-}
-
-func defaultRouteFamily(message *route.RouteMessage) (int, bool) {
-	if len(message.Addrs) <= unix.RTAX_NETMASK {
-		return 0, false
-	}
-
-	switch destination := message.Addrs[unix.RTAX_DST].(type) {
-	case *route.Inet4Addr:
-		mask, ok := message.Addrs[unix.RTAX_NETMASK].(*route.Inet4Addr)
-		if !ok || destination.IP != netip.IPv4Unspecified().As4() {
-			return 0, false
-		}
-		ones, bits := net.IPMask(mask.IP[:]).Size()
-		return unix.AF_INET, ones == 0 && bits == 32
-	case *route.Inet6Addr:
-		mask, ok := message.Addrs[unix.RTAX_NETMASK].(*route.Inet6Addr)
-		if !ok || destination.IP != netip.IPv6Unspecified().As16() {
-			return 0, false
-		}
-		ones, bits := net.IPMask(mask.IP[:]).Size()
-		return unix.AF_INET6, ones == 0 && bits == 128
-	default:
-		return 0, false
-	}
-}
-
-func usableDarwinInterface(index int) (*net.Interface, error) {
-	iface, err := net.InterfaceByIndex(index)
-	if err != nil {
-		return nil, err
-	}
-	if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-		return nil, errors.New("default route interface is not usable")
-	}
-	return iface, nil
 }
 
 func (t *DarwinTun) setSystemRoutes() error {

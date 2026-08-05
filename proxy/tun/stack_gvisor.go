@@ -36,6 +36,7 @@ const (
 type stackGVisor struct {
 	ctx         context.Context
 	tun         Tun
+	mtu         uint32
 	idleTimeout time.Duration
 	handler     *Handler
 	stack       *stack.Stack
@@ -43,10 +44,11 @@ type stackGVisor struct {
 }
 
 // NewStack builds new ip stack (using gVisor)
-func NewStack(ctx context.Context, options StackOptions, handler *Handler) (Stack, error) {
+func NewStack(ctx context.Context, options StackOptions, handler *Handler) (*stackGVisor, error) {
 	gStack := &stackGVisor{
 		ctx:         ctx,
 		tun:         options.Tun,
+		mtu:         options.MTU,
 		idleTimeout: options.IdleTimeout,
 		handler:     handler,
 	}
@@ -56,7 +58,7 @@ func NewStack(ctx context.Context, options StackOptions, handler *Handler) (Stac
 
 // Start is called by Handler to bring stack to life
 func (t *stackGVisor) Start() error {
-	linkEndpoint, err := t.tun.newEndpoint()
+	linkEndpoint, err := newEndpoint(t.tun, t.mtu)
 	if err != nil {
 		return err
 	}

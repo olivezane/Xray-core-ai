@@ -27,14 +27,19 @@ import (
 type Handler struct {
 	ctx             context.Context
 	config          *Config
-	stack           Stack
+	stack           *stackGVisor
 	tun             Tun
+	updater         *InterfaceUpdater
 	policyManager   policy.Manager
 	dispatcher      routing.Dispatcher
 	tag             string
 	sniffingRequest session.SniffingRequest
 	uplinkCounter   stats.Counter
 	downlinkCounter stats.Counter
+
+	// injection points for tests; nil defaults to the platform constructors
+	newTun   func(*Config) (Tun, error)
+	newStack func(context.Context, StackOptions, *Handler) (*stackGVisor, error)
 }
 
 // ConnectionHandler interface with the only method that stack is going to push new connections to
@@ -84,7 +89,11 @@ func (t *Handler) Init(ctx context.Context, pm policy.Manager, dispatcher routin
 
 func (t *Handler) Start() error {
 	tunName := t.config.Name
-	tunInterface, err := NewTun(t.config)
+	newTun := t.newTun
+	if newTun == nil {
+		newTun = NewTun
+	}
+	tunInterface, err := newTun(t.config)
 	if err != nil {
 		return err
 	}
@@ -98,14 +107,12 @@ func (t *Handler) Start() error {
 		if t.config.AutoOutboundsInterface == "auto" {
 			t.config.AutoOutboundsInterface = ""
 		}
-		updater = &InterfaceUpdater{tunIndex: tunIndex, fixedName: t.config.AutoOutboundsInterface}
-		updater.Update()
+		t.updater = &InterfaceUpdater{tunIndex: tunIndex, fixedName: t.config.AutoOutboundsInterface}
+		t.updater.Update()
+		// hand the updater to the device, so its platform monitor refreshes it on network changes
+		tunInterface.SetUpdater(t.updater)
 		internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
-			u := updater
-			if u == nil {
-				return nil
-			}
-			iface := u.Get()
+			iface := t.updater.Get()
 			if iface == nil {
 				return nil
 			}
@@ -127,9 +134,14 @@ func (t *Handler) Start() error {
 
 	tunStackOptions := StackOptions{
 		Tun:         tunInterface,
+		MTU:         t.config.MTU,
 		IdleTimeout: t.policyManager.ForLevel(t.config.UserLevel).Timeouts.ConnectionIdle,
 	}
-	tunStack, err := NewStack(t.ctx, tunStackOptions, t)
+	newStack := t.newStack
+	if newStack == nil {
+		newStack = NewStack
+	}
+	tunStack, err := newStack(t.ctx, tunStackOptions, t)
 	if err != nil {
 		_ = tunInterface.Close()
 		return err
@@ -218,7 +230,9 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 // Close implements common.Closable.
 func (t *Handler) Close() error {
 	err := errors.Combine(common.CloseIfExists(t.stack), common.CloseIfExists(t.tun))
-	Reset()
+	if t.updater != nil {
+		t.updater.Reset()
+	}
 	return err
 }
 
