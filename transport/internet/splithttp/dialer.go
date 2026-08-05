@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
-	reflect "reflect"
 	"runtime"
 	"strconv"
 	"sync"
@@ -22,7 +21,6 @@ import (
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
-	"github.com/xtls/xray-core/common/net/cnc"
 	"github.com/xtls/xray-core/common/signal/done"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/browser_dialer"
@@ -123,31 +121,24 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 			return nil, err
 		}
 
-		if streamSettings.TcpmaskManager != nil {
-			newConn, err := streamSettings.TcpmaskManager.WrapConnClient(conn)
-			if err != nil {
-				conn.Close()
-				return nil, errors.New("mask err").Base(err)
+		return internet.WrapConnClient(streamSettings, conn, func(conn net.Conn) (net.Conn, error) {
+			if realityConfig != nil {
+				return reality.UClient(conn, realityConfig, ctxInner, dest)
 			}
-			conn = newConn
-		}
 
-		if realityConfig != nil {
-			return reality.UClient(conn, realityConfig, ctxInner, dest)
-		}
-
-		if gotlsConfig != nil {
-			if fingerprint := tls.GetFingerprint(tlsConfig.Fingerprint); fingerprint != nil {
-				conn = tls.UClient(conn, gotlsConfig, fingerprint)
-				if err := conn.(*tls.UConn).HandshakeContext(ctxInner); err != nil {
-					return nil, err
+			if gotlsConfig != nil {
+				if fingerprint := tls.GetFingerprint(tlsConfig.Fingerprint); fingerprint != nil {
+					conn = tls.UClient(conn, gotlsConfig, fingerprint)
+					if err := conn.(*tls.UConn).HandshakeContext(ctxInner); err != nil {
+						return nil, err
+					}
+				} else {
+					conn = tls.Client(conn, gotlsConfig)
 				}
-			} else {
-				conn = tls.Client(conn, gotlsConfig)
 			}
-		}
 
-		return conn, nil
+			return conn, nil
+		})
 	}
 
 	var keepAlivePeriod time.Duration
@@ -204,15 +195,10 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 						return nil, errors.New("")
 					}
 
-					var pktConn net.PacketConn
-
-					switch c := conn.(type) {
-					case *internet.PacketConnWrapper:
-						pktConn = c.PacketConn
-					case *cnc.Connection:
-						pktConn = &internet.FakePacketConn{Conn: c}
-					default:
-						panic(reflect.TypeOf(c))
+					pktConn, _, err := internet.UnwrapPacketConn(conn)
+					if err != nil {
+						errors.LogInfoInner(context.Background(), err, "skip hop: failed to unwrap conn")
+						return nil, errors.New("")
 					}
 
 					return pktConn, nil
@@ -231,28 +217,18 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 				if err != nil {
 					return nil, errors.New("failed to dial to dest").Base(err)
 				}
-				switch c := raw.(type) {
-				case *internet.PacketConnWrapper:
-					pktConn = c.PacketConn
-					udpAddr = raw.RemoteAddr().(*net.UDPAddr)
-				case *cnc.Connection:
-					pktConn = &internet.FakePacketConn{Conn: c}
-					udpAddr = &net.UDPAddr{IP: c.RemoteAddr().(*net.TCPAddr).IP, Port: c.RemoteAddr().(*net.TCPAddr).Port}
-				default:
-					panic(reflect.TypeOf(c))
+				pktConn, udpAddr, err = internet.UnwrapPacketConn(raw)
+				if err != nil {
+					return nil, err
 				}
 
 				if len(quicParams.UdpHop.Ports) > 0 {
 					pktConn = udphop.NewUDPHopPacketConn(udphop.ToAddrs(udpAddr.IP, quicParams.UdpHop.Ports), time.Duration(quicParams.UdpHop.IntervalMin)*time.Second, time.Duration(quicParams.UdpHop.IntervalMax)*time.Second, udpHopDialer, pktConn, index)
 				}
 
-				if streamSettings.UdpmaskManager != nil {
-					newConn, err := streamSettings.UdpmaskManager.WrapPacketConnClient(pktConn)
-					if err != nil {
-						pktConn.Close()
-						return nil, errors.New("mask err").Base(err)
-					}
-					pktConn = newConn
+				pktConn, err = internet.WrapPacketConnClient(streamSettings, pktConn)
+				if err != nil {
+					return nil, err
 				}
 
 				conn, err := quic.DialEarly(ctx, pktConn, udpAddr, tlsCfg, cfg)

@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/xtls/xray-core/transport/internet/finalmask"
 )
 
 type clientConn struct {
@@ -31,7 +33,7 @@ type clientConn struct {
 	hostname        string
 	paddingSchedule []paddingTurn
 	packet          *packetStream
-	deadlines       *connectionDeadlines
+	deadlines       *finalmask.HandshakeDeadlines
 }
 
 type clientState int
@@ -63,7 +65,7 @@ func newClientConn(c net.Conn, profiles []loginProfile, password string, rsaPubl
 		rsaPublicKey:    rsaPublicKey,
 		hostname:        hostname,
 		paddingSchedule: paddingSchedule,
-		deadlines:       newConnectionDeadlines(c),
+		deadlines:       finalmask.NewHandshakeDeadlines(c),
 	}, nil
 }
 
@@ -75,10 +77,10 @@ func (c *clientConn) handshake() error {
 		return nil
 	}
 
-	if err := c.deadlines.beginHandshake(); err != nil {
+	if err := c.deadlines.BeginHandshake(); err != nil {
 		return fmt.Errorf("set deadline: %w", err)
 	}
-	defer func() { _ = c.deadlines.endHandshake() }()
+	defer func() { _ = c.deadlines.EndHandshake() }()
 
 	var (
 		protocolVersion Varint        = Varint(775)
@@ -275,13 +277,13 @@ func (c *clientConn) RemoteAddr() net.Addr {
 }
 
 func (c *clientConn) SetDeadline(t time.Time) error {
-	return c.deadlines.setDeadline(t)
+	return c.deadlines.SetDeadline(t)
 }
 
 func (c *clientConn) SetReadDeadline(t time.Time) error {
-	return c.deadlines.setReadDeadline(t)
+	return c.deadlines.SetReadDeadline(t)
 }
 
 func (c *clientConn) SetWriteDeadline(t time.Time) error {
-	return c.deadlines.setWriteDeadline(t)
+	return c.deadlines.SetWriteDeadline(t)
 }
