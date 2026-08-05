@@ -2,6 +2,7 @@ package conf_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -156,6 +157,35 @@ func TestSocketConfig(t *testing.T) {
 	})
 	if expectedOutput.ParseTFOValue() != -1 {
 		t.Fatalf("unexpected parsed TFO value, which should be -1")
+	}
+}
+
+func TestStreamConfigLegacyKeys(t *testing.T) {
+	parse := func(s string) *internet.StreamConfig {
+		config := new(StreamConfig)
+		if err := json.Unmarshal([]byte(s), config); err != nil {
+			t.Fatalf("failed to parse %s: %v", s, err)
+		}
+		out, err := config.Build()
+		if err != nil {
+			t.Fatalf("failed to build %s: %v", s, err)
+		}
+		return out
+	}
+	// Old-style ("network"/"rawSettings"/"xhttpSettings") must behave
+	// identically to new-style ("method"/"tcpSettings"/"splithttpSettings").
+	oldStyle := parse(`{
+		"network": "tcp",
+		"rawSettings": {"acceptProxyProtocol": true},
+		"xhttpSettings": {"path": "/x"}
+	}`)
+	newStyle := parse(`{
+		"method": "tcp",
+		"tcpSettings": {"acceptProxyProtocol": true},
+		"splithttpSettings": {"path": "/x"}
+	}`)
+	if !reflect.DeepEqual(oldStyle, newStyle) {
+		t.Fatalf("old-style and new-style StreamConfigs differ:\nold: %#v\nnew: %#v", oldStyle, newStyle)
 	}
 }
 

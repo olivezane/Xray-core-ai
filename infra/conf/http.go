@@ -10,6 +10,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("http", func() interface{} { return new(HTTPServerConfig) })
+	outboundConfigLoader.MustRegister("http", func() interface{} { return new(HTTPClientConfig) })
+}
+
 type HTTPAccount struct {
 	Username string `json:"user"`
 	Password string `json:"pass"`

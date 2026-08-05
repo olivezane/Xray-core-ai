@@ -14,6 +14,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("wireguard", func() interface{} { return &WireGuardConfig{IsClient: false} })
+	outboundConfigLoader.MustRegister("wireguard", func() interface{} { return &WireGuardConfig{IsClient: true} })
+}
+
 type WireGuardPeerConfig struct {
 	PublicKey    string   `json:"publicKey"`
 	PreSharedKey string   `json:"preSharedKey"`
