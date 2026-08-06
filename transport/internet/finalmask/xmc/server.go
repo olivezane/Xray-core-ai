@@ -8,10 +8,7 @@ import (
 	"crypto/subtle"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"net"
-	"sync"
-	"time"
 
 	"github.com/xtls/xray-core/transport/internet/finalmask"
 )
@@ -19,45 +16,50 @@ import (
 // Response by vanilla 26.1.2 server.
 var statusResponse = `{"description":"A Minecraft Server","players":{"max":20,"online":0},"version":{"name":"26.1.2","protocol":775},"enforcesSecureChat":true}`
 
-type serverState int
-
-var (
-	serverStateHandshake serverState = 1
-	serverStateProxy     serverState = 3
-)
-
+// serverConn is the XMC server mask connection: the Minecraft login protocol
+// (including the ping/status interlude) as a handshake script, with the
+// connection lifecycle owned by the shared finalmask.StatefulConn module.
 type serverConn struct {
-	reader io.Reader
-	writer io.Writer
-	c      net.Conn
+	*finalmask.StatefulConn
 
-	state serverState
-
-	handshakeLock   sync.Mutex
-	lifecycleMu     sync.Mutex
-	closed          bool
 	profiles        []loginProfile
 	password        string
 	rsaPrivateKey   *rsa.PrivateKey
 	rsaPublicKey    []byte
 	paddingSchedule []paddingTurn
-	packet          *packetStream
-	deadlines       *finalmask.HandshakeDeadlines
 }
 
-func (c *serverConn) handshake() error {
-	c.handshakeLock.Lock()
-	defer c.handshakeLock.Unlock()
-
-	if c.state != serverStateHandshake {
-		return nil
+func wrapConnServer(c net.Conn, profiles []loginProfile, password string, rsaPrivateKeyDER []byte, rsaPublicKey []byte) (*serverConn, error) {
+	if len(profiles) == 0 {
+		return nil, fmt.Errorf("empty profiles")
+	}
+	if len(rsaPrivateKeyDER) == 0 {
+		return nil, fmt.Errorf("empty rsa private key")
+	}
+	if len(rsaPublicKey) == 0 {
+		return nil, fmt.Errorf("empty rsa public key")
+	}
+	rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(rsaPrivateKeyDER)
+	if err != nil {
+		return nil, fmt.Errorf("parse rsa private key: %w", err)
+	}
+	paddingSchedule, err := newServerPaddingSchedule2612()
+	if err != nil {
+		return nil, fmt.Errorf("select padding profile: %w", err)
 	}
 
-	if err := c.deadlines.BeginHandshake(); err != nil {
-		return fmt.Errorf("set deadline: %w", err)
+	s := &serverConn{
+		profiles:        profiles,
+		password:        password,
+		rsaPrivateKey:   rsaPrivateKey,
+		rsaPublicKey:    rsaPublicKey,
+		paddingSchedule: paddingSchedule,
 	}
-	defer func() { _ = c.deadlines.EndHandshake() }()
+	s.StatefulConn = finalmask.NewStatefulConn(c, bufio.NewReader(c), s.serverHandshake)
+	return s, nil
+}
 
+func (c *serverConn) serverHandshake(h *finalmask.Handshake) error {
 	var (
 		protocolVersion Varint
 		serverAddress   String
@@ -67,7 +69,7 @@ func (c *serverConn) handshake() error {
 
 	// handshake packet
 
-	pkt, err := readPacket(c.reader)
+	pkt, err := readPacket(h.Reader)
 	if err != nil {
 		return fmt.Errorf("read handshake packet: %w", err)
 	}
@@ -88,7 +90,7 @@ func (c *serverConn) handshake() error {
 
 		for range 2 {
 
-			pkt, err := readPacket(c.reader)
+			pkt, err := readPacket(h.Reader)
 			if err != nil {
 				return fmt.Errorf("read packet: %w", err)
 			}
@@ -96,7 +98,7 @@ func (c *serverConn) handshake() error {
 			switch pkt.packetID {
 			case 0: // Status Request
 
-				err = writePacket(c.writer, 0, new(String(statusResponse)))
+				err = writePacket(h.Writer, 0, new(String(statusResponse)))
 				if err != nil {
 					return fmt.Errorf("write status response: %w", err)
 				}
@@ -109,7 +111,7 @@ func (c *serverConn) handshake() error {
 					return fmt.Errorf("read ping packet: %w", err)
 				}
 
-				err = writePacket(c.writer, 1, &payload)
+				err = writePacket(h.Writer, 1, &payload)
 				if err != nil {
 					return fmt.Errorf("write ping response: %w", err)
 				}
@@ -126,7 +128,7 @@ func (c *serverConn) handshake() error {
 
 		// login start
 
-		pkt, err := readPacket(c.reader)
+		pkt, err := readPacket(h.Reader)
 		if err != nil {
 			return fmt.Errorf("read login start packet: %w", err)
 		}
@@ -159,7 +161,7 @@ func (c *serverConn) handshake() error {
 			return fmt.Errorf("generate verify token: %w", err)
 		}
 
-		err = writePacket(c.writer, 0x01, &serverId, &publicKey, &verifyToken, &shouldAuthenticate)
+		err = writePacket(h.Writer, 0x01, &serverId, &publicKey, &verifyToken, &shouldAuthenticate)
 		if err != nil {
 			return fmt.Errorf("write encryption request: %w", err)
 		}
@@ -174,7 +176,7 @@ func (c *serverConn) handshake() error {
 			decryptedVerifyToken []byte
 		)
 
-		pkt, err = readPacket(c.reader)
+		pkt, err = readPacket(h.Reader)
 		if err != nil {
 			return fmt.Errorf("read encrypt response: %w", err)
 		}
@@ -205,12 +207,12 @@ func (c *serverConn) handshake() error {
 			return fmt.Errorf("verify token mismatch")
 		}
 
-		c.reader, err = newCryptoReader(c.reader, sharedSecret)
+		h.Reader, err = newCryptoReader(h.Reader, sharedSecret)
 		if err != nil {
 			return fmt.Errorf("new crypto reader: %w", err)
 		}
 
-		c.writer, err = newCryptoWriter(c.writer, sharedSecret)
+		h.Writer, err = newCryptoWriter(h.Writer, sharedSecret)
 		if err != nil {
 			return fmt.Errorf("new crypto writer: %w", err)
 		}
@@ -219,11 +221,11 @@ func (c *serverConn) handshake() error {
 		receivedPassword := decryptedVerifyToken[4:]
 
 		if subtle.ConstantTimeCompare(receivedPassword, []byte(c.password)) != 1 {
-			writeDisconnectPacket(c.writer, `{"type":"translatable","translate":"multiplayer.disconnect.authservers_down"}`)
+			writeDisconnectPacket(h.Writer, `{"type":"translatable","translate":"multiplayer.disconnect.authservers_down"}`)
 			return fmt.Errorf("bad password")
 		}
 		if !found {
-			if err = writeDisconnectPacket(c.writer, `{"text":"You are not white-listed on this server!"}`); err != nil {
+			if err = writeDisconnectPacket(h.Writer, `{"text":"You are not white-listed on this server!"}`); err != nil {
 				return fmt.Errorf("write unknown login profile disconnect: %w", err)
 			}
 			return fmt.Errorf("unknown login profile")
@@ -235,36 +237,23 @@ func (c *serverConn) handshake() error {
 		texturesValue := String(profile.TexturesValue)
 		signed := Boolean(true)
 		texturesSignature := String(profile.TexturesSignature)
-		if err = writePacket(c.writer, 0x02, &profile.UUID, &loginName, &propertyCount, &propertyName, &texturesValue, &signed, &texturesSignature); err != nil {
+		if err = writePacket(h.Writer, 0x02, &profile.UUID, &loginName, &propertyCount, &propertyName, &texturesValue, &signed, &texturesSignature); err != nil {
 			return fmt.Errorf("write login finished: %w", err)
 		}
 
 		var loginAcknowledgedLength int
-		pkt, loginAcknowledgedLength, err = readPacketWithLength(c.reader)
+		pkt, loginAcknowledgedLength, err = readPacketWithLength(h.Reader)
 		if err != nil {
 			return fmt.Errorf("read login acknowledged: %w", err)
 		}
 		if err = validateLoginAcknowledgedPacket(pkt); err != nil {
 			return err
 		}
-		if err = runPaddingSchedule(c.reader, c.writer, false, loginAcknowledgedLength, c.paddingSchedule); err != nil {
+		if err = runPaddingSchedule(h.Reader, h.Writer, false, loginAcknowledgedLength, c.paddingSchedule); err != nil {
 			return fmt.Errorf("run startup padding: %w", err)
 		}
 
-		packet := newPacketStream(c.reader, c.writer, false)
-		c.lifecycleMu.Lock()
-		if c.closed {
-			c.lifecycleMu.Unlock()
-			packet.Stop()
-			return net.ErrClosed
-		}
-		c.packet = packet
-		c.reader = packet
-		c.writer = packet
-		c.state = serverStateProxy
-		c.lifecycleMu.Unlock()
-
-		return nil
+		return h.Commit(newPacketStream(h.Reader, h.Writer, false))
 
 	default:
 		return fmt.Errorf("bad handshake packet: bad next state: %d", nextState)
@@ -279,88 +268,4 @@ func validateLoginAcknowledgedPacket(pkt *mcPacket) error {
 		return fmt.Errorf("bad login acknowledged packet data length: %d", len(pkt.data))
 	}
 	return nil
-}
-
-func (c *serverConn) Read(b []byte) (int, error) {
-	err := c.handshake()
-	if err != nil {
-		return 0, fmt.Errorf("handshake: %w", err)
-	}
-
-	return c.reader.Read(b)
-}
-
-func (c *serverConn) Write(b []byte) (int, error) {
-	err := c.handshake()
-	if err != nil {
-		return 0, fmt.Errorf("handshake: %w", err)
-	}
-
-	return c.writer.Write(b)
-}
-
-func (c *serverConn) Close() error {
-	c.lifecycleMu.Lock()
-	c.closed = true
-	packet := c.packet
-	c.lifecycleMu.Unlock()
-	if packet != nil {
-		packet.Stop()
-	}
-	return c.c.Close()
-}
-
-func (c *serverConn) LocalAddr() net.Addr {
-	return c.c.LocalAddr()
-}
-
-func (c *serverConn) RemoteAddr() net.Addr {
-	return c.c.RemoteAddr()
-}
-
-func (c *serverConn) SetDeadline(t time.Time) error {
-	return c.deadlines.SetDeadline(t)
-}
-
-func (c *serverConn) SetReadDeadline(t time.Time) error {
-	return c.deadlines.SetReadDeadline(t)
-}
-
-func (c *serverConn) SetWriteDeadline(t time.Time) error {
-	return c.deadlines.SetWriteDeadline(t)
-}
-
-func wrapConnServer(c net.Conn, profiles []loginProfile, password string, rsaPrivateKeyDER []byte, rsaPublicKey []byte) (*serverConn, error) {
-	if len(profiles) == 0 {
-		return nil, fmt.Errorf("empty profiles")
-	}
-	if len(rsaPrivateKeyDER) == 0 {
-		return nil, fmt.Errorf("empty rsa private key")
-	}
-	if len(rsaPublicKey) == 0 {
-		return nil, fmt.Errorf("empty rsa public key")
-	}
-	rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(rsaPrivateKeyDER)
-	if err != nil {
-		return nil, fmt.Errorf("parse rsa private key: %w", err)
-	}
-	paddingSchedule, err := newServerPaddingSchedule2612()
-	if err != nil {
-		return nil, fmt.Errorf("select padding profile: %w", err)
-	}
-
-	s := &serverConn{
-		reader:          bufio.NewReader(c),
-		writer:          c,
-		c:               c,
-		state:           serverStateHandshake,
-		profiles:        profiles,
-		password:        password,
-		rsaPrivateKey:   rsaPrivateKey,
-		rsaPublicKey:    rsaPublicKey,
-		paddingSchedule: paddingSchedule,
-		deadlines:       finalmask.NewHandshakeDeadlines(c),
-	}
-
-	return s, nil
 }

@@ -58,7 +58,7 @@ func runPaddingSchedule(reader io.Reader, writer io.Writer, isClient bool, first
 
 		localSends := isClient == (turn.direction == paddingClientToServer)
 		if localSends {
-			if err := writePaddingTurnWithBuffer(writer, turn, prefixLength, time.Sleep, &writeBuffer); err != nil {
+			if err := writePaddingTurn(writer, turn, prefixLength, time.Sleep, &writeBuffer); err != nil {
 				return fmt.Errorf("write padding turn %d: %w", i, err)
 			}
 			continue
@@ -128,15 +128,7 @@ func validatePaddingSchedule(schedule []paddingTurn, firstTurnPrefixLength int) 
 	return nil
 }
 
-func writePaddingTurn(w io.Writer, turn paddingTurn, prefixLength int) error {
-	return writePaddingTurnWithSleep(w, turn, prefixLength, time.Sleep)
-}
-
-func writePaddingTurnWithSleep(w io.Writer, turn paddingTurn, prefixLength int, sleep func(time.Duration)) error {
-	return writePaddingTurnWithBuffer(w, turn, prefixLength, sleep, nil)
-}
-
-func writePaddingTurnWithBuffer(w io.Writer, turn paddingTurn, prefixLength int, sleep func(time.Duration), reusableBuffer *[]byte) error {
+func writePaddingTurn(w io.Writer, turn paddingTurn, prefixLength int, sleep func(time.Duration), reusableBuffer *[]byte) error {
 	startDelay, err := randomPaddingDelay(turn.startDelay)
 	if err != nil {
 		return fmt.Errorf("select padding start delay: %w", err)

@@ -7,41 +7,25 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"math/big"
 	"net"
 	"strconv"
-	"sync"
-	"time"
 
 	"github.com/xtls/xray-core/transport/internet/finalmask"
 )
 
+// clientConn is the XMC client mask connection: the Minecraft login protocol
+// as a handshake script, with the connection lifecycle owned by the shared
+// finalmask.StatefulConn module.
 type clientConn struct {
-	reader io.Reader
-	writer io.Writer
-	c      net.Conn
+	*finalmask.StatefulConn
 
-	state clientState
-
-	handshakeLock   sync.Mutex
-	lifecycleMu     sync.Mutex
-	closed          bool
 	profiles        []loginProfile
 	password        string
 	rsaPublicKey    []byte
 	hostname        string
 	paddingSchedule []paddingTurn
-	packet          *packetStream
-	deadlines       *finalmask.HandshakeDeadlines
 }
-
-type clientState int
-
-var (
-	clientStateHandshake clientState = 1
-	clientStateProxy     clientState = 2
-)
 
 func newClientConn(c net.Conn, profiles []loginProfile, password string, rsaPublicKey []byte, hostname string) (*clientConn, error) {
 	if len(rsaPublicKey) == 0 {
@@ -54,34 +38,18 @@ func newClientConn(c net.Conn, profiles []loginProfile, password string, rsaPubl
 	if err != nil {
 		return nil, fmt.Errorf("select padding profile: %w", err)
 	}
-	return &clientConn{
-		reader:          bufio.NewReader(c),
-		writer:          c,
-		c:               c,
-		state:           clientStateHandshake,
-		handshakeLock:   sync.Mutex{},
+	cc := &clientConn{
 		profiles:        profiles,
 		password:        password,
 		rsaPublicKey:    rsaPublicKey,
 		hostname:        hostname,
 		paddingSchedule: paddingSchedule,
-		deadlines:       finalmask.NewHandshakeDeadlines(c),
-	}, nil
+	}
+	cc.StatefulConn = finalmask.NewStatefulConn(c, bufio.NewReader(c), cc.clientHandshake)
+	return cc, nil
 }
 
-func (c *clientConn) handshake() error {
-	c.handshakeLock.Lock()
-	defer c.handshakeLock.Unlock()
-
-	if c.state != clientStateHandshake {
-		return nil
-	}
-
-	if err := c.deadlines.BeginHandshake(); err != nil {
-		return fmt.Errorf("set deadline: %w", err)
-	}
-	defer func() { _ = c.deadlines.EndHandshake() }()
-
+func (c *clientConn) clientHandshake(h *finalmask.Handshake) error {
 	var (
 		protocolVersion Varint        = Varint(775)
 		serverAddress   String        = String(c.hostname)
@@ -89,7 +57,7 @@ func (c *clientConn) handshake() error {
 		nextState       Varint        = Varint(2)
 	)
 
-	host, portString, err := net.SplitHostPort(c.c.RemoteAddr().String())
+	host, portString, err := net.SplitHostPort(c.RemoteAddr().String())
 	if err == nil {
 		port, err := strconv.Atoi(portString)
 		if err == nil {
@@ -101,7 +69,7 @@ func (c *clientConn) handshake() error {
 		}
 	}
 
-	err = writePacket(c.writer, 0x00, &protocolVersion, &serverAddress, &serverPort, &nextState)
+	err = writePacket(h.Writer, 0x00, &protocolVersion, &serverAddress, &serverPort, &nextState)
 	if err != nil {
 		return fmt.Errorf("write handshake packet: %w", err)
 	}
@@ -114,13 +82,13 @@ func (c *clientConn) handshake() error {
 	selectedProfile := c.profiles[randomProfile.Int64()]
 	username := String(selectedProfile.Username)
 
-	err = writePacket(c.writer, 0x00, &username, &selectedProfile.UUID)
+	err = writePacket(h.Writer, 0x00, &username, &selectedProfile.UUID)
 	if err != nil {
 		return fmt.Errorf("write login start: %w", err)
 	}
 
 	// Encryption Request
-	pkt, err := readPacket(c.reader)
+	pkt, err := readPacket(h.Reader)
 	if err != nil {
 		return fmt.Errorf("read encryption request: %w", err)
 	}
@@ -173,7 +141,7 @@ func (c *clientConn) handshake() error {
 
 	// Send Encryption Response
 	err = writePacket(
-		c.writer,
+		h.Writer,
 		0x01,
 		(*Bytes)(&encryptedSharedSecret),
 		(*Bytes)(&encryptedVerifyToken),
@@ -183,17 +151,17 @@ func (c *clientConn) handshake() error {
 	}
 
 	// Enable encryption
-	c.reader, err = newCryptoReader(c.reader, sharedSecret)
+	h.Reader, err = newCryptoReader(h.Reader, sharedSecret)
 	if err != nil {
 		return fmt.Errorf("new crypto reader: %w", err)
 	}
 
-	c.writer, err = newCryptoWriter(c.writer, sharedSecret)
+	h.Writer, err = newCryptoWriter(h.Writer, sharedSecret)
 	if err != nil {
 		return fmt.Errorf("new crypto writer: %w", err)
 	}
 
-	pkt, err = readPacket(c.reader)
+	pkt, err = readPacket(h.Reader)
 	if err != nil {
 		return fmt.Errorf("read login finished: %w", err)
 	}
@@ -215,75 +183,13 @@ func (c *clientConn) handshake() error {
 	if receivedProfile != selectedProfile {
 		return fmt.Errorf("login profile mismatch")
 	}
-	loginAcknowledgedLength, err := writePacketWithLength(c.writer, 0x03)
+	loginAcknowledgedLength, err := writePacketWithLength(h.Writer, 0x03)
 	if err != nil {
 		return fmt.Errorf("write login acknowledged: %w", err)
 	}
-	if err = runPaddingSchedule(c.reader, c.writer, true, loginAcknowledgedLength, c.paddingSchedule); err != nil {
+	if err = runPaddingSchedule(h.Reader, h.Writer, true, loginAcknowledgedLength, c.paddingSchedule); err != nil {
 		return fmt.Errorf("run startup padding: %w", err)
 	}
 
-	packet := newPacketStream(c.reader, c.writer, true)
-	c.lifecycleMu.Lock()
-	if c.closed {
-		c.lifecycleMu.Unlock()
-		packet.Stop()
-		return net.ErrClosed
-	}
-	c.packet = packet
-	c.reader = packet
-	c.writer = packet
-	c.state = clientStateProxy
-	c.lifecycleMu.Unlock()
-
-	return nil
-}
-
-func (c *clientConn) Read(b []byte) (int, error) {
-	err := c.handshake()
-	if err != nil {
-		return 0, fmt.Errorf("handshake: %w", err)
-	}
-
-	return c.reader.Read(b)
-}
-
-func (c *clientConn) Write(b []byte) (int, error) {
-	err := c.handshake()
-	if err != nil {
-		return 0, fmt.Errorf("handshake: %w", err)
-	}
-
-	return c.writer.Write(b)
-}
-
-func (c *clientConn) Close() error {
-	c.lifecycleMu.Lock()
-	c.closed = true
-	packet := c.packet
-	c.lifecycleMu.Unlock()
-	if packet != nil {
-		packet.Stop()
-	}
-	return c.c.Close()
-}
-
-func (c *clientConn) LocalAddr() net.Addr {
-	return c.c.LocalAddr()
-}
-
-func (c *clientConn) RemoteAddr() net.Addr {
-	return c.c.RemoteAddr()
-}
-
-func (c *clientConn) SetDeadline(t time.Time) error {
-	return c.deadlines.SetDeadline(t)
-}
-
-func (c *clientConn) SetReadDeadline(t time.Time) error {
-	return c.deadlines.SetReadDeadline(t)
-}
-
-func (c *clientConn) SetWriteDeadline(t time.Time) error {
-	return c.deadlines.SetWriteDeadline(t)
+	return h.Commit(newPacketStream(h.Reader, h.Writer, true))
 }
