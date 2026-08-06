@@ -163,7 +163,7 @@ func TestHandshakePasswordMismatch(t *testing.T) {
 		t.Fatalf("failed to create client: %v", err)
 	}
 
-	err = client.handshake()
+	_, err = client.Read(make([]byte, 1))
 	if err == nil {
 		t.Fatal("expected client handshake to fail due to password mismatch")
 	}
@@ -211,7 +211,7 @@ func TestHandshakeNetPipeWithKeepAlive(t *testing.T) {
 			followupDone <- readErr
 		}()
 
-		if err = server.packet.writeKeepAlive(Long(42)); err != nil {
+		if err = server.Stream().(*packetStream).writeKeepAlive(Long(42)); err != nil {
 			serverDone <- fmt.Errorf("write keep-alive: %w", err)
 			return
 		}
@@ -262,7 +262,7 @@ func TestStatusQueryUnaffected(t *testing.T) {
 	go func() {
 		server, err := wrapConnServer(serverRaw, profiles, password, privateKey, publicKey)
 		if err == nil {
-			err = server.handshake()
+			_, err = server.Read(make([]byte, 1))
 		}
 		serverDone <- err
 	}()
