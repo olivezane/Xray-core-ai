@@ -15,9 +15,9 @@ import (
 
 type noopCounter struct{ stats.Counter }
 
-func (noopCounter) Add(int64) int64  { return 0 }
-func (noopCounter) Set(int64) int64  { return 0 }
-func (noopCounter) Value() int64     { return 0 }
+func (noopCounter) Add(int64) int64 { return 0 }
+func (noopCounter) Set(int64) int64 { return 0 }
+func (noopCounter) Value() int64    { return 0 }
 
 func TestIsRAW_plainTCP(t *testing.T) {
 	conn := &stat.CounterConnection{

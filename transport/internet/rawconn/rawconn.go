@@ -17,17 +17,42 @@ import (
 	"github.com/xtls/xray-core/proxy/vless/encryption"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/finalmask"
-	"github.com/xtls/xray-core/transport/internet/reality"
 	"github.com/xtls/xray-core/transport/internet/stat"
-	"github.com/xtls/xray-core/transport/internet/tls"
 )
+
+// peelSpliceTransparent peels exactly the layers that are transparent to a
+// splice copy: stat counters (counted, then discarded) and the finalmask
+// TcpMask when it allows splicing. It deliberately stops at TLS/Reality/
+// CommonConn-style wrappers — their presence means "do not raw-handle me"
+// (see the MITM guard in proxy/freedom). Shared by IsRAW and Unwrap.
+func peelSpliceTransparent(conn net.Conn, readCounter, writerCounter stats.Counter) (net.Conn, stats.Counter, stats.Counter) {
+	for conn != nil {
+		// Extract stat counters (peel this layer, continue unwrapping).
+		if sc, ok := conn.(*stat.CounterConnection); ok {
+			if readCounter == nil {
+				readCounter = sc.ReadCounter
+			}
+			if writerCounter == nil {
+				writerCounter = sc.WriteCounter
+			}
+			conn = sc.Unwrap()
+			continue
+		}
+		// finalmask TcpMaskConn — respects Splice() flag.
+		if unwrapped := finalmask.UnwrapTcpMask(conn); unwrapped != conn {
+			conn = unwrapped
+			continue
+		}
+		break
+	}
+	return conn, readCounter, writerCounter
+}
 
 func IsRAW(conn stat.Connection) bool {
 	if conn == nil {
 		return false
 	}
-	iConn := stat.TryUnwrapStatsConn(conn)
-	iConn = finalmask.UnwrapTcpMask(iConn)
+	iConn, _, _ := peelSpliceTransparent(conn, nil, nil)
 	_, ok1 := iConn.(*proxyproto.Conn)
 	_, ok2 := iConn.(*net.TCPConn)
 	_, ok3 := iConn.(*internet.UnixConnWrapper)
@@ -36,41 +61,29 @@ func IsRAW(conn stat.Connection) bool {
 
 func Unwrap(conn net.Conn) (net.Conn, stats.Counter, stats.Counter) {
 	var readCounter, writerCounter stats.Counter
-	if conn != nil {
-		isEncryption := false
-		if commonConn, ok := conn.(*encryption.CommonConn); ok {
-			conn = commonConn.Conn
-			isEncryption = true
+	for conn != nil {
+		// Transparent layers first (counters + TcpMask), then deepen one
+		// opaque layer at a time. Re-peeling each round keeps the original
+		// priority (counters > Unwrapper > TcpMask > CommonConn > proxyproto)
+		// intact for any wrapper nesting.
+		conn, readCounter, writerCounter = peelSpliceTransparent(conn, readCounter, writerCounter)
+		if conn == nil {
+			return nil, readCounter, writerCounter
 		}
-		if xorConn, ok := conn.(*encryption.XorConn); ok {
-			return xorConn, nil, nil
+		if u, ok := conn.(stat.Unwrapper); ok {
+			conn = u.Unwrap()
+			continue
 		}
-		if statConn, ok := conn.(*stat.CounterConnection); ok {
-			conn = statConn.Connection
-			readCounter = statConn.ReadCounter
-			writerCounter = statConn.WriteCounter
+		// Special cases for external/internal types we can't modify.
+		if cc, ok := conn.(*encryption.CommonConn); ok {
+			conn = cc.Conn
+			continue
 		}
-
-		if !isEncryption {
-			if xc, ok := conn.(*tls.Conn); ok {
-				conn = xc.NetConn()
-			} else if utlsConn, ok := conn.(*tls.UConn); ok {
-				conn = utlsConn.NetConn()
-			} else if realityConn, ok := conn.(*reality.Conn); ok {
-				conn = realityConn.NetConn()
-			} else if realityUConn, ok := conn.(*reality.UConn); ok {
-				conn = realityUConn.NetConn()
-			}
-		}
-
-		conn = finalmask.UnwrapTcpMask(conn)
-
 		if pc, ok := conn.(*proxyproto.Conn); ok {
 			conn = pc.Raw()
+			continue
 		}
-		if uc, ok := conn.(*internet.UnixConnWrapper); ok {
-			conn = uc.UnixConn
-		}
+		break
 	}
 	return conn, readCounter, writerCounter
 }

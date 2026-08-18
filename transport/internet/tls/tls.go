@@ -12,6 +12,7 @@ import (
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/utils"
+	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
 type Interface interface {
@@ -23,12 +24,17 @@ type Interface interface {
 }
 
 var (
-	_ buf.Writer = (*Conn)(nil)
-	_ Interface  = (*Conn)(nil)
+	_ buf.Writer      = (*Conn)(nil)
+	_ Interface        = (*Conn)(nil)
+	_ stat.Unwrapper   = (*Conn)(nil)
 )
 
 type Conn struct {
 	*tls.Conn
+}
+
+func (c *Conn) Unwrap() net.Conn {
+	return c.Conn.NetConn()
 }
 
 const tlsCloseTimeout = 250 * time.Millisecond
@@ -77,6 +83,11 @@ type UConn struct {
 }
 
 var _ Interface = (*UConn)(nil)
+var _ stat.Unwrapper = (*UConn)(nil)
+
+func (c *UConn) Unwrap() net.Conn {
+	return c.Conn.NetConn()
+}
 
 func (c *UConn) Close() error {
 	timer := time.AfterFunc(tlsCloseTimeout, func() {
