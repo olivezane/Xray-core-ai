@@ -64,7 +64,7 @@ func TestWrapConnClientMaskOrderBeforeTLS(t *testing.T) {
 	}
 	tlsConn := &recordingMaskConn{Conn: raw}
 	result, err := WrapConnClient(mss, raw, func(conn net.Conn) (net.Conn, error) {
-		*(&order) = append(order, "tls")
+		order = append(order, "tls")
 		return tlsConn, nil
 	})
 	if err != nil {
