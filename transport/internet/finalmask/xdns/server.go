@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	finalmask "github.com/xtls/xray-core/transport/internet"
 )
 
 const (

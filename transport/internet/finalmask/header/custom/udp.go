@@ -9,7 +9,7 @@ import (
 
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	internet "github.com/xtls/xray-core/transport/internet"
 )
 
 const udpStandaloneBufferSize = 4096
@@ -78,9 +78,9 @@ func NewConnClientUDP(c *UDPConfig, raw net.PacketConn) (net.PacketConn, error) 
 
 func (c *udpCustomClientConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	b := p
-	if len(b) < finalmask.UDPSize {
+	if len(b) < internet.UDPSize {
 		buf := buf.New()
-		buf.Resize(0, finalmask.UDPSize)
+		buf.Resize(0, internet.UDPSize)
 		b = buf.Bytes()
 		defer buf.Release()
 	}
@@ -103,7 +103,7 @@ func (c *udpCustomClientConn) ReadFrom(p []byte) (n int, addr net.Addr, err erro
 
 func (c *udpCustomClientConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	buf := buf.New()
-	buf.Resize(0, finalmask.UDPSize)
+	buf.Resize(0, internet.UDPSize)
 	b := buf.Bytes()
 	defer buf.Release()
 
@@ -198,9 +198,9 @@ func NewConnServerUDP(c *UDPConfig, raw net.PacketConn) (net.PacketConn, error) 
 
 func (c *udpCustomServerConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	b := p
-	if len(b) < finalmask.UDPSize {
+	if len(b) < internet.UDPSize {
 		buf := buf.New()
-		buf.Resize(0, finalmask.UDPSize)
+		buf.Resize(0, internet.UDPSize)
 		b = buf.Bytes()
 		defer buf.Release()
 	}
@@ -223,7 +223,7 @@ func (c *udpCustomServerConn) ReadFrom(p []byte) (n int, addr net.Addr, err erro
 
 func (c *udpCustomServerConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	buf := buf.New()
-	buf.Resize(0, finalmask.UDPSize)
+	buf.Resize(0, internet.UDPSize)
 	b := buf.Bytes()
 	defer buf.Release()
 

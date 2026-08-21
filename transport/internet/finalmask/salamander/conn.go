@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/xtls/xray-core/common/buf"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	finalmask "github.com/xtls/xray-core/transport/internet"
 )
 
 type salamanderConn struct {

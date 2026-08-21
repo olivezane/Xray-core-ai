@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
@@ -88,4 +88,4 @@ func (noopCounter) Add(int64) int64 { return 0 }
 func (noopCounter) Set(int64) int64 { return 0 }
 func (noopCounter) Value() int64    { return 0 }
 
-var _ finalmask.TcpMaskConn = tcpMaskStub{}
+var _ internet.TcpMaskConn = tcpMaskStub{}

@@ -10,7 +10,6 @@ import (
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/net/cnc"
 	"github.com/xtls/xray-core/transport/internet"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
 	"github.com/xtls/xray-core/transport/pipe"
 )
 
@@ -50,12 +49,12 @@ func (failingMask) WrapPacketConnServer(raw net.PacketConn, _, _ int) (net.Packe
 	return raw, nil
 }
 
-func maskStreamConfig(manager *finalmask.TcpmaskManager) *internet.MemoryStreamConfig {
+func maskStreamConfig(manager *internet.TcpmaskManager) *internet.MemoryStreamConfig {
 	return &internet.MemoryStreamConfig{TcpmaskManager: manager}
 }
 
 func TestWrapConnClientMaskBeforeTLS(t *testing.T) {
-	mss := maskStreamConfig(finalmask.NewTcpmaskManager([]finalmask.Tcpmask{orderMask{}}))
+	mss := maskStreamConfig(internet.NewTcpmaskManager([]internet.Tcpmask{orderMask{}}))
 	client, server := net.Pipe()
 	defer client.Close()
 	defer server.Close()
@@ -97,7 +96,7 @@ func TestWrapConnClientNoMaskPassthrough(t *testing.T) {
 }
 
 func TestWrapConnClientMaskErrorClosesRaw(t *testing.T) {
-	mss := maskStreamConfig(finalmask.NewTcpmaskManager([]finalmask.Tcpmask{failingMask{}}))
+	mss := maskStreamConfig(internet.NewTcpmaskManager([]internet.Tcpmask{failingMask{}}))
 	client, server := net.Pipe()
 	defer server.Close()
 
@@ -192,7 +191,7 @@ func TestWrapPacketConnDial(t *testing.T) {
 	}
 	defer rawPC.Close()
 	mss := &internet.MemoryStreamConfig{
-		UdpmaskManager: finalmask.NewUdpmaskManager([]finalmask.Udpmask{orderMask{}}),
+		UdpmaskManager: internet.NewUdpmaskManager([]internet.Udpmask{orderMask{}}),
 	}
 	out, err = internet.WrapPacketConnDial(mss, &internet.PacketConnWrapper{PacketConn: rawPC, Dest: udpAddr})
 	if err != nil {
@@ -229,7 +228,7 @@ func TestWrapPacketConnClientServerNoMask(t *testing.T) {
 
 	// mask error closes the raw conn
 	mss := &internet.MemoryStreamConfig{
-		UdpmaskManager: finalmask.NewUdpmaskManager([]finalmask.Udpmask{failingMask{}}),
+		UdpmaskManager: internet.NewUdpmaskManager([]internet.Udpmask{failingMask{}}),
 	}
 	_, err = internet.WrapPacketConnClient(mss, rawPC)
 	if err == nil || !errors.Is(err, io.ErrClosedPipe) {

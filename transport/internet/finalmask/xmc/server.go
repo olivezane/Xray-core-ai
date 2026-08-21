@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	finalmask "github.com/xtls/xray-core/transport/internet"
 )
 
 // Response by vanilla 26.1.2 server.

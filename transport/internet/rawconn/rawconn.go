@@ -16,7 +16,6 @@ import (
 	"github.com/xtls/xray-core/features/stats"
 	"github.com/xtls/xray-core/proxy/vless/encryption"
 	"github.com/xtls/xray-core/transport/internet"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
 	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
@@ -39,7 +38,7 @@ func peelSpliceTransparent(conn net.Conn, readCounter, writerCounter stats.Count
 			continue
 		}
 		// finalmask TcpMaskConn — respects Splice() flag.
-		if unwrapped := finalmask.UnwrapTcpMask(conn); unwrapped != conn {
+		if unwrapped := internet.UnwrapTcpMask(conn); unwrapped != conn {
 			conn = unwrapped
 			continue
 		}

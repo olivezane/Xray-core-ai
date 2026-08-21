@@ -1,4 +1,4 @@
-package finalmask_test
+package internet_test
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/finalmask/header/custom"
 	"github.com/xtls/xray-core/transport/internet/finalmask/mkcp/aes128gcm"
 	"github.com/xtls/xray-core/transport/internet/finalmask/mkcp/header"
@@ -51,7 +51,7 @@ func mustSendRecv(
 
 type layerMask struct {
 	name   string
-	mask   finalmask.Udpmask
+	mask   internet.Udpmask
 	layers int
 }
 
@@ -225,7 +225,7 @@ func newUDPClientServerPair(t *testing.T, cfg *custom.UDPStandaloneConfig) (net.
 	}
 	t.Cleanup(func() { _ = serverRaw.Close() })
 
-	maskManager := finalmask.NewUdpmaskManager([]finalmask.Udpmask{cfg})
+	maskManager := internet.NewUdpmaskManager([]internet.Udpmask{cfg})
 
 	client, err := maskManager.WrapPacketConnClient(clientRaw)
 	if err != nil {
@@ -348,11 +348,11 @@ func TestPacketConnReadWrite(t *testing.T) {
 			if layers <= 0 {
 				layers = 1
 			}
-			masks := make([]finalmask.Udpmask, 0, layers)
+			masks := make([]internet.Udpmask, 0, layers)
 			for i := 0; i < layers; i++ {
 				masks = append(masks, mask)
 			}
-			maskManager := finalmask.NewUdpmaskManager(masks)
+			maskManager := internet.NewUdpmaskManager(masks)
 
 			client, err := net.ListenPacket("udp", "127.0.0.1:0")
 			if err != nil {
@@ -397,7 +397,7 @@ func TestUDPcustomStaticHeaderWireShape(t *testing.T) {
 			{Rand: 1, RandMin: 0x30, RandMax: 0x40},
 		},
 	}
-	maskManager := finalmask.NewUdpmaskManager([]finalmask.Udpmask{cfg})
+	maskManager := internet.NewUdpmaskManager([]internet.Udpmask{cfg})
 
 	clientRaw, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
@@ -889,7 +889,7 @@ func TestSudokuBDD(t *testing.T) {
 			PaddingMin:   0,
 			PaddingMax:   0,
 		}
-		maskManager := finalmask.NewUdpmaskManager([]finalmask.Udpmask{cfg})
+		maskManager := internet.NewUdpmaskManager([]internet.Udpmask{cfg})
 
 		clientRaw, err := net.ListenPacket("udp", "127.0.0.1:0")
 		if err != nil {

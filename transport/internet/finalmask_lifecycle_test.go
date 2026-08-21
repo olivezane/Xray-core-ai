@@ -1,4 +1,4 @@
-package finalmask
+package internet
 
 import (
 	"errors"

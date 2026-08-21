@@ -11,7 +11,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	finalmask "github.com/xtls/xray-core/transport/internet"
 )
 
 // clientConn is the XMC client mask connection: the Minecraft login protocol
