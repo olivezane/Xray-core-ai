@@ -3,6 +3,7 @@ package conf
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"strings"
 
 	"github.com/xtls/xray-core/common/errors"
@@ -39,17 +40,24 @@ func rejectUnknownFields() bool {
 	return platform.NewEnvFlag(platform.UseStrictJSON).GetValue(func() string { return "" }) != "false"
 }
 
+// DecodeJSON decodes JSON from reader into config, rejecting unknown fields
+// unless platform.UseStrictJSON is set to "false". Sole owner of the
+// strict-mode semantics; shared by JSONConfigLoader and serial's decoders.
+func DecodeJSON(reader io.Reader, config interface{}) error {
+	dec := json.NewDecoder(reader)
+	if rejectUnknownFields() {
+		dec.DisallowUnknownFields()
+	}
+	return dec.Decode(config)
+}
+
 func (v *JSONConfigLoader) LoadWithID(raw []byte, id string) (interface{}, error) {
 	id = strings.ToLower(id)
 	config, err := v.cache.Create(id)
 	if err != nil {
 		return nil, err
 	}
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	if rejectUnknownFields() {
-		dec.DisallowUnknownFields()
-	}
-	if err := dec.Decode(config); err != nil {
+	if err := DecodeJSON(bytes.NewReader(raw), config); err != nil {
 		return nil, err
 	}
 	return config, nil
