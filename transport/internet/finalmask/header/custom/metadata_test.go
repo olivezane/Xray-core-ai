@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	finalmask "github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 func TestMetadataEvaluatorRejectsUnknownName(t *testing.T) {
@@ -156,7 +156,7 @@ func TestMetadataUDPStandaloneWriteUsesRemotePort(t *testing.T) {
 	}
 	defer serverRaw.Close()
 
-	client, err := finalmask.NewUdpmaskManager([]finalmask.Udpmask{cfg}).WrapPacketConnClient(clientRaw)
+	client, err := internet.NewUdpmaskManager([]internet.Udpmask{cfg}).WrapPacketConnClient(clientRaw)
 	if err != nil {
 		t.Fatal(err)
 	}

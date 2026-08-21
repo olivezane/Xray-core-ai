@@ -6,12 +6,12 @@ import (
 	"net"
 	"sync"
 
-	finalmask "github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 const ioBufferSize = 32 * 1024
 
-var _ finalmask.TcpMaskConn = (*wrappedConn)(nil)
+var _ internet.TcpMaskConn = (*wrappedConn)(nil)
 
 type streamDecoder interface {
 	decodeChunk(in []byte, pending []byte) ([]byte, error)

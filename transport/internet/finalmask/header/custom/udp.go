@@ -9,7 +9,7 @@ import (
 
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/errors"
-	internet "github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 const udpStandaloneBufferSize = 4096

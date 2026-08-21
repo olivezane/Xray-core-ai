@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"net"
 
-	finalmask "github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 // Response by vanilla 26.1.2 server.
@@ -18,9 +18,9 @@ var statusResponse = `{"description":"A Minecraft Server","players":{"max":20,"o
 
 // serverConn is the XMC server mask connection: the Minecraft login protocol
 // (including the ping/status interlude) as a handshake script, with the
-// connection lifecycle owned by the shared finalmask.StatefulConn module.
+// connection lifecycle owned by the shared internet.StatefulConn module.
 type serverConn struct {
-	*finalmask.StatefulConn
+	*internet.StatefulConn
 
 	profiles        []loginProfile
 	password        string
@@ -55,11 +55,11 @@ func wrapConnServer(c net.Conn, profiles []loginProfile, password string, rsaPri
 		rsaPublicKey:    rsaPublicKey,
 		paddingSchedule: paddingSchedule,
 	}
-	s.StatefulConn = finalmask.NewStatefulConn(c, bufio.NewReader(c), s.serverHandshake)
+	s.StatefulConn = internet.NewStatefulConn(c, bufio.NewReader(c), s.serverHandshake)
 	return s, nil
 }
 
-func (c *serverConn) serverHandshake(h *finalmask.Handshake) error {
+func (c *serverConn) serverHandshake(h *internet.Handshake) error {
 	var (
 		protocolVersion Varint
 		serverAddress   String

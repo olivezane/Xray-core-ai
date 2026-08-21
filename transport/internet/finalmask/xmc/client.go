@@ -11,14 +11,14 @@ import (
 	"net"
 	"strconv"
 
-	finalmask "github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 // clientConn is the XMC client mask connection: the Minecraft login protocol
 // as a handshake script, with the connection lifecycle owned by the shared
-// finalmask.StatefulConn module.
+// internet.StatefulConn module.
 type clientConn struct {
-	*finalmask.StatefulConn
+	*internet.StatefulConn
 
 	profiles        []loginProfile
 	password        string
@@ -45,11 +45,11 @@ func newClientConn(c net.Conn, profiles []loginProfile, password string, rsaPubl
 		hostname:        hostname,
 		paddingSchedule: paddingSchedule,
 	}
-	cc.StatefulConn = finalmask.NewStatefulConn(c, bufio.NewReader(c), cc.clientHandshake)
+	cc.StatefulConn = internet.NewStatefulConn(c, bufio.NewReader(c), cc.clientHandshake)
 	return cc, nil
 }
 
-func (c *clientConn) clientHandshake(h *finalmask.Handshake) error {
+func (c *clientConn) clientHandshake(h *internet.Handshake) error {
 	var (
 		protocolVersion Varint        = Varint(775)
 		serverAddress   String        = String(c.hostname)

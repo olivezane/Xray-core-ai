@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	finalmask "github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 func mustSendRecvUDP(t *testing.T, from net.PacketConn, to net.PacketConn, msg []byte) {
@@ -48,7 +48,7 @@ func TestStateUDPResponseReusesPriorCapturedValues(t *testing.T) {
 			},
 		},
 	}
-	maskManager := finalmask.NewUdpmaskManager([]finalmask.Udpmask{cfg})
+	maskManager := internet.NewUdpmaskManager([]internet.Udpmask{cfg})
 
 	clientRaw, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
