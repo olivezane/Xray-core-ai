@@ -8,8 +8,6 @@ import (
 	go_errors "errors"
 	"net"
 	"net/netip"
-	"sort"
-	"strings"
 	"sync"
 	"unsafe"
 
@@ -38,6 +36,11 @@ type WindowsTun struct {
 	luid           winipcfg.LUID
 	changeCallback winipcfg.ChangeCallback
 	closed         bool
+
+	// Track address families configured during Start() so Close() can clean them up.
+	hasIPv4, hasIPv6 bool
+
+	updater *InterfaceUpdater
 }
 
 // WindowsTun implements Tun
@@ -86,7 +89,6 @@ func open(name, desc string) (*wintun.Adapter, error) {
 }
 
 func (t *WindowsTun) Start() error {
-	var has4, has6 bool
 	allowedIPs := make([]netip.Prefix, 0, len(t.options.AutoSystemRoutingTable))
 	for _, route := range t.options.AutoSystemRoutingTable {
 		allowedIPs = append(allowedIPs, netip.MustParsePrefix(route))
@@ -98,10 +100,10 @@ func (t *WindowsTun) Start() error {
 			Metric:      0,
 		}
 		if ip.Addr().Is4() {
-			has4 = true
+			t.hasIPv4 = true
 			route.NextHop = netip.IPv4Unspecified()
 		} else {
-			has6 = true
+			t.hasIPv6 = true
 			route.NextHop = netip.IPv6Unspecified()
 		}
 		routesMap[route] = struct{}{}
@@ -127,7 +129,7 @@ func (t *WindowsTun) Start() error {
 		}
 	}
 
-	if has4 {
+	if t.hasIPv4 {
 		ipif, err := t.luid.IPInterface(windows.AF_INET)
 		if err != nil {
 			return err
@@ -144,7 +146,7 @@ func (t *WindowsTun) Start() error {
 			return err
 		}
 	}
-	if has6 {
+	if t.hasIPv6 {
 		ipif, err := t.luid.IPInterface(windows.AF_INET6)
 		if err != nil {
 			return err
@@ -177,9 +179,9 @@ func (t *WindowsTun) Start() error {
 		}
 	}
 
-	if updater != nil {
+	if t.updater != nil {
 		t.changeCallback, err = winipcfg.RegisterInterfaceChangeCallback(func(notificationType winipcfg.MibNotificationType, iface *winipcfg.MibIPInterfaceRow) {
-			updater.Update()
+			t.updater.Update()
 		})
 		if err != nil {
 			return err
@@ -200,10 +202,32 @@ func (t *WindowsTun) Close() error {
 	if t.changeCallback != nil {
 		t.changeCallback.Unregister()
 	}
+
+	// Flush routes, IP addresses, and DNS before closing the adapter.
+	// This prevents stale network configuration from lingering after TUN shutdown,
+	// which would cause slow network access on restart or after idle periods.
+	var errs []error
+	if err := t.luid.FlushRoutes(windows.AF_UNSPEC); err != nil {
+		errs = append(errs, errors.New("failed to flush routes").Base(err))
+	}
+	if err := t.luid.FlushIPAddresses(windows.AF_UNSPEC); err != nil {
+		errs = append(errs, errors.New("failed to flush IP addresses").Base(err))
+	}
+	if t.hasIPv4 {
+		if err := t.luid.FlushDNS(windows.AF_INET); err != nil {
+			errs = append(errs, errors.New("failed to flush IPv4 DNS").Base(err))
+		}
+	}
+	if t.hasIPv6 {
+		if err := t.luid.FlushDNS(windows.AF_INET6); err != nil {
+			errs = append(errs, errors.New("failed to flush IPv6 DNS").Base(err))
+		}
+	}
+
 	t.session.End()
 	_ = t.adapter.Close()
 
-	return nil
+	return errors.Combine(errs...)
 }
 
 func (t *WindowsTun) Name() (string, error) {
@@ -220,6 +244,10 @@ func (t *WindowsTun) Index() (int, error) {
 		return 0, err
 	}
 	return int(row.InterfaceIndex), nil
+}
+
+func (t *WindowsTun) SetUpdater(updater *InterfaceUpdater) {
+	t.updater = updater
 }
 
 // WritePacket implements GVisorDevice method to write one packet to the tun device
@@ -276,10 +304,6 @@ func (t *WindowsTun) Wait() {
 	_, _ = windows.WaitForSingleObject(t.readWait, windows.INFINITE)
 }
 
-func (t *WindowsTun) newEndpoint() (stack.LinkEndpoint, error) {
-	return &LinkEndpoint{deviceMTU: t.options.MTU, device: t}, nil
-}
-
 const (
 	IP_UNICAST_IF   = 31
 	IPV6_UNICAST_IF = 31
@@ -308,78 +332,4 @@ func setinterface(network, address string, fd uintptr, iface *net.Interface) err
 	}
 
 	return errors.Combine(err1, err2, err3, err4)
-}
-
-func findOutboundInterface(tunIndex int, fixedName string) (*net.Interface, error) {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return nil, err
-	}
-
-	if fixedName != "" {
-		for _, iface := range interfaces {
-			if iface.Index != tunIndex && iface.Name == fixedName {
-				return &iface, nil
-			}
-		}
-		return nil, nil
-	}
-
-	var candidates []struct {
-		index int
-		score int
-	}
-	for i, iface := range interfaces {
-		if iface.Index == tunIndex {
-			continue
-		}
-		if strings.Contains(iface.Name, "vEthernet") {
-			continue
-		}
-		if iface.Flags&net.FlagUp == 0 {
-			continue
-		}
-		if iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		addrs, err := iface.Addrs()
-		if err != nil || len(addrs) == 0 {
-			continue
-		}
-		candidates = append(candidates, struct {
-			index int
-			score int
-		}{i, scoreWindowsInterface(&iface, addrs)})
-	}
-
-	sort.Slice(candidates, func(i, j int) bool {
-		if candidates[i].score != candidates[j].score {
-			return candidates[i].score > candidates[j].score
-		}
-		return interfaces[candidates[i].index].Name < interfaces[candidates[j].index].Name
-	})
-	if len(candidates) == 0 {
-		return nil, nil
-	}
-
-	iface := interfaces[candidates[0].index]
-	return &iface, nil
-}
-
-func scoreWindowsInterface(iface *net.Interface, addrs []net.Addr) int {
-	score := 0
-
-	name := strings.ToLower(iface.Name)
-	if strings.Contains(name, "wlan") || strings.Contains(name, "wi-fi") {
-		score += 2
-	}
-
-	for _, addr := range addrs {
-		if strings.HasPrefix(addr.String(), "192.168.") {
-			score++
-			break
-		}
-	}
-
-	return score
 }

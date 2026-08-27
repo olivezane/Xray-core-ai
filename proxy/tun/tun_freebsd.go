@@ -42,6 +42,9 @@ func NewTun(options *Config) (Tun, error) {
 	return &FreeBSDTun{device: tunDev, mtu: options.MTU}, nil
 }
 
+func (t *FreeBSDTun) SetUpdater(updater *InterfaceUpdater) {
+}
+
 func (t *FreeBSDTun) Start() error {
 	return nil
 }
@@ -140,24 +143,6 @@ func (t *FreeBSDTun) Wait() {
 	procyield(1)
 }
 
-func (t *FreeBSDTun) newEndpoint() (stack.LinkEndpoint, error) {
-	return &LinkEndpoint{deviceMTU: t.mtu, device: t}, nil
-}
-
 func setinterface(network, address string, fd uintptr, iface *net.Interface) error {
 	return nil
-}
-
-func findOutboundInterface(tunIndex int, fixedName string) (*net.Interface, error) {
-	if fixedName == "" {
-		return nil, errors.New("automatic outbound interface selection is not supported on this platform")
-	}
-	iface, err := net.InterfaceByName(fixedName)
-	if err != nil {
-		return nil, err
-	}
-	if iface.Index == tunIndex {
-		return nil, errors.New("outbound interface cannot be the TUN interface")
-	}
-	return iface, nil
 }

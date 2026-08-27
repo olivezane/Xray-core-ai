@@ -13,8 +13,6 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/platform"
 	"golang.org/x/sys/unix"
-	"gvisor.dev/gvisor/pkg/tcpip/link/fdbased"
-	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 
 // LinuxTun is an object that handles tun network interface on linux
@@ -30,6 +28,8 @@ type LinuxTun struct {
 	systemRoutes       []netlink.Route
 	routeMonitorStop   chan struct{}
 	routeMonitorOnce   sync.Once
+
+	updater *InterfaceUpdater
 }
 
 // LinuxTun implements Tun
@@ -184,7 +184,7 @@ func (t *LinuxTun) Start() error {
 		return err
 	}
 
-	if updater != nil {
+	if t.updater != nil {
 		t.routeMonitorStop = make(chan struct{})
 		go t.monitorRouteChanges()
 	}
@@ -219,13 +219,14 @@ func (t *LinuxTun) Index() (int, error) {
 	return t.tunLink.Attrs().Index, nil
 }
 
-// newEndpoint builds new gVisor stack.LinkEndpoint from the tun interface file descriptor
-func (t *LinuxTun) newEndpoint() (stack.LinkEndpoint, error) {
-	return fdbased.New(&fdbased.Options{
-		FDs:               []int{t.tunFd},
-		MTU:               t.options.MTU,
-		RXChecksumOffload: true,
-	})
+func (t *LinuxTun) SetUpdater(updater *InterfaceUpdater) {
+	t.updater = updater
+}
+
+// FDs returns the file descriptor backing the tun device, used by the stack
+// module to build its fdbased endpoint.
+func (t *LinuxTun) FDs() []int {
+	return []int{t.tunFd}
 }
 
 func setinterface(network, address string, fd uintptr, iface *net.Interface) error {
@@ -320,87 +321,14 @@ func (t *LinuxTun) monitorRouteChanges() {
 			if !ok {
 				return
 			}
-			if updater != nil {
-				updater.Update()
-			}
+			t.updater.Update()
 		case _, ok := <-linkCh:
 			if !ok {
 				return
 			}
-			if updater != nil {
-				updater.Update()
-			}
+			t.updater.Update()
 		case <-t.routeMonitorStop:
 			return
 		}
 	}
-}
-
-func findOutboundInterface(tunIndex int, fixedName string) (*net.Interface, error) {
-	if fixedName != "" {
-		iface, err := net.InterfaceByName(fixedName)
-		if err != nil {
-			return nil, err
-		}
-		if iface.Index == tunIndex {
-			return nil, errors.New("outbound interface cannot be the TUN interface")
-		}
-		return iface, nil
-	}
-
-	for _, family := range []int{
-		netlink.FAMILY_V4,
-		netlink.FAMILY_V6,
-	} {
-		iface, err := findDefaultInterface(family, tunIndex)
-		if err == nil {
-			return iface, nil
-		}
-	}
-
-	return nil, errors.New("no usable outbound interface found")
-}
-
-func findDefaultInterface(family int, tunIndex int) (*net.Interface, error) {
-	routes, err := netlink.RouteList(nil, family)
-	if err != nil {
-		return nil, err
-	}
-
-	var selected *net.Interface
-	selectedMetric := -1
-
-	for _, route := range routes {
-		if route.Dst != nil {
-			ones, _ := route.Dst.Mask.Size()
-			if ones != 0 {
-				continue
-			}
-		}
-
-		if route.LinkIndex == 0 || route.LinkIndex == tunIndex {
-			continue
-		}
-
-		iface, err := net.InterfaceByIndex(route.LinkIndex)
-		if err != nil {
-			continue
-		}
-
-		if iface.Flags&net.FlagUp == 0 ||
-			iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-
-		if selected == nil || route.Priority < selectedMetric {
-			selected = iface
-			selectedMetric = route.Priority
-		}
-	}
-
-	if selected == nil {
-		return nil, errors.New("physical default route not found")
-	}
-
-	return selected, nil
 }
