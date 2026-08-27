@@ -38,6 +38,21 @@ func (h *SniffHeader) Domain() string {
 	return h.host
 }
 
+// ProtocolForDomainResult implements dispatcher.SnifferResult.
+func (h *SniffHeader) ProtocolForDomainResult() string {
+	return h.Protocol()
+}
+
+// IsProtoSubsetOf implements dispatcher.SnifferResult.
+func (*SniffHeader) IsProtoSubsetOf(string) bool {
+	return false
+}
+
+// IsFakeDNS implements dispatcher.SnifferResult.
+func (*SniffHeader) IsFakeDNS() bool {
+	return false
+}
+
 var (
 	methods = [...]string{"get", "post", "head", "put", "delete", "options", "connect"}
 

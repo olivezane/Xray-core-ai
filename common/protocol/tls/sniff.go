@@ -20,6 +20,21 @@ func (h *SniffHeader) Domain() string {
 	return h.domain
 }
 
+// ProtocolForDomainResult implements dispatcher.SnifferResult.
+func (h *SniffHeader) ProtocolForDomainResult() string {
+	return h.Protocol()
+}
+
+// IsProtoSubsetOf implements dispatcher.SnifferResult.
+func (*SniffHeader) IsProtoSubsetOf(string) bool {
+	return false
+}
+
+// IsFakeDNS implements dispatcher.SnifferResult.
+func (*SniffHeader) IsFakeDNS() bool {
+	return false
+}
+
 var (
 	errNotTLS         = errors.New("not TLS header")
 	errNotClientHello = errors.New("not client hello")
