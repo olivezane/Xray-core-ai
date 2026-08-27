@@ -13,8 +13,6 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/session"
-	"github.com/xtls/xray-core/core"
-	"github.com/xtls/xray-core/features/policy"
 	"github.com/xtls/xray-core/features/routing"
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/internet/stat"
@@ -24,15 +22,11 @@ import (
 func init() {
 	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
 		d := new(DokodemoDoor)
-		err := core.RequireFeatures(ctx, func(pm policy.Manager) error {
-			return d.Init(config.(*Config), pm, session.SockoptFromContext(ctx))
-		})
-		return d, err
+		return d, d.Init(config.(*Config), session.SockoptFromContext(ctx))
 	}))
 }
 
 type DokodemoDoor struct {
-	policyManager  policy.Manager
 	config         *Config
 	rewriteAddress net.Address
 	rewritePort    net.Port
@@ -41,7 +35,7 @@ type DokodemoDoor struct {
 }
 
 // Init initializes the DokodemoDoor instance with necessary parameters.
-func (d *DokodemoDoor) Init(config *Config, pm policy.Manager, sockopt *session.Sockopt) error {
+func (d *DokodemoDoor) Init(config *Config, sockopt *session.Sockopt) error {
 	if len(config.AllowedNetworks) == 0 {
 		return errors.New("no network specified")
 	}
@@ -49,7 +43,6 @@ func (d *DokodemoDoor) Init(config *Config, pm policy.Manager, sockopt *session.
 	d.rewriteAddress = config.GetPredefinedAddress()
 	d.rewritePort = net.Port(config.RewritePort)
 	d.portMap = config.PortMap
-	d.policyManager = pm
 	d.sockopt = sockopt
 
 	return nil
@@ -61,12 +54,6 @@ func (d *DokodemoDoor) Network() []net.Network {
 		return append(d.config.AllowedNetworks, net.Network_UNIX)
 	}
 	return d.config.AllowedNetworks
-}
-
-func (d *DokodemoDoor) policy() policy.Session {
-	config := d.config
-	p := d.policyManager.ForLevel(config.UserLevel)
-	return p
 }
 
 // Process implements proxy.Inbound.

@@ -68,40 +68,28 @@ func showBalancerInfo(b *routerService.BalancerMsg) {
 	if b.Override != nil {
 		sb.WriteString("  - Selecting Override:\n")
 		for i, s := range []string{b.Override.Target} {
-			writeRow(sb, tableIndent, i+1, []string{s}, nil)
+			writeRow(sb, tableIndent, i+1, []string{s})
 		}
 	}
 	// Selects
 	sb.WriteString("  - Selects:\n")
 	if b.PrincipleTarget != nil {
 		for i, o := range b.PrincipleTarget.Tag {
-			writeRow(sb, tableIndent, i+1, []string{o}, nil)
+			writeRow(sb, tableIndent, i+1, []string{o})
 		}
 	}
 	os.Stdout.WriteString(sb.String())
 }
 
-func getColumnFormats(titles []string) []string {
-	w := make([]string, len(titles))
-	for i, t := range titles {
-		w[i] = fmt.Sprintf("%%-%ds ", len(t))
-	}
-	return w
-}
-
-func writeRow(sb *strings.Builder, indent, index int, values, formats []string) {
+func writeRow(sb *strings.Builder, indent, index int, values []string) {
 	if index == 0 {
 		// title line
 		sb.WriteString(strings.Repeat(" ", indent+4))
 	} else {
 		sb.WriteString(fmt.Sprintf("%s%-4d", strings.Repeat(" ", indent), index))
 	}
-	for i, v := range values {
-		format := "%-14s"
-		if i < len(formats) {
-			format = formats[i]
-		}
-		sb.WriteString(fmt.Sprintf(format, v))
+	for _, v := range values {
+		sb.WriteString(fmt.Sprintf("%-14s", v))
 	}
 	sb.WriteByte('\n')
 }

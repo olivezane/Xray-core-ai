@@ -25,8 +25,6 @@ var strategy = [][]byte{
 	{2, 6, 4}, //   ForceIPv6v4 force,      6,      4
 }
 
-const unknownProtocol = "unknown"
-
 func RegisterProtocolConfigCreator(name string, creator ConfigCreator) error {
 	if _, found := globalTransportConfigCreatorCache[name]; found {
 		return errors.New("protocol ", name, " is already registered").AtError()

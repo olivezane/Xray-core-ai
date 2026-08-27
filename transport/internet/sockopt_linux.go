@@ -231,13 +231,6 @@ func applyInboundSocketOptions(network string, fd uintptr, config *SocketConfig)
 	return nil
 }
 
-func setReuseAddr(fd uintptr) error {
-	if err := syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); err != nil {
-		return errors.New("failed to set SO_REUSEADDR").Base(err).AtWarning()
-	}
-	return nil
-}
-
 func setReusePort(fd uintptr) error {
 	if err := syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
 		return errors.New("failed to set SO_REUSEPORT").Base(err).AtWarning()
