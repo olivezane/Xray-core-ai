@@ -5,6 +5,9 @@ import (
 	"net"
 )
 
+// XMC connections handshake (Minecraft login) lazily before proxy data flows,
+// under finalmask.HandshakeDeadlines arbitration.
+
 func (c *Config) TCP() {
 }
 

@@ -1,4 +1,4 @@
-package xmc
+package internet
 
 import (
 	"net"
@@ -7,18 +7,18 @@ import (
 	"time"
 )
 
-func TestConnectionDeadlinesRestoreCallerValues(t *testing.T) {
+func TestHandshakeDeadlinesRestoreCallerValues(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()
 	defer server.Close()
 
 	recording := &deadlineRecordingConn{Conn: client}
-	deadlines := newConnectionDeadlines(recording)
+	deadlines := NewHandshakeDeadlines(recording)
 	callerDeadline := time.Now().Add(10 * time.Minute)
-	if err := deadlines.setDeadline(callerDeadline); err != nil {
+	if err := deadlines.SetDeadline(callerDeadline); err != nil {
 		t.Fatal(err)
 	}
-	if err := deadlines.beginHandshake(); err != nil {
+	if err := deadlines.BeginHandshake(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -28,7 +28,7 @@ func TestConnectionDeadlinesRestoreCallerValues(t *testing.T) {
 	}
 
 	shortReadDeadline := time.Now().Add(time.Second)
-	if err := deadlines.setReadDeadline(shortReadDeadline); err != nil {
+	if err := deadlines.SetReadDeadline(shortReadDeadline); err != nil {
 		t.Fatal(err)
 	}
 	read, _ = recording.currentDeadlines()
@@ -36,7 +36,7 @@ func TestConnectionDeadlinesRestoreCallerValues(t *testing.T) {
 		t.Fatalf("read deadline = %s, want %s", read, shortReadDeadline)
 	}
 
-	if err := deadlines.endHandshake(); err != nil {
+	if err := deadlines.EndHandshake(); err != nil {
 		t.Fatal(err)
 	}
 	read, write = recording.currentDeadlines()

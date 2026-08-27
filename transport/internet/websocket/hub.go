@@ -3,7 +3,6 @@ package websocket
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"io"
 	"net/http"
@@ -17,7 +16,7 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	http_proto "github.com/xtls/xray-core/common/protocol/http"
 	"github.com/xtls/xray-core/transport/internet"
-	v2tls "github.com/xtls/xray-core/transport/internet/tls"
+	"github.com/xtls/xray-core/transport/internet/security"
 )
 
 type requestHandler struct {
@@ -117,19 +116,13 @@ func ListenWS(ctx context.Context, address net.Address, port net.Port, streamSet
 		errors.LogInfo(ctx, "listening TCP(for WS) on ", address, ":", port)
 	}
 
-	if streamSettings.TcpmaskManager != nil {
-		listener, _ = streamSettings.TcpmaskManager.WrapListener(listener)
-	}
+	listener, _ = internet.WrapListener(streamSettings, listener)
 
 	if streamSettings.SocketSettings != nil && streamSettings.SocketSettings.AcceptProxyProtocol {
 		errors.LogWarning(ctx, "accepting PROXY protocol")
 	}
 
-	if config := v2tls.ConfigFromStreamSettings(streamSettings); config != nil {
-		if tlsConfig := config.GetTLSConfig(); tlsConfig != nil {
-			listener = tls.NewListener(listener, tlsConfig)
-		}
-	}
+	listener = security.WrapSecureListener(security.ResolveServerSecurity(streamSettings, security.ServerCaps{WithTLS: true}), listener)
 
 	l.listener = listener
 

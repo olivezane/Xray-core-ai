@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/xtls/xray-core/common/buf"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 type salamanderConn struct {
@@ -204,7 +204,7 @@ func randIntn(n int) int {
 
 func (g *geckoConn) ReadFrom(p []byte) (int, net.Addr, error) {
 	b := buf.New()
-	b.Resize(0, finalmask.UDPSize)
+	b.Resize(0, internet.UDPSize)
 	buf := b.Bytes()
 	defer b.Release()
 	for {

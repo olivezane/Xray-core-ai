@@ -1,4 +1,4 @@
-package finalmask_test
+package internet_test
 
 import (
 	"bytes"
@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xtls/xray-core/proxy"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/finalmask/header/custom"
 	"github.com/xtls/xray-core/transport/internet/finalmask/mkcp/aes128gcm"
 	"github.com/xtls/xray-core/transport/internet/finalmask/mkcp/header"
 	"github.com/xtls/xray-core/transport/internet/finalmask/mkcp/original"
 	"github.com/xtls/xray-core/transport/internet/finalmask/salamander"
 	"github.com/xtls/xray-core/transport/internet/finalmask/sudoku"
+	"github.com/xtls/xray-core/transport/internet/rawconn"
 )
 
 func mustSendRecv(
@@ -51,7 +51,7 @@ func mustSendRecv(
 
 type layerMask struct {
 	name   string
-	mask   finalmask.Udpmask
+	mask   internet.Udpmask
 	layers int
 }
 
@@ -68,67 +68,6 @@ func (c *countingConn) Write(p []byte) (int, error) {
 
 func (c *countingConn) Written() int64 {
 	return c.written.Load()
-}
-
-type recordedPacketWrite struct {
-	payload []byte
-	addr    net.Addr
-}
-
-type scriptedPacketConn struct {
-	local    *net.UDPAddr
-	writes   chan recordedPacketWrite
-	reads    chan recordedPacketWrite
-	closed   atomic.Bool
-	deadline atomic.Int64
-}
-
-func newScriptedPacketConn() *scriptedPacketConn {
-	return &scriptedPacketConn{
-		local:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 40000},
-		writes: make(chan recordedPacketWrite, 8),
-		reads:  make(chan recordedPacketWrite, 8),
-	}
-}
-
-func (c *scriptedPacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	item, ok := <-c.reads
-	if !ok {
-		return 0, nil, io.EOF
-	}
-	copy(p, item.payload)
-	return len(item.payload), item.addr, nil
-}
-
-func (c *scriptedPacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	c.writes <- recordedPacketWrite{
-		payload: append([]byte(nil), p...),
-		addr:    addr,
-	}
-	return len(p), nil
-}
-
-func (c *scriptedPacketConn) Close() error {
-	if c.closed.CompareAndSwap(false, true) {
-		close(c.reads)
-	}
-	return nil
-}
-
-func (c *scriptedPacketConn) LocalAddr() net.Addr { return c.local }
-func (c *scriptedPacketConn) SetDeadline(t time.Time) error {
-	c.deadline.Store(t.UnixNano())
-	return nil
-}
-
-func (c *scriptedPacketConn) SetReadDeadline(t time.Time) error {
-	c.deadline.Store(t.UnixNano())
-	return nil
-}
-
-func (c *scriptedPacketConn) SetWriteDeadline(t time.Time) error {
-	c.deadline.Store(t.UnixNano())
-	return nil
 }
 
 func newStandaloneEchoUDPConfig() *custom.UDPStandaloneConfig {
@@ -225,7 +164,7 @@ func newUDPClientServerPair(t *testing.T, cfg *custom.UDPStandaloneConfig) (net.
 	}
 	t.Cleanup(func() { _ = serverRaw.Close() })
 
-	maskManager := finalmask.NewUdpmaskManager([]finalmask.Udpmask{cfg})
+	maskManager := internet.NewUdpmaskManager([]internet.Udpmask{cfg})
 
 	client, err := maskManager.WrapPacketConnClient(clientRaw)
 	if err != nil {
@@ -348,11 +287,11 @@ func TestPacketConnReadWrite(t *testing.T) {
 			if layers <= 0 {
 				layers = 1
 			}
-			masks := make([]finalmask.Udpmask, 0, layers)
+			masks := make([]internet.Udpmask, 0, layers)
 			for i := 0; i < layers; i++ {
 				masks = append(masks, mask)
 			}
-			maskManager := finalmask.NewUdpmaskManager(masks)
+			maskManager := internet.NewUdpmaskManager(masks)
 
 			client, err := net.ListenPacket("udp", "127.0.0.1:0")
 			if err != nil {
@@ -397,7 +336,7 @@ func TestUDPcustomStaticHeaderWireShape(t *testing.T) {
 			{Rand: 1, RandMin: 0x30, RandMax: 0x40},
 		},
 	}
-	maskManager := finalmask.NewUdpmaskManager([]finalmask.Udpmask{cfg})
+	maskManager := internet.NewUdpmaskManager([]internet.Udpmask{cfg})
 
 	clientRaw, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
@@ -889,7 +828,7 @@ func TestSudokuBDD(t *testing.T) {
 			PaddingMin:   0,
 			PaddingMax:   0,
 		}
-		maskManager := finalmask.NewUdpmaskManager([]finalmask.Udpmask{cfg})
+		maskManager := internet.NewUdpmaskManager([]internet.Udpmask{cfg})
 
 		clientRaw, err := net.ListenPacket("udp", "127.0.0.1:0")
 		if err != nil {
@@ -1017,7 +956,7 @@ func TestSudokuBDD(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		unwrapped, readCounter, writeCounter := proxy.UnwrapRawConn(clientConn)
+		unwrapped, readCounter, writeCounter := rawconn.Unwrap(clientConn)
 		if readCounter != nil || writeCounter != nil {
 			t.Fatal("unexpected stat counters while unwrapping sudoku conn")
 		}
@@ -1041,7 +980,7 @@ func TestSudokuBDD(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		unwrapped, readCounter, writeCounter := proxy.UnwrapRawConn(clientConn)
+		unwrapped, readCounter, writeCounter := rawconn.Unwrap(clientConn)
 		if readCounter != nil || writeCounter != nil {
 			t.Fatal("unexpected stat counters while unwrapping sudoku conn")
 		}

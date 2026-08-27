@@ -2,7 +2,6 @@ package kcp
 
 import (
 	"context"
-	gotls "crypto/tls"
 	"sync"
 
 	"github.com/xtls/xray-core/common"
@@ -10,8 +9,8 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet/security"
 	"github.com/xtls/xray-core/transport/internet/stat"
-	"github.com/xtls/xray-core/transport/internet/tls"
 	"github.com/xtls/xray-core/transport/internet/udp"
 )
 
@@ -24,12 +23,12 @@ type ConnectionID struct {
 // Listener defines a server listening for connections
 type Listener struct {
 	sync.Mutex
-	sessions  map[ConnectionID]*Connection
-	hub       *udp.Hub
-	tlsConfig *gotls.Config
-	config    *Config
-	reader    PacketReader
-	addConn   internet.ConnHandler
+	sessions map[ConnectionID]*Connection
+	hub      *udp.Hub
+	sec      security.ServerSecurity // TLS only: REALITY has never been supported over KCP
+	config   *Config
+	reader   PacketReader
+	addConn  internet.ConnHandler
 }
 
 func NewListener(ctx context.Context, address net.Address, port net.Port, streamSettings *internet.MemoryStreamConfig, addConn internet.ConnHandler) (*Listener, error) {
@@ -42,9 +41,7 @@ func NewListener(ctx context.Context, address net.Address, port net.Port, stream
 		addConn:  addConn,
 	}
 
-	if config := tls.ConfigFromStreamSettings(streamSettings); config != nil {
-		l.tlsConfig = config.GetTLSConfig()
-	}
+	l.sec = security.ResolveServerSecurity(streamSettings, security.ServerCaps{WithTLS: true})
 
 	hub, err := udp.ListenUDP(ctx, address, port, streamSettings, udp.HubCapacity(1024))
 	if err != nil {
@@ -110,10 +107,12 @@ func (l *Listener) OnReceive(payload *buf.Buffer, src net.Destination) {
 			RemoteAddr:   remoteAddr,
 			Conversation: conv,
 		}, writer, writer, l.config)
-		var netConn stat.Connection = conn
-		if l.tlsConfig != nil {
-			netConn = tls.Server(conn, l.tlsConfig)
+		secured, err := security.WrapConnServer(l.sec, conn)
+		if err != nil {
+			errors.LogInfoInner(context.Background(), err, "failed to secure KCP connection")
+			return
 		}
+		var netConn stat.Connection = secured
 
 		l.addConn(netConn)
 		l.sessions[id] = conn

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	"github.com/xtls/xray-core/transport/internet"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -109,7 +109,7 @@ func (c *xicmpConnServer) clean() {
 }
 
 func (c *xicmpConnServer) recv4() {
-	var b [finalmask.UDPSize]byte
+	var b [internet.UDPSize]byte
 
 	for {
 		if c.closed() {
@@ -187,7 +187,7 @@ func (c *xicmpConnServer) recv4() {
 }
 
 func (c *xicmpConnServer) recv6() {
-	var b [finalmask.UDPSize]byte
+	var b [internet.UDPSize]byte
 
 	for {
 		if c.closed() {
@@ -278,7 +278,7 @@ func (c *xicmpConnServer) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 }
 
 func (c *xicmpConnServer) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	if len(p)+8 > finalmask.UDPSize {
+	if len(p)+8 > internet.UDPSize {
 		errors.LogError(context.Background(), "drop packet to ", addr, " with size ", len(p))
 		return 0, nil
 	}
@@ -296,7 +296,7 @@ func (c *xicmpConnServer) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 
 	// errors.LogDebug(context.Background(), "id ", r.id, " seq ", r.seq, " addr ", r.addr)
 
-	b := pool.Get().([]byte)[:finalmask.UDPSize]
+	b := pool.Get().([]byte)[:internet.UDPSize]
 	defer pool.Put(b)
 
 	copy(b[8:], p)

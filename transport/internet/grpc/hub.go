@@ -4,13 +4,12 @@ import (
 	"context"
 	"time"
 
-	goreality "github.com/xtls/reality"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/grpc/encoding"
-	"github.com/xtls/xray-core/transport/internet/reality"
+	"github.com/xtls/xray-core/transport/internet/security"
 	"github.com/xtls/xray-core/transport/internet/tls"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -124,16 +123,12 @@ func Listen(ctx context.Context, address net.Address, port net.Port, settings *i
 			}
 		}
 
-		if settings.TcpmaskManager != nil {
-			streamListener, _ = settings.TcpmaskManager.WrapListener(streamListener)
-		}
+		streamListener, _ = internet.WrapListener(settings, streamListener)
 
 		errors.LogDebug(ctx, "gRPC listen for service name `"+grpcSettings.getServiceName()+"` tun `"+grpcSettings.getTunStreamName()+"` multi tun `"+grpcSettings.getTunMultiStreamName()+"`")
 		encoding.RegisterGRPCServiceServerX(s, listener, grpcSettings.getServiceName(), grpcSettings.getTunStreamName(), grpcSettings.getTunMultiStreamName())
 
-		if config := reality.ConfigFromStreamSettings(settings); config != nil {
-			streamListener = goreality.NewListener(streamListener, config.GetREALITYConfig())
-		}
+		streamListener = security.WrapSecureListener(security.ResolveServerSecurity(settings, security.ServerCaps{WithReality: true}), streamListener)
 		if err = s.Serve(streamListener); err != nil {
 			errors.LogInfoInner(ctx, err, "Listener for gRPC ended")
 		}

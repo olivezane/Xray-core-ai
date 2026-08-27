@@ -17,7 +17,6 @@ import (
 
 	"github.com/apernet/quic-go"
 	"github.com/apernet/quic-go/http3"
-	goreality "github.com/xtls/reality"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/errors"
@@ -27,7 +26,7 @@ import (
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/hysteria/congestion"
 	"github.com/xtls/xray-core/transport/internet/hysteria/congestion/bbr"
-	"github.com/xtls/xray-core/transport/internet/reality"
+	"github.com/xtls/xray-core/transport/internet/security"
 	"github.com/xtls/xray-core/transport/internet/stat"
 	"github.com/xtls/xray-core/transport/internet/tls"
 )
@@ -479,13 +478,9 @@ func ListenXH(ctx context.Context, address net.Address, port net.Port, streamSet
 		if err != nil {
 			return nil, errors.New("failed to listen UDP for XHTTP/3 on ", address, ":", port).Base(err)
 		}
-		if streamSettings.UdpmaskManager != nil {
-			newConn, err := streamSettings.UdpmaskManager.WrapPacketConnServer(Conn)
-			if err != nil {
-				Conn.Close()
-				return nil, errors.New("mask err").Base(err)
-			}
-			Conn = newConn
+		Conn, err = internet.WrapPacketConnServer(streamSettings, Conn)
+		if err != nil {
+			return nil, err
 		}
 
 		quicParams := streamSettings.QuicParams
@@ -537,20 +532,13 @@ func ListenXH(ctx context.Context, address net.Address, port net.Port, streamSet
 		errors.LogInfo(ctx, "listening TCP for XHTTP on ", address, ":", port)
 	}
 
-	if !l.isH3 && streamSettings.TcpmaskManager != nil {
-		l.listener, _ = streamSettings.TcpmaskManager.WrapListener(l.listener)
+	if !l.isH3 {
+		l.listener, _ = internet.WrapListener(streamSettings, l.listener)
 	}
 
 	// tcp/unix (h1/h2)
 	if l.listener != nil {
-		if config := tls.ConfigFromStreamSettings(streamSettings); config != nil {
-			if tlsConfig := config.GetTLSConfig(); tlsConfig != nil {
-				l.listener = gotls.NewListener(l.listener, tlsConfig)
-			}
-		}
-		if config := reality.ConfigFromStreamSettings(streamSettings); config != nil {
-			l.listener = goreality.NewListener(l.listener, config.GetREALITYConfig())
-		}
+		l.listener = security.WrapSecureListener(security.ResolveServerSecurity(streamSettings, security.ServerCaps{WithTLS: true, WithReality: true}), l.listener)
 
 		handler.localAddr = l.listener.Addr()
 

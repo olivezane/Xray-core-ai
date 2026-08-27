@@ -3,7 +3,6 @@ package httpupgrade
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"io"
 	"net/http"
 	"strings"
@@ -14,8 +13,8 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	http_proto "github.com/xtls/xray-core/common/protocol/http"
 	"github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet/security"
 	"github.com/xtls/xray-core/transport/internet/stat"
-	v2tls "github.com/xtls/xray-core/transport/internet/tls"
 )
 
 type server struct {
@@ -144,19 +143,13 @@ func ListenHTTPUpgrade(ctx context.Context, address net.Address, port net.Port, 
 		errors.LogInfo(ctx, "listening TCP(for HttpUpgrade) on ", address, ":", port)
 	}
 
-	if streamSettings.TcpmaskManager != nil {
-		listener, _ = streamSettings.TcpmaskManager.WrapListener(listener)
-	}
+	listener, _ = internet.WrapListener(streamSettings, listener)
 
 	if streamSettings.SocketSettings != nil && streamSettings.SocketSettings.AcceptProxyProtocol {
 		errors.LogWarning(ctx, "accepting PROXY protocol")
 	}
 
-	if config := v2tls.ConfigFromStreamSettings(streamSettings); config != nil {
-		if tlsConfig := config.GetTLSConfig(); tlsConfig != nil {
-			listener = tls.NewListener(listener, tlsConfig)
-		}
-	}
+	listener = security.WrapSecureListener(security.ResolveServerSecurity(streamSettings, security.ServerCaps{WithTLS: true}), listener)
 
 	serverInstance := &server{
 		config:         transportConfiguration,

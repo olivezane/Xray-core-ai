@@ -15,6 +15,7 @@ import (
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/grpc/encoding"
 	"github.com/xtls/xray-core/transport/internet/reality"
+	"github.com/xtls/xray-core/transport/internet/security"
 	"github.com/xtls/xray-core/transport/internet/stat"
 	"github.com/xtls/xray-core/transport/internet/tls"
 	"google.golang.org/grpc"
@@ -126,26 +127,9 @@ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *in
 
 			c, err := internet.DialSystem(gctx, net.TCPDestination(address, port), sockopt)
 			if err == nil {
-				if streamSettings.TcpmaskManager != nil {
-					newConn, err := streamSettings.TcpmaskManager.WrapConnClient(c)
-					if err != nil {
-						c.Close()
-						return nil, errors.New("mask err").Base(err)
-					}
-					c = newConn
-				}
-
-				if tlsConfig != nil {
-					config := tlsConfig.GetTLSConfig(tls.WithDestination(dest))
-					if fingerprint := tls.GetFingerprint(tlsConfig.Fingerprint); fingerprint != nil {
-						return tls.UClient(c, config, fingerprint), nil
-					} else { // Fallback to normal gRPC TLS
-						return tls.Client(c, config), nil
-					}
-				}
-				if realityConfig != nil {
-					return reality.UClient(c, realityConfig, gctx, dest)
-				}
+				// gRPC layers its own TLS lazily through the returned conn;
+				// REALITY is the only eagerly-built security here.
+				c, err = security.WrapConnClient(streamSettings, gctx, dest, c, &security.SecurityHooks{WithReality: true})
 			}
 			return c, err
 		}),

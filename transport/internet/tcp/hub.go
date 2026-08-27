@@ -2,7 +2,6 @@ package tcp
 
 import (
 	"context"
-	gotls "crypto/tls"
 	"strings"
 	"time"
 
@@ -11,19 +10,17 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet"
-	"github.com/xtls/xray-core/transport/internet/reality"
+	"github.com/xtls/xray-core/transport/internet/security"
 	"github.com/xtls/xray-core/transport/internet/stat"
-	"github.com/xtls/xray-core/transport/internet/tls"
 )
 
 // Listener is an internet.Listener that listens for TCP connections.
 type Listener struct {
-	listener      net.Listener
-	tlsConfig     *gotls.Config
-	realityConfig *goreality.Config
-	authConfig    internet.ConnectionAuthenticator
-	config        *Config
-	addConn       internet.ConnHandler
+	listener   net.Listener
+	sec        security.ServerSecurity
+	authConfig internet.ConnectionAuthenticator
+	config     *Config
+	addConn    internet.ConnHandler
 }
 
 // ListenTCP creates a new Listener based on configurations.
@@ -64,9 +61,7 @@ func ListenTCP(ctx context.Context, address net.Address, port net.Port, streamSe
 		errors.LogInfo(ctx, "listening TCP on ", address, ":", port)
 	}
 
-	if streamSettings.TcpmaskManager != nil {
-		listener, _ = streamSettings.TcpmaskManager.WrapListener(listener)
-	}
+	listener, _ = internet.WrapListener(streamSettings, listener)
 
 	if streamSettings.SocketSettings != nil && streamSettings.SocketSettings.AcceptProxyProtocol {
 		errors.LogWarning(ctx, "accepting PROXY protocol")
@@ -74,12 +69,9 @@ func ListenTCP(ctx context.Context, address net.Address, port net.Port, streamSe
 
 	l.listener = listener
 
-	if config := tls.ConfigFromStreamSettings(streamSettings); config != nil {
-		l.tlsConfig = config.GetTLSConfig()
-	}
-	if config := reality.ConfigFromStreamSettings(streamSettings); config != nil {
-		l.realityConfig = config.GetREALITYConfig()
-		go goreality.DetectPostHandshakeRecordsLens(l.realityConfig)
+	l.sec = security.ResolveServerSecurity(streamSettings, security.ServerCaps{WithTLS: true, WithReality: true})
+	if l.sec.Reality != nil {
+		go goreality.DetectPostHandshakeRecordsLens(l.sec.Reality)
 	}
 
 	if tcpSettings.HeaderSettings != nil {
@@ -114,13 +106,10 @@ func (v *Listener) keepAccepting() {
 		}
 
 		go func() {
-			if v.tlsConfig != nil {
-				conn = tls.Server(conn, v.tlsConfig)
-			} else if v.realityConfig != nil {
-				if conn, err = reality.Server(conn, v.realityConfig); err != nil {
-					errors.LogInfo(context.Background(), err.Error())
-					return
-				}
+			conn, err := security.WrapConnServer(v.sec, conn)
+			if err != nil {
+				errors.LogInfo(context.Background(), err.Error())
+				return
 			}
 			if v.authConfig != nil {
 				conn = v.authConfig.Server(conn)

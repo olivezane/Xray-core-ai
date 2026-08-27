@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 const (
@@ -158,7 +158,7 @@ func (c *xdnsConnServer) stash(queue *queue, p []byte) {
 }
 
 func (c *xdnsConnServer) recvLoop() {
-	var buf [finalmask.UDPSize]byte
+	var buf [internet.UDPSize]byte
 
 	for {
 		if c.closed {

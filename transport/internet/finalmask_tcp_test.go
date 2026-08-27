@@ -1,4 +1,4 @@
-package finalmask_test
+package internet_test
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/finalmask/header/custom"
 )
 
@@ -44,7 +44,7 @@ func mustSendRecvTcp(
 
 type layerMaskTcp struct {
 	name string
-	mask finalmask.Tcpmask
+	mask internet.Tcpmask
 }
 
 type failingWrapMask struct{}
@@ -92,7 +92,7 @@ func TestConnReadWrite(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			mask := c.mask
 
-			maskManager := finalmask.NewTcpmaskManager([]finalmask.Tcpmask{mask})
+			maskManager := internet.NewTcpmaskManager([]internet.Tcpmask{mask})
 
 			ln, err := net.Listen("tcp", "127.0.0.1:0")
 			if err != nil {
@@ -150,7 +150,7 @@ func TestTCPcustomStaticHandshakeRoundTrip(t *testing.T) {
 			},
 		},
 	}
-	maskManager := finalmask.NewTcpmaskManager([]finalmask.Tcpmask{cfg})
+	maskManager := internet.NewTcpmaskManager([]internet.Tcpmask{cfg})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -257,8 +257,8 @@ func TestTCPcustomClientRejectsMismatchedServerSequence(t *testing.T) {
 }
 
 func TestTCPWrapListenerRejectsImmediateWrapErrors(t *testing.T) {
-	clientManager := finalmask.NewTcpmaskManager([]finalmask.Tcpmask{failingWrapMask{}})
-	serverManager := finalmask.NewTcpmaskManager([]finalmask.Tcpmask{failingWrapMask{}})
+	clientManager := internet.NewTcpmaskManager([]internet.Tcpmask{failingWrapMask{}})
+	serverManager := internet.NewTcpmaskManager([]internet.Tcpmask{failingWrapMask{}})
 
 	rawLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

@@ -298,13 +298,9 @@ func Listen(ctx context.Context, address net.Address, port net.Port, streamSetti
 		return nil, err
 	}
 
-	if streamSettings.UdpmaskManager != nil {
-		newConn, err := streamSettings.UdpmaskManager.WrapPacketConnServer(pktConn)
-		if err != nil {
-			pktConn.Close()
-			return nil, errors.New("mask err").Base(err)
-		}
-		pktConn = newConn
+	pktConn, err = internet.WrapPacketConnServer(streamSettings, pktConn)
+	if err != nil {
+		return nil, err
 	}
 
 	tr := &quic.Transport{Conn: pktConn}

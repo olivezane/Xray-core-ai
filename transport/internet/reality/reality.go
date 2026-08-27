@@ -29,6 +29,7 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/utils"
 	"github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/transport/internet/stat"
 	"github.com/xtls/xray-core/transport/internet/tls"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/net/http2"
@@ -36,6 +37,12 @@ import (
 
 type Conn struct {
 	*reality.Conn
+}
+
+var _ stat.Unwrapper = (*Conn)(nil)
+
+func (c *Conn) Unwrap() net.Conn {
+	return c.Conn.NetConn()
 }
 
 func (c *Conn) HandshakeAddress() net.Address {
@@ -60,6 +67,12 @@ type UConn struct {
 	ServerName string
 	AuthKey    []byte
 	Verified   bool
+}
+
+var _ stat.Unwrapper = (*UConn)(nil)
+
+func (c *UConn) Unwrap() net.Conn {
+	return c.Conn.NetConn()
 }
 
 func (c *UConn) HandshakeAddress() net.Address {

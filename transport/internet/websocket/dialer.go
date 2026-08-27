@@ -13,6 +13,7 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/browser_dialer"
+	"github.com/xtls/xray-core/transport/internet/security"
 	"github.com/xtls/xray-core/transport/internet/stat"
 	"github.com/xtls/xray-core/transport/internet/tls"
 )
@@ -52,17 +53,8 @@ func dialWebSocket(ctx context.Context, dest net.Destination, streamSettings *in
 			if err != nil {
 				return nil, err
 			}
-
-			if streamSettings.TcpmaskManager != nil {
-				newConn, err := streamSettings.TcpmaskManager.WrapConnClient(conn)
-				if err != nil {
-					conn.Close()
-					return nil, errors.New("mask err").Base(err)
-				}
-				conn = newConn
-			}
-
-			return conn, err
+			// Mask only: gorilla layers TLS itself via TLSClientConfig.
+			return security.WrapConnClient(streamSettings, ctx, dest, conn, nil)
 		},
 		ReadBufferSize:   4 * 1024,
 		WriteBufferSize:  4 * 1024,
@@ -84,29 +76,21 @@ func dialWebSocket(ctx context.Context, dest net.Destination, streamSettings *in
 					errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
 					return nil, err
 				}
-
-				if streamSettings.TcpmaskManager != nil {
-					newConn, err := streamSettings.TcpmaskManager.WrapConnClient(pconn)
-					if err != nil {
-						pconn.Close()
-						return nil, errors.New("mask err").Base(err)
-					}
-					pconn = newConn
-				}
-
-				// TLS and apply the handshake
-				cn := tls.UClient(pconn, tlsConfig, fingerprint).(*tls.UConn)
-				if err := cn.WebsocketHandshakeContext(ctx); err != nil {
+				conn, err := security.WrapConnClient(streamSettings, ctx, dest, pconn, &security.SecurityHooks{
+					RequestALPN:   "http/1.1",
+					UTLSHandshake: security.HandshakeWebsocket,
+					PostHandshake: func(cn *tls.UConn) error {
+						if !tlsConfig.InsecureSkipVerify {
+							return cn.VerifyHostname(tlsConfig.ServerName)
+						}
+						return nil
+					},
+				})
+				if err != nil {
 					errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
 					return nil, err
 				}
-				if !tlsConfig.InsecureSkipVerify {
-					if err := cn.VerifyHostname(tlsConfig.ServerName); err != nil {
-						errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
-						return nil, err
-					}
-				}
-				return cn, nil
+				return conn, nil
 			}
 		}
 	}

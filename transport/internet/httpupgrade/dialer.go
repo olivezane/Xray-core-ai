@@ -12,6 +12,7 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/utils"
 	"github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet/security"
 	"github.com/xtls/xray-core/transport/internet/stat"
 	"github.com/xtls/xray-core/transport/internet/tls"
 )
@@ -52,32 +53,21 @@ func dialhttpUpgrade(ctx context.Context, dest net.Destination, streamSettings *
 		return nil, err
 	}
 
-	if streamSettings.TcpmaskManager != nil {
-		newConn, err := streamSettings.TcpmaskManager.WrapConnClient(pconn)
-		if err != nil {
-			pconn.Close()
-			return nil, errors.New("mask err").Base(err)
-		}
-		pconn = newConn
-	}
-
-	var conn net.Conn
 	var requestURL url.URL
 	tConfig := tls.ConfigFromStreamSettings(streamSettings)
+	var hooks *security.SecurityHooks
 	if tConfig != nil {
-		tlsConfig := tConfig.GetTLSConfig(tls.WithDestination(dest), tls.WithNextProto("http/1.1"))
-		if fingerprint := tls.GetFingerprint(tConfig.Fingerprint); fingerprint != nil {
-			conn = tls.UClient(pconn, tlsConfig, fingerprint)
-			if err := conn.(*tls.UConn).WebsocketHandshakeContext(ctx); err != nil {
-				return nil, err
-			}
-		} else {
-			conn = tls.Client(pconn, tlsConfig)
-		}
 		requestURL.Scheme = "https"
+		hooks = &security.SecurityHooks{
+			RequestALPN:   "http/1.1",
+			UTLSHandshake: security.HandshakeWebsocket,
+		}
 	} else {
-		conn = pconn
 		requestURL.Scheme = "http"
+	}
+	conn, err := security.WrapConnClient(streamSettings, ctx, dest, pconn, hooks)
+	if err != nil {
+		return nil, err
 	}
 
 	requestURL.Host = transportConfiguration.Host

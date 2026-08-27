@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 const (
 	packetQueueSize = 1024
-	udpBufferSize   = finalmask.UDPSize
+	udpBufferSize   = internet.UDPSize
 
 	defaultHopInterval = 30 * time.Second
 )

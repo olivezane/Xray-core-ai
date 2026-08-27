@@ -9,9 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/xtls/xray-core/common/net"
+	"github.com/xtls/xray-core/transport/internet/stat"
+
 	"github.com/pires/go-proxyproto"
 	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/common/net"
 )
 
 var effectiveListener = DefaultListener{}
@@ -66,6 +68,12 @@ func (l *UnixListenerWrapper) Close() error {
 
 type UnixConnWrapper struct {
 	*net.UnixConn
+}
+
+var _ stat.Unwrapper = (*UnixConnWrapper)(nil)
+
+func (conn *UnixConnWrapper) Unwrap() net.Conn {
+	return conn.UnixConn
 }
 
 func (conn *UnixConnWrapper) RemoteAddr() net.Addr {

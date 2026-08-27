@@ -16,7 +16,7 @@ import (
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 const (
@@ -117,7 +117,7 @@ func NewConnClient(c *Config, raw net.PacketConn) (net.PacketConn, error) {
 }
 
 func (c *xdnsConnClient) recvLoop() {
-	var buf [finalmask.UDPSize]byte
+	var buf [internet.UDPSize]byte
 
 	for {
 		if c.closed {
