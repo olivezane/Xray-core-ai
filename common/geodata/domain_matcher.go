@@ -2,7 +2,7 @@ package geodata
 
 import (
 	"context"
-	"runtime"
+	"os"
 	"strings"
 	"sync"
 
@@ -229,10 +229,8 @@ func parseDomain(d *Domain) (strmatcher.Matcher, error) {
 }
 
 func newDomainMatcherFactory() DomainMatcherFactory {
-	switch runtime.GOOS {
-	case "ios", "android":
-		return &CompactDomainMatcherFactory{shared: utils.NewWeakCacheMap[string, strmatcher.LinearAnyMatcher]()}
-	default:
+	if os.Getenv("XRAY_GEODATA_MATCHER") == "mph" {
 		return &MphDomainMatcherFactory{shared: utils.NewWeakCacheMap[string, strmatcher.MphValueMatcher]()}
 	}
+	return &CompactDomainMatcherFactory{shared: utils.NewWeakCacheMap[string, strmatcher.LinearAnyMatcher]()}
 }
