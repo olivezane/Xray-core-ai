@@ -7,6 +7,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("tunnel", func() interface{} { return new(DokodemoConfig) })
+	inboundConfigLoader.MustRegister("dokodemo-door", func() interface{} { return new(DokodemoConfig) })
+}
+
 type DokodemoConfig struct {
 	AllowedNetwork *NetworkList      `json:"allowedNetwork"`
 	RewriteAddress *Address          `json:"rewriteAddress"`

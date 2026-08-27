@@ -224,10 +224,12 @@ func (v *Authenticator) Build() (proto.Message, error) {
 	return config, nil
 }
 
-var tcpHeaderLoader = NewJSONConfigLoader(ConfigCreatorCache{
-	"none": func() interface{} { return new(NoOpConnectionAuthenticator) },
-	"http": func() interface{} { return new(Authenticator) },
-}, "type", "")
+var tcpHeaderLoader = NewJSONConfigLoader(NewConfigRegistry(), "type", "")
+
+func init() {
+	tcpHeaderLoader.MustRegister("none", func() interface{} { return new(NoOpConnectionAuthenticator) })
+	tcpHeaderLoader.MustRegister("http", func() interface{} { return new(Authenticator) })
+}
 
 type TCPConfig struct {
 	HeaderConfig        json.RawMessage `json:"header"`

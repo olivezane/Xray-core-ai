@@ -14,6 +14,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("shadowsocks", func() interface{} { return new(ShadowsocksServerConfig) })
+	outboundConfigLoader.MustRegister("shadowsocks", func() interface{} { return new(ShadowsocksClientConfig) })
+}
+
 func cipherFromString(c string) shadowsocks.CipherType {
 	switch strings.ToLower(c) {
 	case "aes-128-gcm", "aead_aes_128_gcm":

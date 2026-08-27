@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 
@@ -45,14 +46,11 @@ type StreamConfig struct {
 	Address             *Address           `json:"address"`
 	Port                uint16             `json:"port"`
 	Method              *TransportProtocol `json:"method"`
-	Network             *TransportProtocol `json:"network"`
 	Security            string             `json:"security"`
 	FinalMask           *FinalMask         `json:"finalmask"`
 	TLSSettings         *TLSConfig         `json:"tlsSettings"`
 	REALITYSettings     *REALITYConfig     `json:"realitySettings"`
-	RAWSettings         *TCPConfig         `json:"rawSettings"`
 	TCPSettings         *TCPConfig         `json:"tcpSettings"`
-	XHTTPSettings       *SplitHTTPConfig   `json:"xhttpSettings"`
 	SplitHTTPSettings   *SplitHTTPConfig   `json:"splithttpSettings"`
 	KCPSettings         *KCPConfig         `json:"kcpSettings"`
 	GRPCSettings        *GRPCConfig        `json:"grpcSettings"`
@@ -60,6 +58,35 @@ type StreamConfig struct {
 	HTTPUPGRADESettings *HttpUpgradeConfig `json:"httpupgradeSettings"`
 	HysteriaSettings    *HysteriaConfig    `json:"hysteriaSettings"`
 	SocketSettings      *SocketConfig      `json:"sockopt"`
+}
+
+// UnmarshalJSON folds the pre-rename keys ("network", "rawSettings",
+// "xhttpSettings") onto their canonical fields, keeping the same precedence
+// the old dual-field Build had: legacy keys win when both are present
+// ("network" only fills a missing "method"; "rawSettings"/"xhttpSettings"
+// overwrite their canonical counterparts).
+func (c *StreamConfig) UnmarshalJSON(data []byte) error {
+	type streamConfig StreamConfig
+	var legacy struct {
+		streamConfig
+		Network       *TransportProtocol `json:"network"`
+		RAWSettings   *TCPConfig         `json:"rawSettings"`
+		XHTTPSettings *SplitHTTPConfig   `json:"xhttpSettings"`
+	}
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return err
+	}
+	*c = StreamConfig(legacy.streamConfig)
+	if c.Method == nil && legacy.Network != nil {
+		c.Method = legacy.Network
+	}
+	if legacy.RAWSettings != nil {
+		c.TCPSettings = legacy.RAWSettings
+	}
+	if legacy.XHTTPSettings != nil {
+		c.SplitHTTPSettings = legacy.XHTTPSettings
+	}
+	return nil
 }
 
 // Build implements Buildable.
@@ -72,10 +99,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		config.Address = c.Address.Build()
 	}
 	if c.Method != nil {
-		c.Network = c.Method
-	}
-	if c.Network != nil {
-		protocol, err := c.Network.Build()
+		protocol, err := c.Method.Build()
 		if err != nil {
 			return nil, err
 		}
@@ -116,9 +140,6 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		return nil, errors.New(`Unknown security "` + c.Security + `".`)
 	}
 
-	if c.RAWSettings != nil {
-		c.TCPSettings = c.RAWSettings
-	}
 	if c.TCPSettings != nil {
 		ts, err := c.TCPSettings.Build()
 		if err != nil {
@@ -128,9 +149,6 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 			ProtocolName: "tcp",
 			Settings:     serial.ToTypedMessage(ts),
 		})
-	}
-	if c.XHTTPSettings != nil {
-		c.SplitHTTPSettings = c.XHTTPSettings
 	}
 	if c.SplitHTTPSettings != nil {
 		hs, err := c.SplitHTTPSettings.Build()

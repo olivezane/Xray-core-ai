@@ -11,6 +11,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("tun", func() interface{} { return new(TunConfig) })
+}
+
 type TunConfig struct {
 	Name                   string   `json:"name"`
 	Desc                   string   `json:"desc"`

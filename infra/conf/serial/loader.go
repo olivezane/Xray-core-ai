@@ -40,36 +40,45 @@ func findOffset(b []byte, o int) *offset {
 	return &offset{line: line, char: char}
 }
 
-// DecodeJSONConfig reads from reader and decode the config into *conf.Config
-// syntax error could be detected.
-//
-// Permissive: accepts JSON with Java/Python-style comments via json_reader.Reader.
-// Used for local files and stdin where the config is human-edited.
-func DecodeJSONConfig(reader io.Reader) (*conf.Config, error) {
+// decodeJSONConfig decodes into *conf.Config via conf.DecodeJSON, which owns
+// the strict-mode (UseStrictJSON) semantics shared by all decoders.
+func decodeJSONConfig(reader io.Reader, permissive bool) (*conf.Config, error) {
 	jsonConfig := &conf.Config{}
 
-	jsonContent := bytes.NewBuffer(make([]byte, 0, 10240))
-	jsonReader := io.TeeReader(&json_reader.Reader{
-		Reader: reader,
-	}, jsonContent)
-	decoder := json.NewDecoder(jsonReader)
+	var r io.Reader = reader
+	var jsonContent *bytes.Buffer
+	if permissive {
+		// Accepts JSON with Java/Python-style comments via json_reader.Reader.
+		// Used for local files and stdin where the config is human-edited.
+		jsonContent = bytes.NewBuffer(make([]byte, 0, 10240))
+		r = io.TeeReader(&json_reader.Reader{Reader: reader}, jsonContent)
+	}
 
-	if err := decoder.Decode(jsonConfig); err != nil {
-		var pos *offset
-		cause := errors.Cause(err)
-		switch tErr := cause.(type) {
-		case *json.SyntaxError:
-			pos = findOffset(jsonContent.Bytes(), int(tErr.Offset))
-		case *json.UnmarshalTypeError:
-			pos = findOffset(jsonContent.Bytes(), int(tErr.Offset))
+	if err := conf.DecodeJSON(r, jsonConfig); err != nil {
+		if permissive {
+			var pos *offset
+			cause := errors.Cause(err)
+			switch tErr := cause.(type) {
+			case *json.SyntaxError:
+				pos = findOffset(jsonContent.Bytes(), int(tErr.Offset))
+			case *json.UnmarshalTypeError:
+				pos = findOffset(jsonContent.Bytes(), int(tErr.Offset))
+			}
+			if pos != nil {
+				return nil, errors.New("failed to read config file at line ", pos.line, " char ", pos.char).Base(err)
+			}
+			return nil, errors.New("failed to read config file").Base(err)
 		}
-		if pos != nil {
-			return nil, errors.New("failed to read config file at line ", pos.line, " char ", pos.char).Base(err)
-		}
-		return nil, errors.New("failed to read config file").Base(err)
+		return nil, errors.New("failed to parse remote JSON config").Base(err)
 	}
 
 	return jsonConfig, nil
+}
+
+// DecodeJSONConfig reads from reader and decode the config into *conf.Config
+// syntax error could be detected.
+func DecodeJSONConfig(reader io.Reader) (*conf.Config, error) {
+	return decodeJSONConfig(reader, true)
 }
 
 // DecodeJSONConfigStrict reads standard RFC 8259 JSON without comment-stripping.
@@ -78,15 +87,7 @@ func DecodeJSONConfig(reader io.Reader) (*conf.Config, error) {
 // byte-by-byte comment stripper and TeeReader, which are significant overhead on
 // large configs.
 func DecodeJSONConfigStrict(reader io.Reader) (*conf.Config, error) {
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, errors.New("failed to read config file").Base(err)
-	}
-	jsonConfig := &conf.Config{}
-	if err := json.Unmarshal(data, jsonConfig); err != nil {
-		return nil, errors.New("failed to parse remote JSON config").Base(err)
-	}
-	return jsonConfig, nil
+	return decodeJSONConfig(reader, false)
 }
 
 func LoadJSONConfig(reader io.Reader) (*core.Config, error) {

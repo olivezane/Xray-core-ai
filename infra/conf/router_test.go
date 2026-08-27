@@ -64,13 +64,6 @@ func TestRouterConfig(t *testing.T) {
 						"strategy": {
 							"type": "leastload",
 							"settings": {
-								"healthCheck": {
-									"interval": "5m0s",
-									"sampling": 2,
-									"timeout": "5s",
-									"destination": "dest",
-									"connectivity": "conn"
-								},
 								"costs": [
 									{
 										"regexp": true,

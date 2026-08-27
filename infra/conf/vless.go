@@ -21,6 +21,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("vless", func() interface{} { return new(VLessInboundConfig) })
+	outboundConfigLoader.MustRegister("vless", func() interface{} { return new(VLessOutboundConfig) })
+}
+
 type VLessInboundFallback struct {
 	Name string          `json:"name"`
 	Alpn string          `json:"alpn"`

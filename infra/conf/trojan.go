@@ -17,6 +17,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("trojan", func() interface{} { return new(TrojanServerConfig) })
+	outboundConfigLoader.MustRegister("trojan", func() interface{} { return new(TrojanClientConfig) })
+}
+
 // TrojanServerTarget is configuration of a single trojan server
 type TrojanServerTarget struct {
 	Address  *Address `json:"address"`

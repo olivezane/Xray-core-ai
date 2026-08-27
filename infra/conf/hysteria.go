@@ -10,6 +10,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	inboundConfigLoader.MustRegister("hysteria", func() interface{} { return new(HysteriaServerConfig) })
+	outboundConfigLoader.MustRegister("hysteria", func() interface{} { return new(HysteriaClientConfig) })
+}
+
 type HysteriaClientConfig struct {
 	Version int32    `json:"version"`
 	Address *Address `json:"address"`
