@@ -84,7 +84,11 @@ func (o *Outbound) Process(ctx context.Context, link *transport.Link, dialer int
 	}
 
 	if session.TimeoutOnlyFromContext(ctx) {
-		ctx, _ = context.WithCancel(context.Background())
+		// Detach the caller's deadline: the connection is timed out via explicit
+		// signals only. The ctx lives exactly as long as the relay below.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(context.Background())
+		defer cancel()
 	}
 
 	if network == net.Network_TCP {

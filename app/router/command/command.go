@@ -98,7 +98,11 @@ func (s *routingServer) TestRoute(ctx context.Context, request *TestRouteRequest
 		return nil, err
 	}
 	if request.PublishResult && s.routingStats != nil {
-		ctx, _ := context.WithTimeout(context.Background(), 4*time.Second)
+		// The ctx is handed to async channel subscribers (see stats.Channel);
+		// it is reclaimed by the timeout schedule, not by this handler.
+		timeout := 4 * time.Second
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		time.AfterFunc(timeout, cancel)
 		s.routingStats.Publish(ctx, route)
 	}
 	return AsProtobufMessage(request.FieldSelectors)(route), nil
