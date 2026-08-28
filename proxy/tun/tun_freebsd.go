@@ -43,6 +43,7 @@ type FreeBSDTun struct {
 	options       *Config
 	tunIndex      int
 	autoInterface bool
+	updater       *InterfaceUpdater
 
 	systemRoutes     []netip.Prefix
 	escapeMu         sync.Mutex
@@ -154,6 +155,10 @@ func nextLocalIPv4(gateway netip.Prefix) (netip.Addr, bool) {
 	return netip.Addr{}, false
 }
 
+func (t *FreeBSDTun) SetUpdater(updater *InterfaceUpdater) {
+	t.updater = updater
+}
+
 func (t *FreeBSDTun) Start() error {
 	if err := t.setSystemRoutes(); err != nil {
 		return err
@@ -190,8 +195,8 @@ func (t *FreeBSDTun) monitorRouteChanges() {
 			}
 			return
 		}
-		if updater != nil {
-			updater.Update()
+		if t.updater != nil {
+			t.updater.Update()
 		}
 		if err := t.syncEscapeFib(); err != nil {
 			xerrors.LogInfoInner(context.Background(), err, "[tun] failed to refresh escape routes")
@@ -777,8 +782,8 @@ func checkEscapeFib() error {
 // route flap.
 func (t *FreeBSDTun) syncEscapeFib() error {
 	var onlyIndex int
-	if t.options.AutoOutboundsInterface != "" && updater != nil {
-		if iface := updater.Get(); iface != nil {
+	if t.options.AutoOutboundsInterface != "" && t.updater != nil {
+		if iface := t.updater.Get(); iface != nil {
 			onlyIndex = iface.Index
 		}
 	}
