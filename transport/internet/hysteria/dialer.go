@@ -87,6 +87,7 @@ func (c *client) dial(ctx context.Context) error {
 		MaxIdleTimeout:                 time.Duration(quicParams.MaxIdleTimeout) * time.Second,
 		KeepAlivePeriod:                time.Duration(quicParams.KeepAlivePeriod) * time.Second,
 		DisablePathMTUDiscovery:        quicParams.DisablePathMtuDiscovery || (runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin"),
+		ChromeParrot:                   !quicParams.DisableChromeParrot,
 		EnableDatagrams:                true,
 		MaxDatagramFrameSize:           MaxDatagramFrameSize,
 		OmitMaxDatagramFrameSize:       time.Now().After(time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)),
@@ -154,7 +155,12 @@ func (c *client) dial(ctx context.Context) error {
 		return err
 	}
 
-	tr := &quic.Transport{Conn: pktConn}
+	tr := &quic.Transport{Conn: pktConn, DisableGSO: quicParams.DisableGSO}
+
+	if !quicParams.DisableChromeParrot {
+		tr.ConnectionIDGenerator = quic.ZeroLengthConnectionIDGenerator{}
+		c.tlsConfig.GetCertificate = nil
+	}
 
 	var conn *quic.Conn
 	rt := &http3.Transport{
@@ -201,6 +207,7 @@ func (c *client) dial(ctx context.Context) error {
 
 	// udp, _ := strconv.ParseBool(resp.Header.Get(ResponseHeaderUDPEnabled))
 	down, _ := strconv.ParseUint(resp.Header.Get(CommonHeaderCCRX), 10, 64)
+	errors.LogDebug(context.Background(), "ECHAccepted ", conn.ConnectionState().TLS.ECHAccepted)
 
 	switch quicParams.Congestion {
 	case "reno":
@@ -210,10 +217,10 @@ func (c *client) dial(ctx context.Context) error {
 		if quicParams.BrutalUp == 0 || down == 0 {
 			congestion.UseBBR(conn, bbr.Profile(quicParams.BbrProfile))
 		} else {
-			congestion.UseBrutal(conn, min(quicParams.BrutalUp, down))
+			congestion.UseBrutal(conn, min(quicParams.BrutalUp, down), quicParams.BrutalDisableLossCompensation)
 		}
 	case "force-brutal":
-		congestion.UseBrutal(conn, quicParams.BrutalUp)
+		congestion.UseBrutal(conn, quicParams.BrutalUp, quicParams.BrutalDisableLossCompensation)
 	default:
 		panic(quicParams.Congestion)
 	}
