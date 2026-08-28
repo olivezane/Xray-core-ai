@@ -14,7 +14,7 @@ import (
 func TestECHDial(t *testing.T) {
 	config := &Config{
 		ServerName:    "cloudflare.com",
-		EchConfigList: "encryptedsni.com+udp://1.1.1.1",
+		EchConfigList: "encryptedsni.com+https://1.1.1.1/dns-query",
 	}
 	// test concurrent Dial(to test cache problem)
 	wg := sync.WaitGroup{}
@@ -39,7 +39,7 @@ func TestECHDial(t *testing.T) {
 	}
 	wg.Wait()
 	// check cache
-	echConfigCache, ok := GlobalECHConfigCache.Load(ECHCacheKey("udp://1.1.1.1", "encryptedsni.com", nil))
+	echConfigCache, ok := GlobalECHConfigCache.Load(ECHCacheKey("https://1.1.1.1/dns-query", "encryptedsni.com", nil))
 	if !ok {
 		t.Error("ECH config cache not found")
 	}
