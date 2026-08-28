@@ -2,10 +2,15 @@ package serial_test
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 
+	"github.com/xtls/xray-core/app/log"
+	"github.com/xtls/xray-core/common/cmdarg"
+	clog "github.com/xtls/xray-core/common/log"
 	"github.com/xtls/xray-core/infra/conf/serial"
+	"github.com/xtls/xray-core/main/confloader"
 )
 
 func TestDecodeJSONConfig_RejectsUnknownFields(t *testing.T) {
@@ -138,5 +143,50 @@ func TestLoaderError(t *testing.T) {
 		if !strings.Contains(errString, testCase.Output) {
 			t.Error("unexpected output from json: ", testCase.Input, ". expected ", testCase.Output, ", but actually ", errString)
 		}
+	}
+}
+
+func TestLoadMultiFileConfig(t *testing.T) {
+	files := map[string]string{
+		"a.json": `{"log":{"loglevel":"warning"},"inbounds":[{"protocol":"dokodemo-door","port":12345,"settings":{"address":"1.2.3.4"}}]}`,
+		"b.json": `{"log":{"loglevel":"debug"}}`,
+	}
+	confloader.EffectiveConfigFileLoader = func(file string) (io.Reader, error) {
+		if c, ok := files[file]; ok {
+			return strings.NewReader(c), nil
+		}
+		return nil, io.EOF
+	}
+	t.Cleanup(func() { confloader.EffectiveConfigFileLoader = nil })
+
+	cfg, err := serial.LoadMultiFileConfig(cmdarg.Arg{"a.json", "b.json"}, serial.DecodeJSONConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawLogApp, sawProxymanApp bool
+	for _, app := range cfg.App {
+		switch m := app.Type; {
+		case strings.Contains(m, "xray.app.log.Config"):
+			msg, err := app.GetInstance()
+			if err != nil {
+				t.Fatal(err)
+			}
+			logCfg, ok := msg.(*log.Config)
+			if !ok {
+				t.Fatalf("unexpected app type %T", msg)
+			}
+			sawLogApp = true
+			if logCfg.ErrorLogLevel != clog.Severity_Debug {
+				t.Fatalf("later config files must override overlapping settings, got loglevel %v", logCfg.ErrorLogLevel)
+			}
+		case strings.Contains(m, "xray.app.proxyman"):
+			sawProxymanApp = true
+		}
+	}
+	if !sawLogApp {
+		t.Fatal("log app missing from built config")
+	}
+	if !sawProxymanApp {
+		t.Fatal("settings present only in earlier files must be kept: inbounds from a.json lost")
 	}
 }

@@ -2,15 +2,18 @@ package serial
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 
 	"github.com/ghodss/yaml"
 	"github.com/pelletier/go-toml"
+	"github.com/xtls/xray-core/common/cmdarg"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/infra/conf"
 	json_reader "github.com/xtls/xray-core/infra/conf/json"
+	"github.com/xtls/xray-core/main/confloader"
 )
 
 type offset struct {
@@ -167,4 +170,30 @@ func LoadYAMLConfig(reader io.Reader) (*core.Config, error) {
 	}
 
 	return pbConfig, nil
+}
+
+// LoadMultiFileConfig reads multiple config files given as command line
+// arguments. The first file initializes the config; subsequent files override
+// overlapping settings and fill in the rest.
+func LoadMultiFileConfig(v cmdarg.Arg, decode func(io.Reader) (*conf.Config, error)) (*core.Config, error) {
+	cf := &conf.Config{}
+	for i, arg := range v {
+		errors.LogInfo(context.Background(), "Reading config: ", arg)
+		r, err := confloader.LoadConfig(arg)
+		if err != nil {
+			return nil, errors.New("failed to read config: ", arg).Base(err)
+		}
+		c, err := decode(r)
+		if err != nil {
+			return nil, errors.New("failed to decode config: ", arg).Base(err)
+		}
+		if i == 0 {
+			// The first file initializes the config instead of overriding an
+			// empty one, so no settings are lost when it is the only file.
+			*cf = *c
+			continue
+		}
+		cf.Override(c, arg)
+	}
+	return cf.Build()
 }

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/mux"
@@ -14,6 +13,7 @@ import (
 	"github.com/xtls/xray-core/testing/mocks"
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/pipe"
+	"go.uber.org/mock/gomock"
 )
 
 func TestIncrementalPickerFailure(t *testing.T) {

@@ -1,15 +1,15 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-	"go/build"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/xtls/xray-core/common"
 )
 
 var (
@@ -22,72 +22,6 @@ var (
 	isDryrun bool
 	isFormat bool
 )
-
-// envFile returns the name of the Go environment configuration file.
-// Copy from https://github.com/golang/go/blob/c4f2a9788a7be04daf931ac54382fbe2cb754938/src/cmd/go/internal/cfg/cfg.go#L150-L166
-func envFile() (string, error) {
-	if file := os.Getenv("GOENV"); file != "" {
-		if file == "off" {
-			return "", errors.New("GOENV=off")
-		}
-		return file, nil
-	}
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	if dir == "" {
-		return "", errors.New("missing user-config dir")
-	}
-	return filepath.Join(dir, "go", "env"), nil
-}
-
-// GetRuntimeEnv returns the value of runtime environment variable,
-// that is set by running following command: `go env -w key=value`.
-func GetRuntimeEnv(key string) (string, error) {
-	file, err := envFile()
-	if err != nil {
-		return "", err
-	}
-	if file == "" {
-		return "", errors.New("missing runtime env file")
-	}
-	var data []byte
-	var runtimeEnv string
-	data, readErr := os.ReadFile(file)
-	if readErr != nil {
-		return "", readErr
-	}
-	envStrings := strings.Split(string(data), "\n")
-	for _, envItem := range envStrings {
-		envItem = strings.TrimSuffix(envItem, "\r")
-		envKeyValue := strings.Split(envItem, "=")
-		if len(envKeyValue) == 2 && strings.TrimSpace(envKeyValue[0]) == key {
-			runtimeEnv = strings.TrimSpace(envKeyValue[1])
-		}
-	}
-	return runtimeEnv, nil
-}
-
-// GetGOBIN returns GOBIN environment variable as a string. It will NOT be empty.
-func GetGOBIN() string {
-	// The one set by user explicitly by `export GOBIN=/path` or `env GOBIN=/path command`
-	GOBIN := os.Getenv("GOBIN")
-	if GOBIN == "" {
-		var err error
-		// The one set by user by running `go env -w GOBIN=/path`
-		GOBIN, err = GetRuntimeEnv("GOBIN")
-		if err != nil {
-			// The default one that Golang uses
-			return filepath.Join(build.Default.GOPATH, "bin")
-		}
-		if GOBIN == "" {
-			return filepath.Join(build.Default.GOPATH, "bin")
-		}
-		return GOBIN
-	}
-	return GOBIN
-}
 
 func Run(binary string, args []string) ([]byte, error) {
 	cmd := exec.Command(binary, args...)
@@ -150,7 +84,7 @@ func main() {
 	}
 
 	pwd := *directory
-	GOBIN := GetGOBIN()
+	GOBIN := common.GetGOBIN()
 	binPath := os.Getenv("PATH")
 	pathSlice := []string{pwd, GOBIN, binPath}
 	binPath = strings.Join(pathSlice, string(os.PathListSeparator))

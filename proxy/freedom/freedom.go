@@ -26,8 +26,8 @@ import (
 	"github.com/xtls/xray-core/features/policy"
 	"github.com/xtls/xray-core/features/stats"
 	"github.com/xtls/xray-core/transport"
-	"github.com/xtls/xray-core/transport/internet/rawconn"
 	"github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet/rawconn"
 	"github.com/xtls/xray-core/transport/internet/stat"
 )
 

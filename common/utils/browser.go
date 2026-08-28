@@ -1,25 +1,13 @@
 package utils
 
 import (
-	"hash/fnv"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/klauspost/cpuid/v2"
 )
-
-func GetRandomizer() *rand.Rand {
-	// Seed the PRNG with the hash of CPU info, increasing the overall probable space.
-	fnvHash := fnv.New64()
-	fnvHash.Write([]byte(strconv.Itoa(cpuid.CPU.Family) + strconv.Itoa(cpuid.CPU.Model) + strconv.Itoa(cpuid.CPU.PhysicalCores) + strconv.Itoa(cpuid.CPU.LogicalCores) + strconv.Itoa(cpuid.CPU.CacheLine) + strconv.Itoa(cpuid.CPU.ThreadsPerCore)))
-	return rand.New(rand.NewSource(int64(fnvHash.Sum64())))
-}
-
-var globalRng *rand.Rand = GetRandomizer()
 
 // The Chrome version generator will suffer from deviation of a normal distribution.
 func ChromeVersion() int {
@@ -27,7 +15,7 @@ func ChromeVersion() int {
 	var startVersion int = 144
 	var timeStart int64 = time.Date(2026, 1, 13, 0, 0, 0, 0, time.UTC).Unix() / 86400
 	var timeCurrent int64 = time.Now().Unix() / 86400
-	var timeDiff int = int((timeCurrent - timeStart - 35)) - int(math.Floor(math.Pow(globalRng.Float64(), 2)*105))
+	var timeDiff int = int((timeCurrent - timeStart - 35)) - int(math.Floor(math.Pow(rand.Float64(), 2)*105))
 	return startVersion + (timeDiff / 35) // It's 31.15 currently.
 }
 
@@ -42,7 +30,7 @@ func CurlVersion() string {
 	// curl 8.0.0 was released on 20/03/2023.
 	var timeCurrent int64 = time.Now().Unix() / 86400
 	var timeStart int64 = time.Date(2023, 3, 20, 0, 0, 0, 0, time.UTC).Unix() / 86400
-	var timeDiff int = int((timeCurrent - timeStart - 60)) - int(math.Floor(math.Pow(globalRng.Float64(), 2)*165))
+	var timeDiff int = int((timeCurrent - timeStart - 60)) - int(math.Floor(math.Pow(rand.Float64(), 2)*165))
 	var minorValue int = int(timeDiff / 57) // The release cadence is actually 56.67 days.
 	return "8." + strconv.Itoa(minorValue) + ".0"
 }
@@ -51,7 +39,7 @@ func FirefoxVersion() int {
 	// Firefox 128 ESR was released on 09/07/2023.
 	var timeCurrent int64 = time.Now().Unix() / 86400
 	var timeStart int64 = time.Date(2024, 7, 29, 0, 0, 0, 0, time.UTC).Unix() / 86400
-	timeDiff := timeCurrent - timeStart - 25 - int64(math.Floor(math.Pow(globalRng.Float64(), 2)*50))
+	timeDiff := timeCurrent - timeStart - 25 - int64(math.Floor(math.Pow(rand.Float64(), 2)*50))
 	return int(timeDiff/30) + 128
 }
 
@@ -59,7 +47,7 @@ func SafariVersion() string {
 	var anchoredTime time.Time = time.Now()
 	var releaseYear int = anchoredTime.Year()
 	var splitPoint time.Time = time.Date(releaseYear, 9, 23, 0, 0, 0, 0, time.UTC)
-	delayedDays := int(math.Floor(math.Pow(globalRng.Float64(), 3) * 75))
+	delayedDays := int(math.Floor(math.Pow(rand.Float64(), 3) * 75))
 	splitPoint = splitPoint.AddDate(0, 0, delayedDays)
 	if anchoredTime.Compare(splitPoint) < 0 {
 		releaseYear--
@@ -145,7 +133,7 @@ func getGreasedChUa(majorVersion int, forkName string) string {
 	return strings.Join(shuffledCh, ", ")
 }
 
-// The code below provides a coherent default browser user agent string based on a CPU-seeded PRNG.
+// The code below provides a coherent default browser user agent string based on a per-process seeded PRNG.
 var (
 	CurlUA                 = "curl/" + CurlVersion()
 	AnchoredFirefoxVersion = strconv.Itoa(FirefoxVersion())
