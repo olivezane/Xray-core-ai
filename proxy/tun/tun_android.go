@@ -300,7 +300,11 @@ func androidRoutes(cidrs []string, table, linkIndex int) ([]netlink.Route, error
 // ---------------------------------------------------------------------------
 
 func (t *AndroidTun) setRules() error {
-	for _, family := range []int{unix.AF_INET, unix.AF_INET6} {
+	// Only install redirect rules for families that actually have routes in
+	// the custom table; with no autoSystemRoutingTable the rules would only
+	// pollute the ip-rule space and can interfere with other VPNs.
+	families := androidRuleFamilies(t.options.AutoSystemRoutingTable)
+	for _, family := range families {
 		r := netlink.NewRule()
 		r.Priority = ipRoute2RuleIndex
 		r.Family = family

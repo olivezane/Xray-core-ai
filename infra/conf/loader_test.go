@@ -7,7 +7,25 @@ import (
 	. "github.com/xtls/xray-core/infra/conf"
 )
 
-func TestJSONConfigLoader_RejectsUnknownSettings(t *testing.T) {
+// Default (env unset) must match upstream: unknown fields are allowed.
+func TestJSONConfigLoader_AllowsUnknownSettingsByDefault(t *testing.T) {
+	cache := NewConfigRegistry()
+	if err := cache.Register("freedom", func() interface{} {
+		return new(FreedomConfig)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	loader := NewJSONConfigLoader(cache, "protocol", "settings")
+
+	raw := []byte(`{"protocol": "freedom", "settings": {"unknwn": "value"}}`)
+	_, _, err := loader.Load(raw)
+	if err != nil {
+		t.Fatalf("expected unknown fields to be allowed by default, got: %v", err)
+	}
+}
+
+func TestJSONConfigLoader_RejectsUnknownSettingsWhenStrict(t *testing.T) {
+	t.Setenv("XRAY_JSON_STRICT", "true")
 	cache := NewConfigRegistry()
 	if err := cache.Register("freedom", func() interface{} {
 		return new(FreedomConfig)
@@ -19,7 +37,7 @@ func TestJSONConfigLoader_RejectsUnknownSettings(t *testing.T) {
 	raw := []byte(`{"protocol": "freedom", "settings": {"unknwn": "value"}}`)
 	_, _, err := loader.Load(raw)
 	if err == nil {
-		t.Fatal("expected error for unknown field in settings, got nil")
+		t.Fatal("expected error for unknown field in settings when strict, got nil")
 	}
 	if !strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("expected error about unknown field, got: %v", err)
@@ -69,7 +87,7 @@ func TestConfigRegistry_FailureSurfacesWithKey(t *testing.T) {
 	registry.MustRegister("freedom", func() interface{} { return new(FreedomConfig) })
 }
 
-func TestJSONConfigLoader_RejectsUnknownInPlainSettings(t *testing.T) {
+func TestJSONConfigLoader_AllowsUnknownInPlainSettingsByDefault(t *testing.T) {
 	cache := NewConfigRegistry()
 	if err := cache.Register("freedom", func() interface{} {
 		return new(FreedomConfig)
@@ -80,10 +98,7 @@ func TestJSONConfigLoader_RejectsUnknownInPlainSettings(t *testing.T) {
 
 	raw := []byte(`{"protocol": "freedom", "unknownKey": "nope"}`)
 	_, _, err := loader.Load(raw)
-	if err == nil {
-		t.Fatal("expected error for unknown field, got nil")
-	}
-	if !strings.Contains(err.Error(), "unknown field") {
-		t.Fatalf("expected error about unknown field, got: %v", err)
+	if err != nil {
+		t.Fatalf("expected unknown fields to be allowed by default, got: %v", err)
 	}
 }

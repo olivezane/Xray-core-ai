@@ -72,3 +72,29 @@ func TestMphDomainMatcher_MatchReturnsDetachedSlice(t *testing.T) {
 		t.Fatalf("Match() after caller mutation = %v, want %v", gotAgain, []uint32{0, 1})
 	}
 }
+
+// Upstream default: desktop/server platforms select the MPH matcher; mobile
+// selects the compact one. The fork's env override may only refine this, never
+// change the default selection.
+func TestSelectDomainMatcherFactory_upstreamGOOSDefault(t *testing.T) {
+	if _, ok := selectDomainMatcherFactory("linux").(*MphDomainMatcherFactory); !ok {
+		t.Fatalf("linux: expected MPH matcher factory (upstream default), got %T", selectDomainMatcherFactory("linux"))
+	}
+	if _, ok := selectDomainMatcherFactory("android").(*CompactDomainMatcherFactory); !ok {
+		t.Fatalf("android: expected Compact matcher factory (upstream default), got %T", selectDomainMatcherFactory("android"))
+	}
+	if _, ok := selectDomainMatcherFactory("ios").(*CompactDomainMatcherFactory); !ok {
+		t.Fatalf("ios: expected Compact matcher factory (upstream default), got %T", selectDomainMatcherFactory("ios"))
+	}
+}
+
+func TestNewDomainMatcherFactory_envOverridesOnly(t *testing.T) {
+	t.Setenv("XRAY_GEODATA_MATCHER", "mph")
+	if _, ok := newDomainMatcherFactory().(*MphDomainMatcherFactory); !ok {
+		t.Fatalf("XRAY_GEODATA_MATCHER=mph: expected MPH factory, got %T", newDomainMatcherFactory())
+	}
+	t.Setenv("XRAY_GEODATA_MATCHER", "compact")
+	if _, ok := newDomainMatcherFactory().(*CompactDomainMatcherFactory); !ok {
+		t.Fatalf("XRAY_GEODATA_MATCHER=compact: expected Compact factory, got %T", newDomainMatcherFactory())
+	}
+}

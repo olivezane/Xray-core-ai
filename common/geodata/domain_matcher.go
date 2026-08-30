@@ -3,6 +3,7 @@ package geodata
 import (
 	"context"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -228,9 +229,24 @@ func parseDomain(d *Domain) (strmatcher.Matcher, error) {
 	}
 }
 
-func newDomainMatcherFactory() DomainMatcherFactory {
-	if os.Getenv("XRAY_GEODATA_MATCHER") == "mph" {
+// selectDomainMatcherFactory mirrors upstream's per-platform default: the
+// MPH matcher on desktop/server, the compact (LinearAny) matcher on mobile
+// where memory is the constraint.
+func selectDomainMatcherFactory(goos string) DomainMatcherFactory {
+	switch goos {
+	case "ios", "android":
+		return &CompactDomainMatcherFactory{shared: utils.NewWeakCacheMap[string, strmatcher.LinearAnyMatcher]()}
+	default:
 		return &MphDomainMatcherFactory{shared: utils.NewWeakCacheMap[string, strmatcher.MphValueMatcher]()}
 	}
-	return &CompactDomainMatcherFactory{shared: utils.NewWeakCacheMap[string, strmatcher.LinearAnyMatcher]()}
+}
+
+func newDomainMatcherFactory() DomainMatcherFactory {
+	switch os.Getenv("XRAY_GEODATA_MATCHER") {
+	case "mph":
+		return &MphDomainMatcherFactory{shared: utils.NewWeakCacheMap[string, strmatcher.MphValueMatcher]()}
+	case "compact", "linear":
+		return &CompactDomainMatcherFactory{shared: utils.NewWeakCacheMap[string, strmatcher.LinearAnyMatcher]()}
+	}
+	return selectDomainMatcherFactory(runtime.GOOS)
 }

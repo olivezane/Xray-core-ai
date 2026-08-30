@@ -1,6 +1,7 @@
 package vision_test
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -33,6 +34,41 @@ func TestNewTrafficState_uuid(t *testing.T) {
 	}
 }
 
+// TestReaderReplaysBufferedInputOnDirectCopy pins the upstream XTLS-Vision
+// contract: when the padded phase ends with a direct-copy command (0x02),
+// the reader must replay the data buffered by the underlying TLS/REALITY
+// conn (input/rawInput) into the stream before switching to the raw conn.
+func TestReaderReplaysBufferedInputOnDirectCopy(t *testing.T) {
+	pipeR, pipeW := pipe.New(pipe.WithSizeLimit(32768))
+	state := vision.NewTrafficState(uuid16("replay-uuid-123456"))
+	state.NumberOfPacketToFilter = 0
+
+	// One vision padding block: uuid + command(0x02 direct) + content len + padding len + content.
+	encoded := append([]byte{}, uuid16("replay-uuid-123456")...)
+	encoded = append(encoded, 0x02, 0x00, 0x04, 0x00, 0x00)
+	encoded = append(encoded, []byte("PAYL")...)
+	if err := pipeW.WriteMultiBuffer(buf.MultiBuffer{buf.FromBytes(encoded)}); err != nil {
+		t.Fatalf("write crafted stream: %v", err)
+	}
+
+	input := bytes.NewReader([]byte("INPUT"))
+	rawInput := bytes.NewBufferString("RAW")
+	r := vision.WrapReader(pipeR, nil, state, vision.DirectionUpstream, context.Background(), input, rawInput)
+
+	mb, err := r.ReadMultiBuffer()
+	if err != nil {
+		t.Fatalf("ReadMultiBuffer: %v", err)
+	}
+	if mb.IsEmpty() {
+		t.Fatal("expected non-empty read buffer")
+	}
+	got := make([]byte, mb.Len())
+	mb.Copy(got)
+	if string(got) != "PAYLINPUTRAW" {
+		t.Errorf("got %q, want %q (input/rawInput must be replayed on direct-copy switch)", got, "PAYLINPUTRAW")
+	}
+}
+
 func TestPaddingRoundTrip_upstream(t *testing.T) {
 	content := []byte("Hello, Xray Vision!")
 	pipeR, pipeW := pipe.New(pipe.WithSizeLimit(32768))
@@ -40,7 +76,7 @@ func TestPaddingRoundTrip_upstream(t *testing.T) {
 	state := vision.NewTrafficState(uuid16("uuid-123456789012"))
 
 	w := vision.WrapWriter(pipeW, nil, state, vision.DirectionUpstream, context.Background(), nil)
-	r := vision.WrapReader(pipeR, nil, state, vision.DirectionUpstream, context.Background())
+	r := vision.WrapReader(pipeR, nil, state, vision.DirectionUpstream, context.Background(), nil, nil)
 
 	mb := buf.MultiBuffer{buf.FromBytes(content)}
 	if err := w.WriteMultiBuffer(mb); err != nil {
@@ -69,7 +105,7 @@ func TestPaddingRoundTrip_downstream(t *testing.T) {
 	state := vision.NewTrafficState(uuid16("downstream-uuid-1"))
 
 	w := vision.WrapWriter(pipeW, nil, state, vision.DirectionDownstream, context.Background(), nil)
-	r := vision.WrapReader(pipeR, nil, state, vision.DirectionDownstream, context.Background())
+	r := vision.WrapReader(pipeR, nil, state, vision.DirectionDownstream, context.Background(), nil, nil)
 
 	mb := buf.MultiBuffer{buf.FromBytes(content)}
 	if err := w.WriteMultiBuffer(mb); err != nil {
@@ -101,10 +137,10 @@ func TestPaddingRoundTrip_bothDirections(t *testing.T) {
 	state := vision.NewTrafficState(uuid16("pair-uuid-1234567"))
 
 	wUp := vision.WrapWriter(upPipeW, nil, state, vision.DirectionUpstream, context.Background(), nil)
-	rUp := vision.WrapReader(upPipeR, nil, state, vision.DirectionUpstream, context.Background())
+	rUp := vision.WrapReader(upPipeR, nil, state, vision.DirectionUpstream, context.Background(), nil, nil)
 
 	wDown := vision.WrapWriter(downPipeW, nil, state, vision.DirectionDownstream, context.Background(), nil)
-	rDown := vision.WrapReader(downPipeR, nil, state, vision.DirectionDownstream, context.Background())
+	rDown := vision.WrapReader(downPipeR, nil, state, vision.DirectionDownstream, context.Background(), nil, nil)
 
 	mb := buf.MultiBuffer{buf.FromBytes(upContent)}
 	if err := wUp.WriteMultiBuffer(mb); err != nil {
@@ -150,7 +186,7 @@ func TestBatchedWrite(t *testing.T) {
 	state := vision.NewTrafficState(uuid16("batched-uuid-1234"))
 
 	w := vision.WrapWriter(pipeW, nil, state, vision.DirectionUpstream, context.Background(), nil)
-	r := vision.WrapReader(pipeR, nil, state, vision.DirectionUpstream, context.Background())
+	r := vision.WrapReader(pipeR, nil, state, vision.DirectionUpstream, context.Background(), nil, nil)
 
 	mb := buf.MultiBuffer{}
 	for _, p := range payloads {

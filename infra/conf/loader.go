@@ -36,16 +36,23 @@ func (v *JSONConfigLoader) MustRegister(id string, creator ConfigCreator) {
 	v.cache.MustRegister(id, creator)
 }
 
-func rejectUnknownFields() bool {
-	return platform.NewEnvFlag(platform.UseStrictJSON).GetValue(func() string { return "" }) != "false"
+// StrictJSON reports whether JSON config decoding runs in strict mode
+// (env xray.json.strict=true / XRAY_JSON_STRICT=true). Strict mode rejects
+// unknown fields and is the explicit opt-in for the fork's strict parser.
+// Default (unset or any other value) keeps upstream-compatible lenient
+// parsing: comments are stripped and unknown fields are ignored.
+// This is the single predicate for the strict semantics; serial.UseStrictJSON
+// derives from here so the two never disagree.
+func StrictJSON() bool {
+	return platform.NewEnvFlag(platform.UseStrictJSON).GetValue(func() string { return "" }) == "true"
 }
 
-// DecodeJSON decodes JSON from reader into config, rejecting unknown fields
-// unless platform.UseStrictJSON is set to "false". Sole owner of the
-// strict-mode semantics; shared by JSONConfigLoader and serial's decoders.
+// DecodeJSON decodes JSON from reader into config. In strict mode
+// (see StrictJSON) unknown fields are rejected; otherwise they are ignored,
+// matching upstream Xray-core. Shared by JSONConfigLoader and serial's decoders.
 func DecodeJSON(reader io.Reader, config interface{}) error {
 	dec := json.NewDecoder(reader)
-	if rejectUnknownFields() {
+	if StrictJSON() {
 		dec.DisallowUnknownFields()
 	}
 	return dec.Decode(config)

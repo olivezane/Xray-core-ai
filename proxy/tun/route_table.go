@@ -3,6 +3,7 @@ package tun
 import (
 	"errors"
 	"net"
+	"net/netip"
 
 	"github.com/vishvananda/netlink"
 )
@@ -100,4 +101,37 @@ func isDefaultRoute(dst *net.IPNet) bool {
 	}
 	ones, _ := dst.Mask.Size()
 	return ones == 0
+}
+
+// Androoid ip-rule family constants (AF_INET / AF_INET6 values on Linux and
+// Android). Defined locally so the rule-family logic stays testable
+// cross-platform; only setRules (android build) consumes them.
+const (
+	androidFamilyIPv4 = 2
+	androidFamilyIPv6 = 10
+)
+
+// androidRuleFamilies returns the IP families that need ip-rule redirects for
+// the configured autoSystemRoutingTable CIDRs. Empty input yields no
+// families: with no routes in the custom table, adding rules would only
+// pollute the ip-rule space. Invalid CIDRs are skipped — setRoutes reports
+// them before rules ever matter.
+func androidRuleFamilies(cidrs []string) []int {
+	var fams []int
+	seen := map[int]bool{}
+	for _, cidr := range cidrs {
+		prefix, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			continue
+		}
+		f := androidFamilyIPv4
+		if prefix.Addr().Is6() {
+			f = androidFamilyIPv6
+		}
+		if !seen[f] {
+			seen[f] = true
+			fams = append(fams, f)
+		}
+	}
+	return fams
 }

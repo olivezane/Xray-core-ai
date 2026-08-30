@@ -195,3 +195,32 @@ func TestInterfaceUpdaterKeepsLastKnownGoodDuringTransitions(t *testing.T) {
 		t.Fatalf("expected nil after Reset, got %v", got)
 	}
 }
+
+func TestAndroidRuleFamilies(t *testing.T) {
+	t.Run("no routes means no rules", func(t *testing.T) {
+		if got := androidRuleFamilies(nil); len(got) != 0 {
+			t.Fatalf("expected no families for empty cidrs, got %v", got)
+		}
+		if got := androidRuleFamilies([]string{}); len(got) != 0 {
+			t.Fatalf("expected no families for empty cidrs, got %v", got)
+		}
+	})
+	t.Run("IPv4 only", func(t *testing.T) {
+		got := androidRuleFamilies([]string{"0.0.0.0/0", "10.0.0.0/8"})
+		if len(got) != 1 || got[0] != androidFamilyIPv4 {
+			t.Fatalf("expected only IPv4 family, got %v", got)
+		}
+	})
+	t.Run("IPv6 only", func(t *testing.T) {
+		got := androidRuleFamilies([]string{"::/0"})
+		if len(got) != 1 || got[0] != androidFamilyIPv6 {
+			t.Fatalf("expected only IPv6 family, got %v", got)
+		}
+	})
+	t.Run("mixed dedupes", func(t *testing.T) {
+		got := androidRuleFamilies([]string{"0.0.0.0/0", "::/0", "2001:db8::/32"})
+		if len(got) != 2 {
+			t.Fatalf("expected two families (v4, v6), got %v", got)
+		}
+	})
+}

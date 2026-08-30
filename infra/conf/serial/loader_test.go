@@ -13,7 +13,24 @@ import (
 	"github.com/xtls/xray-core/main/confloader"
 )
 
-func TestDecodeJSONConfig_RejectsUnknownFields(t *testing.T) {
+// Default (env unset) must match upstream: unknown fields are allowed.
+func TestDecodeJSONConfig_AllowsUnknownFieldsByDefault(t *testing.T) {
+	unknownField := `{
+		"outbound": [{
+			"protocol": "freedom"
+		}]
+	}`
+	reader := bytes.NewReader([]byte(unknownField))
+	_, err := serial.DecodeJSONConfig(reader)
+	if err != nil {
+		t.Fatalf("expected unknown fields to be allowed by default (upstream behavior), got: %v", err)
+	}
+}
+
+// Strict mode (xray.json.strict=true) is the fork's explicit opt-in: it
+// rejects unknown fields in addition to skipping comment-stripping.
+func TestDecodeJSONConfig_RejectsUnknownFieldsWhenStrict(t *testing.T) {
+	t.Setenv("XRAY_JSON_STRICT", "true")
 	unknownField := `{
 		"outbound": [{
 			"protocol": "freedom"
@@ -22,7 +39,7 @@ func TestDecodeJSONConfig_RejectsUnknownFields(t *testing.T) {
 	reader := bytes.NewReader([]byte(unknownField))
 	_, err := serial.DecodeJSONConfig(reader)
 	if err == nil {
-		t.Fatal("expected error for unknown field 'outbound', got nil")
+		t.Fatal("expected error for unknown field 'outbound' in strict mode, got nil")
 	}
 	if !strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("expected error about unknown field, got: %v", err)
@@ -65,27 +82,50 @@ func TestDecodeJSONConfig_AcceptsValidConfig(t *testing.T) {
 	}
 }
 
-func TestDecodeTOMLConfig_RejectsUnknownFields(t *testing.T) {
+func TestDecodeTOMLConfig_AllowsUnknownFieldsByDefault(t *testing.T) {
+	unknownField := `log_level = "info"
+outbound = []`
+	reader := bytes.NewReader([]byte(unknownField))
+	_, err := serial.DecodeTOMLConfig(reader)
+	if err != nil {
+		t.Fatalf("expected unknown fields to be allowed by default in TOML, got: %v", err)
+	}
+}
+
+func TestDecodeTOMLConfig_RejectsUnknownFieldsWhenStrict(t *testing.T) {
+	t.Setenv("XRAY_JSON_STRICT", "true")
 	unknownField := `log_level = "info"
 outbound = []`
 	reader := bytes.NewReader([]byte(unknownField))
 	_, err := serial.DecodeTOMLConfig(reader)
 	if err == nil {
-		t.Fatal("expected error for unknown field 'outbound' in TOML, got nil")
+		t.Fatal("expected error for unknown field 'outbound' in strict TOML, got nil")
 	}
 	if !strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("expected error about unknown field, got: %v", err)
 	}
 }
 
-func TestDecodeYAMLConfig_RejectsUnknownFields(t *testing.T) {
+func TestDecodeYAMLConfig_AllowsUnknownFieldsByDefault(t *testing.T) {
+	unknownField := `log:
+  loglevel: info
+outbound: []`
+	reader := bytes.NewReader([]byte(unknownField))
+	_, err := serial.DecodeYAMLConfig(reader)
+	if err != nil {
+		t.Fatalf("expected unknown fields to be allowed by default in YAML, got: %v", err)
+	}
+}
+
+func TestDecodeYAMLConfig_RejectsUnknownFieldsWhenStrict(t *testing.T) {
+	t.Setenv("XRAY_JSON_STRICT", "true")
 	unknownField := `log:
   loglevel: info
 outbound: []`
 	reader := bytes.NewReader([]byte(unknownField))
 	_, err := serial.DecodeYAMLConfig(reader)
 	if err == nil {
-		t.Fatal("expected error for unknown field 'outbound' in YAML, got nil")
+		t.Fatal("expected error for unknown field 'outbound' in strict YAML, got nil")
 	}
 	if !strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("expected error about unknown field, got: %v", err)

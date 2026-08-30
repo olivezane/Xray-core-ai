@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/common/platform"
 	creflect "github.com/xtls/xray-core/common/reflect"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/infra/conf"
@@ -13,15 +12,15 @@ import (
 )
 
 // UseStrictJSON, when true, makes JSON config decoders skip the custom
-// comment-stripping reader (parse as strict RFC 8259 JSON).
+// comment-stripping reader (parse as strict RFC 8259 JSON) and reject
+// unknown fields. Same predicate as conf.StrictJSON, so both entry points
+// always agree on the strict semantics.
 //
 // Enabled by setting the env variable xray.json.strict=true (or its normalized
-// form XRAY_JSON_STRICT=true). Default false keeps comment-stripping enabled.
-//
-// The same env variable controls DisallowUnknownFields. When set to "false",
-// unknown fields are allowed (for configs with fields from newer versions).
-// Default (unset or "true") rejects unknown fields.
-var UseStrictJSON = platform.NewEnvFlag(platform.UseStrictJSON).GetValue(func() string { return "" }) == "true"
+// form XRAY_JSON_STRICT=true). Default false preserves upstream-compatible
+// behavior for human-edited configs that may contain comments or unknown
+// fields.
+var UseStrictJSON = conf.StrictJSON()
 
 func MergeConfigFromFiles(files []*core.ConfigSource) (string, error) {
 	c, err := mergeConfigs(files)

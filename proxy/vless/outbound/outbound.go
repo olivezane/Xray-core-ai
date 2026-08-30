@@ -1,12 +1,15 @@
 package outbound
 
 import (
+	"bytes"
 	"context"
 	gotls "crypto/tls"
 	"encoding/base64"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	utls "github.com/refraction-networking/utls"
 	proxymanConfig "github.com/xtls/xray-core/app/proxyman"
@@ -27,10 +30,10 @@ import (
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/policy"
 	"github.com/xtls/xray-core/features/routing"
+	"github.com/xtls/xray-core/proxy/vision"
 	"github.com/xtls/xray-core/proxy/vless"
 	"github.com/xtls/xray-core/proxy/vless/encoding"
 	"github.com/xtls/xray-core/proxy/vless/encryption"
-	"github.com/xtls/xray-core/proxy/vision"
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/rawconn"
@@ -244,6 +247,11 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 	}
 
 	allowUDP443 := false
+	// input/rawInput point into the underlying TLS/REALITY conn: on the
+	// direct-copy switch the Vision reader replays whatever the conn has
+	// already buffered, so the stream does not lose bytes (upstream contract).
+	var input *bytes.Reader
+	var rawInput *bytes.Buffer
 	switch requestAddons.Flow {
 	case vless.XRV + "-udp443":
 		allowUDP443 = true
@@ -261,10 +269,12 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 		case protocol.RequestCommandTCP, protocol.RequestCommandRvs:
 			if commonConn, ok := conn.(*encryption.CommonConn); ok {
 				if _, ok := commonConn.Conn.(*encryption.XorConn); ok || !rawconn.IsRAW(iConn) {
-					ob.CanSpliceCopy = 3
+					ob.CanSpliceCopy = 3 // full-random xorConn / non-RAW transport / another securityConn should not be penetrated
 				}
 			}
-			if err := checkConnType(iConn); err != nil {
+			var err error
+			input, rawInput, err = extractConnBuffers(conn, iConn)
+			if err != nil {
 				return err
 			}
 		default:
@@ -369,7 +379,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 		// default: serverReader := buf.NewReader(conn)
 		serverReader := encoding.DecodeBodyAddons(conn, request, responseAddons)
 		if requestAddons.Flow == vless.XRV {
-			serverReader = vision.WrapReader(serverReader, conn, trafficState, vision.DirectionDownstream, ctx)
+			serverReader = vision.WrapReader(serverReader, conn, trafficState, vision.DirectionDownstream, ctx, input, rawInput)
 		}
 		if request.Command == protocol.RequestCommandMux && request.Port == 666 {
 			if requestAddons.Flow == vless.XRV {
@@ -460,12 +470,37 @@ func (r *Reverse) monitor() error {
 	return nil
 }
 
-func checkConnType(iConn stat.Connection) error {
-	switch iConn.(type) {
-	case *tls.Conn, *tls.UConn, *reality.UConn:
-		return nil
+// extractConnBuffers returns the input/rawInput buffers of the underlying
+// TLS/REALITY conn holding already-buffered application data. The XTLS-Vision
+// reader replays them when it switches to direct copy (upstream contract).
+// conn is the outer connection (CommonConn when the vless body is encrypted
+// on top of XTLS); inner is the stat-stripped connection carrying the
+// TLS/REALITY wrappers.
+func extractConnBuffers(conn net.Conn, inner stat.Connection) (*bytes.Reader, *bytes.Buffer, error) {
+	var t reflect.Type
+	var p uintptr
+	switch c := conn.(type) {
+	case *encryption.CommonConn:
+		t = reflect.TypeOf(c).Elem()
+		p = uintptr(unsafe.Pointer(c))
+	default:
+		switch c := inner.(type) {
+		case *tls.Conn:
+			t = reflect.TypeOf(c.Conn).Elem()
+			p = uintptr(unsafe.Pointer(c.Conn))
+		case *tls.UConn:
+			t = reflect.TypeOf(c.Conn).Elem()
+			p = uintptr(unsafe.Pointer(c.Conn))
+		case *reality.UConn:
+			t = reflect.TypeOf(c.Conn).Elem()
+			p = uintptr(unsafe.Pointer(c.Conn))
+		default:
+			return nil, nil, errors.New("XTLS only supports TLS and REALITY directly for now.").AtWarning()
+		}
 	}
-	return errors.New("XTLS only supports TLS and REALITY directly for now.").AtWarning()
+	i, _ := t.FieldByName("input")
+	r, _ := t.FieldByName("rawInput")
+	return (*bytes.Reader)(unsafe.Pointer(p + i.Offset)), (*bytes.Buffer)(unsafe.Pointer(p + r.Offset)), nil
 }
 
 func (r *Reverse) Start() error {
