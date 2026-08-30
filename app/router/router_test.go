@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/xtls/xray-core/app/router"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/geodata"
@@ -13,7 +14,6 @@ import (
 	"github.com/xtls/xray-core/features/outbound"
 	routing_session "github.com/xtls/xray-core/features/routing/session"
 	"github.com/xtls/xray-core/testing/mocks"
-	"go.uber.org/mock/gomock"
 )
 
 type mockOutboundManager struct {
