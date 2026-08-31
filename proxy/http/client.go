@@ -254,12 +254,9 @@ func setUpHTTPTunnel(ctx context.Context, dest net.Destination, target string, u
 
 		var pErr error
 		var wg sync.WaitGroup
-		wg.Add(1)
-
-		go func() {
+		wg.Go(func() {
 			_, pErr = pw.Write(firstPayload)
-			wg.Done()
-		}()
+		})
 
 		resp, err := h2clientConn.RoundTrip(req)
 		if err != nil {

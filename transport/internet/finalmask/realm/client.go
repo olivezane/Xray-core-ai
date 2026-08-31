@@ -120,8 +120,7 @@ func (c *realmConnClient) getpeer() (net.PacketConn, error) {
 	errors.LogDebug(context.Background(), "[realm] punch peer ", peer, " with ", time.Since(start))
 
 	if c.mapper != nil {
-		c.wg.Add(1)
-		go portMapLoop(c.ctx, c.mapper, c.wg.Done)
+		c.wg.Go(func() { portMapLoop(c.ctx, c.mapper) })
 	}
 
 	c.peer = peer
@@ -217,10 +216,9 @@ func (c *realmConnClient) Close() error {
 	return nil
 }
 
-func portMapLoop(ctx context.Context, mapper *PortMapper, done func()) {
+func portMapLoop(ctx context.Context, mapper *PortMapper) {
 	defer func() {
 		err := mapper.Close()
-		done()
 		errors.LogDebug(context.Background(), "[realm] [port mapping] [", mapper.InternalPort(), "] removed with ", err)
 	}()
 	interval := mapper.Lifetime() / 2

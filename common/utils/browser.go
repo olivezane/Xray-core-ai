@@ -3,7 +3,7 @@ package utils
 import (
 	"hash/fnv"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,7 +16,7 @@ func GetRandomizer() *rand.Rand {
 	// Seed the PRNG with the hash of CPU info, increasing the overall probable space.
 	fnvHash := fnv.New64()
 	fnvHash.Write([]byte(strconv.Itoa(cpuid.CPU.Family) + strconv.Itoa(cpuid.CPU.Model) + strconv.Itoa(cpuid.CPU.PhysicalCores) + strconv.Itoa(cpuid.CPU.LogicalCores) + strconv.Itoa(cpuid.CPU.CacheLine) + strconv.Itoa(cpuid.CPU.ThreadsPerCore)))
-	return rand.New(rand.NewSource(int64(fnvHash.Sum64())))
+	return rand.New(rand.NewPCG(fnvHash.Sum64(), 0))
 }
 
 var globalRng *rand.Rand = GetRandomizer()

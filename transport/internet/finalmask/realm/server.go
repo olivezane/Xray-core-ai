@@ -100,12 +100,10 @@ func NewConnServer(config *Config, raw net.PacketConn) (net.PacketConn, error) {
 	}
 
 	if mapper != nil {
-		conn.wg.Add(1)
-		go portMapLoop(ctx, mapper, conn.wg.Done)
+		conn.wg.Go(func() { portMapLoop(ctx, mapper) })
 	}
 
-	conn.wg.Add(1)
-	go conn.run()
+	conn.wg.Go(conn.run)
 
 	return conn, nil
 }

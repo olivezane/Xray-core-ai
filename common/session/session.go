@@ -3,7 +3,7 @@ package session // import "github.com/xtls/xray-core/common/session"
 
 import (
 	"context"
-	"math/rand"
+	"math/rand/v2"
 
 	c "github.com/xtls/xray-core/common/ctx"
 	"github.com/xtls/xray-core/common/errors"
