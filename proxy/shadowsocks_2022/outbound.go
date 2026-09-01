@@ -82,6 +82,7 @@ func (o *Outbound) Process(ctx context.Context, link *transport.Link, dialer int
 	if err != nil {
 		return errors.New("failed to connect to server").Base(err)
 	}
+	defer connection.Close()
 
 	if session.TimeoutOnlyFromContext(ctx) {
 		// Detach the caller's deadline: the connection is timed out via explicit
