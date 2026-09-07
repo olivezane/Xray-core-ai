@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/netip"
 	"sync"
+	"sync/atomic"
 	"time"
 	_ "unsafe"
 
@@ -43,7 +44,7 @@ type xicmpConnClient struct {
 	ips      []netip.Addr
 	clientID [8]byte
 	id       int
-	seq      int
+	seq      atomic.Int32
 	readCh   chan packet
 	closedCh chan struct{}
 	mu       sync.Mutex
@@ -79,10 +80,10 @@ func NewConnClient(c *Config, raw net.PacketConn) (net.PacketConn, error) {
 		ips:      ips,
 		clientID: clientID,
 		id:       mathrand.Intn(65536),
-		seq:      1,
 		readCh:   make(chan packet),
 		closedCh: make(chan struct{}),
 	}
+	conn.seq.Store(1)
 
 	go conn.recv4()
 	go conn.recv6()
@@ -146,7 +147,7 @@ func (c *xicmpConnClient) recv4() {
 			continue
 		}
 
-		if c.ring(uint16(echo.Seq), uint16(c.seq)) > 1000 {
+		if c.ring(uint16(echo.Seq), uint16(c.seq.Load())) > 1000 {
 			continue
 		}
 
@@ -216,7 +217,7 @@ func (c *xicmpConnClient) recv6() {
 			continue
 		}
 
-		if c.ring(uint16(echo.Seq), uint16(c.seq)) > 1000 {
+		if c.ring(uint16(echo.Seq), uint16(c.seq.Load())) > 1000 {
 			continue
 		}
 
@@ -263,9 +264,8 @@ func (c *xicmpConnClient) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	}
 
 	c.mu.Lock()
-	seq := c.seq
-	c.seq += 1
-	c.seq %= 65536
+	seq := c.seq.Load()
+	c.seq.Store((seq + 1) % 65536)
 	c.mu.Unlock()
 
 	ip := addr.(*net.UDPAddr).IP
@@ -286,10 +286,10 @@ func (c *xicmpConnClient) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	copy(b[16:], p)
 
 	if ip.To4() != nil {
-		b = marshal(b, ipv4.ICMPTypeEcho, c.id, seq, 8+len(p))
+		b = marshal(b, ipv4.ICMPTypeEcho, c.id, int(seq), 8+len(p))
 		_, err = c.icmp4.WriteTo(b, addr)
 	} else {
-		b = marshal(b, ipv6.ICMPTypeEchoRequest, c.id, seq, 8+len(p))
+		b = marshal(b, ipv6.ICMPTypeEchoRequest, c.id, int(seq), 8+len(p))
 		_, err = c.icmp6.WriteTo(b, addr)
 	}
 
