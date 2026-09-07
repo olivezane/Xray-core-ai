@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,20 +18,39 @@ import (
 	xraytls "github.com/xtls/xray-core/transport/internet/tls"
 )
 
-// recordingMask records each client-side wrap into a shared order slice.
+// orderRecorder 以锁保护共享顺序断言:wrap 发生在 accept goroutine,
+// 断言在主 goroutine,裸 slice 写入构成数据竞争(-race 可复现)。
+type orderRecorder struct {
+	mu    sync.Mutex
+	order []string
+}
+
+func (r *orderRecorder) add(s string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.order = append(r.order, s)
+}
+
+func (r *orderRecorder) snapshot() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.order...)
+}
+
+// recordingMask records each client-side wrap into a shared order recorder.
 type recordingMask struct {
-	rec *[]string
+	rec *orderRecorder
 }
 
 func (m *recordingMask) TCP() {}
 
 func (m *recordingMask) WrapConnClient(raw net.Conn) (net.Conn, error) {
-	*m.rec = append(*m.rec, "mask")
+	m.rec.add("mask")
 	return raw, nil
 }
 
 func (m *recordingMask) WrapConnServer(raw net.Conn) (net.Conn, error) {
-	*m.rec = append(*m.rec, "mask")
+	m.rec.add("mask")
 	return raw, nil
 }
 
@@ -110,9 +130,9 @@ func TestWrapConnClientMaskBeforeTLSEager(t *testing.T) {
 			port, pin, shutdown := loopbackTLS(t, tc.alpn)
 			defer shutdown()
 
-			var order []string
+			var rec orderRecorder
 			mss := &internet.MemoryStreamConfig{
-				TcpmaskManager:   internet.NewTcpmaskManager([]internet.Tcpmask{&recordingMask{rec: &order}}),
+				TcpmaskManager:   internet.NewTcpmaskManager([]internet.Tcpmask{&recordingMask{rec: &rec}}),
 				SecuritySettings: &xraytls.Config{ServerName: "localhost", PinnedPeerCertSha256: [][]byte{pin}},
 			}
 			dest := cnet.TCPDestination(cnet.LocalHostIP, port)
@@ -126,7 +146,7 @@ func TestWrapConnClientMaskBeforeTLSEager(t *testing.T) {
 			hooks := tc.hooks
 			hooks.RequestALPN = tc.reqALPN
 			hooks.PostHandshake = func(*xraytls.UConn) error {
-				order = append(order, "tls-handshake")
+				rec.add("tls-handshake")
 				return nil
 			}
 			conn, err := WrapConnClient(mss, context.Background(), dest, raw, &hooks)
@@ -136,8 +156,8 @@ func TestWrapConnClientMaskBeforeTLSEager(t *testing.T) {
 			defer conn.Close()
 			_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
-			if len(order) != 2 || order[0] != "mask" || order[1] != "tls-handshake" {
-				t.Fatalf("wrap order = %v, want [mask tls-handshake]", order)
+			if got := rec.snapshot(); len(got) != 2 || got[0] != "mask" || got[1] != "tls-handshake" {
+				t.Fatalf("wrap order = %v, want [mask tls-handshake]", got)
 			}
 
 			// Echo roundtrip proves the stacked conn is functional end to end.
@@ -161,10 +181,10 @@ func TestWrapConnClientNilHooksStaysMaskOnly(t *testing.T) {
 	defer client.Close()
 	defer server.Close()
 
-	var order []string
+	var rec orderRecorder
 	mss := &internet.MemoryStreamConfig{
 		SecuritySettings: &xraytls.Config{ServerName: "localhost"},
-		TcpmaskManager:   internet.NewTcpmaskManager([]internet.Tcpmask{&recordingMask{rec: &order}}),
+		TcpmaskManager:   internet.NewTcpmaskManager([]internet.Tcpmask{&recordingMask{rec: &rec}}),
 	}
 	conn, err := WrapConnClient(mss, context.Background(), cnet.TCPDestination(cnet.LocalHostIP, 443), client, nil)
 	if err != nil {
@@ -174,8 +194,8 @@ func TestWrapConnClientNilHooksStaysMaskOnly(t *testing.T) {
 	if conn != net.Conn(client) {
 		t.Fatalf("nil hooks must return the masked raw conn unchanged, got %T", conn)
 	}
-	if len(order) != 1 || order[0] != "mask" {
-		t.Fatalf("wrap order = %v, want [mask]", order)
+	if got := rec.snapshot(); len(got) != 1 || got[0] != "mask" {
+		t.Fatalf("wrap order = %v, want [mask]", got)
 	}
 }
 

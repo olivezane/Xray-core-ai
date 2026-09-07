@@ -155,10 +155,9 @@ func TestWrapConnServerForms(t *testing.T) {
 // internet.WrapListener) must stay underneath the security layer, and the
 // composed listener must carry a real TLS handshake end to end.
 func TestSecureListenerOverMaskedListener(t *testing.T) {
-
-	var order []string
+	var rec orderRecorder
 	mss := tlsSettings(t)
-	mss.TcpmaskManager = internet.NewTcpmaskManager([]internet.Tcpmask{&recordingMask{rec: &order}})
+	mss.TcpmaskManager = internet.NewTcpmaskManager([]internet.Tcpmask{&recordingMask{rec: &rec}})
 
 	rawLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -193,8 +192,8 @@ func TestSecureListenerOverMaskedListener(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(order) != 1 || order[0] != "mask" {
-		t.Fatalf("wrap order = %v, want [mask] recorded beneath the TLS layer", order)
+	if got := rec.snapshot(); len(got) != 1 || got[0] != "mask" {
+		t.Fatalf("wrap order = %v, want [mask] recorded beneath the TLS layer", got)
 	}
 
 	msg := []byte("ping")

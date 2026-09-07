@@ -72,6 +72,12 @@ func (c *Config) BuildCertificates() []*tls.Certificate {
 		}
 		index := len(certs) - 1
 		setupOcspTicker(entry, func(isReloaded, isOcspstapling bool) {
+			// 无 reload 且无 OCSP 时首次/周期唤醒都是同值自写,却与
+			// GetCertificate 回调的并发遍历构成数据竞争(-race 可复现),
+			// 直接跳过。
+			if !isReloaded && !isOcspstapling {
+				return
+			}
 			cert := certs[index]
 			if isReloaded {
 				if newKeyPair := getX509KeyPair(); newKeyPair != nil {
