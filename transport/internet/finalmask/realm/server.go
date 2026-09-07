@@ -266,7 +266,6 @@ retry:
 	if err != nil {
 		errors.LogErrorInner(context.Background(), err, "[realm] ", c.realmID, " register session err retry in ", backoff)
 		if c.waitctx(c.ctx, backoff) {
-			c.wg.Done()
 			return
 		}
 		backoff *= 2
@@ -293,7 +292,6 @@ retry:
 	case <-c.ctx.Done():
 		_ = c.realmClient.Deregister(context.Background(), c.realmID, resp.SessionID)
 		errors.LogDebug(context.Background(), "[realm] ", c.realmID, " ", resp.SessionID, " deregistered")
-		c.wg.Done()
 		return
 	default:
 		goto retry
