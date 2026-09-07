@@ -92,6 +92,7 @@ func dialhttpUpgrade(ctx context.Context, dest net.Destination, streamSettings *
 
 	err = req.Write(conn)
 	if err != nil {
+		_ = conn.Close()
 		return nil, err
 	}
 
@@ -104,6 +105,7 @@ func dialhttpUpgrade(ctx context.Context, dest net.Destination, streamSettings *
 	if transportConfiguration.Ed == 0 {
 		_, err = connRF.Read([]byte{})
 		if err != nil {
+			_ = conn.Close()
 			return nil, err
 		}
 	}
