@@ -72,3 +72,6 @@ AGENTS.md
 # Other common ignores
 *.bak
 *.tmp
+/.agents
+/.claude
+skills-lock.json
