@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xtls/xray-core/common/crypto"
@@ -21,7 +22,7 @@ type tcpCustomClientConn struct {
 	net.Conn
 	header *tcpCustomClient
 
-	auth bool
+	auth atomic.Bool
 	wg   sync.WaitGroup
 	once sync.Once
 }
@@ -49,14 +50,18 @@ func (c *tcpCustomClientConn) RawConn() net.Conn {
 	return c.Conn
 }
 
+// Splice 在握手完成前返回 false:relay 的 peel 逻辑(UnwrapTcpMask)
+// 只看 Splice() 就决定是否剥层,若握手未完成即放行,header 序列
+// 将永远不会上线,伪装被整体旁路。握手完成后流是纯数据,此时
+// RawConn 才可安全交给 splice 拷贝。
 func (c *tcpCustomClientConn) Splice() bool {
-	return true
+	return c.auth.Load()
 }
 
 func (c *tcpCustomClientConn) Read(p []byte) (n int, err error) {
 	c.wg.Wait()
 
-	if !c.auth {
+	if !c.auth.Load() {
 		return 0, errors.New("header auth failed")
 	}
 
@@ -95,13 +100,13 @@ func (c *tcpCustomClientConn) Write(p []byte) (n int, err error) {
 		}
 
 		c.header.state.set(tcpStateKey(c.LocalAddr(), c.RemoteAddr()), ctx.vars)
-		c.auth = true
+		c.auth.Store(true)
 		c.wg.Done()
 	})
 
 	c.wg.Wait()
 
-	if !c.auth {
+	if !c.auth.Load() {
 		return 0, errors.New("header auth failed")
 	}
 
@@ -119,7 +124,7 @@ type tcpCustomServerConn struct {
 	net.Conn
 	header *tcpCustomServer
 
-	auth bool
+	auth atomic.Bool
 	wg   sync.WaitGroup
 	once sync.Once
 }
@@ -148,8 +153,10 @@ func (c *tcpCustomServerConn) RawConn() net.Conn {
 	return c.Conn
 }
 
+// Splice 在握手完成前返回 false,原因同客户端:peel 只认 Splice(),
+// 放行过早会让服务端的 header 校验序列根本没机会执行。
 func (c *tcpCustomServerConn) Splice() bool {
-	return true
+	return c.auth.Load()
 }
 
 func (c *tcpCustomServerConn) Read(p []byte) (n int, err error) {
@@ -187,13 +194,13 @@ func (c *tcpCustomServerConn) Read(p []byte) (n int, err error) {
 		}
 
 		c.header.state.set(tcpStateKey(c.LocalAddr(), c.RemoteAddr()), ctx.vars)
-		c.auth = true
+		c.auth.Store(true)
 		c.wg.Done()
 	})
 
 	c.wg.Wait()
 
-	if !c.auth {
+	if !c.auth.Load() {
 		return 0, errors.New("header auth failed")
 	}
 
@@ -203,7 +210,7 @@ func (c *tcpCustomServerConn) Read(p []byte) (n int, err error) {
 func (c *tcpCustomServerConn) Write(p []byte) (n int, err error) {
 	c.wg.Wait()
 
-	if !c.auth {
+	if !c.auth.Load() {
 		return 0, errors.New("header auth failed")
 	}
 
