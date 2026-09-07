@@ -183,6 +183,9 @@ func (c *FreedomConfig) Build() (proto.Message, error) {
 		}
 	}
 
+	if c.ProxyProtocol > 2 {
+		return nil, errors.New(`invalid "proxyProtocol": only 0, 1 or 2 are accepted, got `, c.ProxyProtocol)
+	}
 	if c.ProxyProtocol > 0 && c.ProxyProtocol <= 2 {
 		config.ProxyProtocol = c.ProxyProtocol
 	}

@@ -80,7 +80,7 @@ func (c *WireGuardConfig) Build() (proto.Message, error) {
 	var err error
 	config.SecretKey, err = ParseWireGuardKey(c.SecretKey)
 	if err != nil {
-		return nil, errors.New("invalid WireGuard secret key: %w", err)
+		return nil, errors.New("invalid WireGuard secret key").Base(err)
 	}
 
 	if c.Address == nil {

@@ -110,6 +110,9 @@ func (v *SocksClientConfig) Build() (proto.Message, error) {
 		if len(serverConfig.Users) > 1 {
 			return nil, errors.New(`SOCKS servers: "users" should have one member at most. Multiple members in "users" should use multiple SOCKS outbounds and routing balancer instead`)
 		}
+		if serverConfig.Address == nil {
+			return nil, errors.New(`SOCKS servers: "address" is not set`)
+		}
 		server := &protocol.ServerEndpoint{
 			Address: serverConfig.Address.Build(),
 			Port:    uint32(serverConfig.Port),
