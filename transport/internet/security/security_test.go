@@ -226,7 +226,8 @@ func TestWrapConnClientMaskErrorPropagatesWithHooks(t *testing.T) {
 
 // TestWrapConnClientRealityRouting proves the REALITY branch is reachable
 // when (and only when) hooks opt in: an invalid public key makes
-// reality.UClient fail loudly instead of silently passing plaintext.
+// reality.UClient fail loudly instead of silently passing plaintext, and the
+// failure must close the raw conn (WrapConnClient's documented contract).
 func TestWrapConnClientRealityRouting(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()
@@ -235,8 +236,32 @@ func TestWrapConnClientRealityRouting(t *testing.T) {
 	mss := &internet.MemoryStreamConfig{
 		SecuritySettings: &reality.Config{PublicKey: []byte{1, 2, 3}},
 	}
-	_, err := WrapConnClient(mss, context.Background(), cnet.TCPDestination(cnet.LocalHostIP, 443), client, &SecurityHooks{WithReality: true})
+	raw := &closeTrackingConn{Conn: client}
+	_, err := WrapConnClient(mss, context.Background(), cnet.TCPDestination(cnet.LocalHostIP, 443), raw, &SecurityHooks{WithReality: true})
 	if err == nil || !strings.Contains(err.Error(), "REALITY") {
 		t.Fatalf("expected REALITY branch error, got %v", err)
+	}
+	if !raw.closed {
+		t.Fatal("raw conn was not closed on REALITY error")
+	}
+}
+
+// TestWrapConnClientTLSHandshakeErrorClosesRaw: an eager TLS handshake that
+// fails (peer gone before ServerHello) must close the raw conn instead of
+// leaking the established socket up the dialer call chain.
+func TestWrapConnClientTLSHandshakeErrorClosesRaw(t *testing.T) {
+	client, server := net.Pipe()
+	_ = server.Close() // peer is gone: handshake cannot complete
+
+	mss := &internet.MemoryStreamConfig{
+		SecuritySettings: &xraytls.Config{ServerName: "localhost"},
+	}
+	raw := &closeTrackingConn{Conn: client}
+	_, err := WrapConnClient(mss, context.Background(), cnet.TCPDestination(cnet.LocalHostIP, 443), raw, &SecurityHooks{UTLSHandshake: HandshakeAuto, PlainTLSHandshake: true})
+	if err == nil {
+		t.Fatal("expected TLS handshake error, got nil")
+	}
+	if !raw.closed {
+		t.Fatal("raw conn was not closed on TLS handshake error")
 	}
 }

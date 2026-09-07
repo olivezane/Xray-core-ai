@@ -83,7 +83,13 @@ func WrapConnClient(mss *internet.MemoryStreamConfig, ctx context.Context, dest 
 		}
 		raw = newConn
 	}
-	return applySecurity(ctx, dest, mss, raw, hooks)
+	secured, err := applySecurity(ctx, dest, mss, raw, hooks)
+	if err != nil {
+		// 握手失败时底层连接已无主:关掉它,避免每个 dialer 各自补 close
+		_ = raw.Close()
+		return nil, err
+	}
+	return secured, nil
 }
 
 // applySecurity layers TLS or REALITY on top of the given (already masked)
