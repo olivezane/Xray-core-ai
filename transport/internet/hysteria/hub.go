@@ -192,23 +192,9 @@ func (l *Listener) Close() error {
 	return errors.Combine(l.listener.Close(), l.tr.Close(), l.pktConn.Close())
 }
 
-func Listen(ctx context.Context, address net.Address, port net.Port, streamSettings *internet.MemoryStreamConfig, handler internet.ConnHandler) (internet.Listener, error) {
-	if address.Family().IsDomain() {
-		return nil, errors.New("address is domain")
-	}
-
-	tlsConfig := tls.ConfigFromStreamSettings(streamSettings)
-	if tlsConfig == nil {
-		return nil, errors.New("tls config is nil")
-	}
-
-	validator := ValidatorFromContext(ctx)
-	config := streamSettings.ProtocolSettings.(*Config)
-
-	if validator == nil && config.Auth == "" {
-		return nil, errors.New("validator is nil")
-	}
-
+// buildMasqHandler 按 MasqType 构造 masquerade 处理器:
+// 404/file 返回静态内容,proxy 反代到 MasqUrl,string 返回固定响应。
+func buildMasqHandler(config *Config) (http.Handler, error) {
 	var masqHandler http.Handler
 	switch strings.ToLower(config.MasqType) {
 	case "", "404":
@@ -231,13 +217,14 @@ func Listen(ctx context.Context, address net.Address, port net.Port, streamSetti
 				transport.TLSClientConfig.InsecureSkipVerify = true
 			}
 		case "", "unix":
+			// socket 路径必须取自原始 URL,再换成 localhost 代理目标
+			socketPath := u.Path
 			u = &url.URL{Scheme: "http", Host: "localhost"}
-			path := u.Path
 			dialer := &net.Dialer{Timeout: 30 * time.Second}
 			transport = transport.Clone()
 			transport.Proxy = nil
 			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return dialer.DialContext(ctx, "unix", path)
+				return dialer.DialContext(ctx, "unix", socketPath)
 			}
 			transport.MaxIdleConns = masqueradeProxyMaxIdleConnections
 			transport.MaxIdleConnsPerHost = masqueradeProxyMaxIdleConnsPerHost
@@ -275,6 +262,30 @@ func Listen(ctx context.Context, address net.Address, port net.Port, streamSetti
 		})
 	default:
 		return nil, errors.New("unknown masq type")
+	}
+	return masqHandler, nil
+}
+
+func Listen(ctx context.Context, address net.Address, port net.Port, streamSettings *internet.MemoryStreamConfig, handler internet.ConnHandler) (internet.Listener, error) {
+	if address.Family().IsDomain() {
+		return nil, errors.New("address is domain")
+	}
+
+	tlsConfig := tls.ConfigFromStreamSettings(streamSettings)
+	if tlsConfig == nil {
+		return nil, errors.New("tls config is nil")
+	}
+
+	validator := ValidatorFromContext(ctx)
+	config := streamSettings.ProtocolSettings.(*Config)
+
+	if validator == nil && config.Auth == "" {
+		return nil, errors.New("validator is nil")
+	}
+
+	masqHandler, err := buildMasqHandler(config)
+	if err != nil {
+		return nil, err
 	}
 
 	quicParams := streamSettings.QuicParams
