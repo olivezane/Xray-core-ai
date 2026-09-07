@@ -3,6 +3,8 @@ package reflect_test
 import (
 	"bytes"
 	"encoding/json"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -117,10 +119,6 @@ func TestMarshalConfigJson(t *testing.T) {
 		"XHTTP_IN",
 		"\"host\": \"bing.com\"",
 		"scMaxEachPostBytes",
-		"\"from\": 100",
-		"\"to\": 1000",
-		"\"from\": 1000000",
-		"\"to\": 1000000",
 	}
 	for _, kw := range keywords {
 		if !strings.Contains(tc, kw) {
@@ -128,6 +126,27 @@ func TestMarshalConfigJson(t *testing.T) {
 			t.Error("keyword not found:", kw)
 			break
 		}
+	}
+
+	// 数值字段必须按值精确断言:子串匹配存在空洞
+	// (如 "from": 100 是 "from": 1000000 的前缀,区间被丢弃也能通过)。
+	numValues := func(key string) map[int64]bool {
+		vals := make(map[int64]bool)
+		for _, m := range regexp.MustCompile(`"`+key+`":\s*(-?\d+)`).FindAllStringSubmatch(tc, -1) {
+			v, err := strconv.ParseInt(m[1], 10, 64)
+			if err == nil {
+				vals[v] = true
+			}
+		}
+		return vals
+	}
+	if got := numValues("from"); !got[100] || !got[1000000] {
+		t.Log("config.json:", tc)
+		t.Fatalf("from values = %v, want both 100 and 1000000", got)
+	}
+	if got := numValues("to"); !got[1000] || !got[1000000] {
+		t.Log("config.json:", tc)
+		t.Fatalf("to values = %v, want both 1000 and 1000000", got)
 	}
 }
 

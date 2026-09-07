@@ -7,11 +7,17 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/xtls/xray-core/common"
 )
 
 func TestECHDial(t *testing.T) {
+	// 直连 cloudflare.com 与 1.1.1.1 DoH,离线/受限环境必挂:
+	// -short 时跳过,并给 HTTP 设置超时防止无网环境挂死。
+	if testing.Short() {
+		t.Skip("requires network access to cloudflare.com and 1.1.1.1")
+	}
 	config := &Config{
 		ServerName:    "cloudflare.com",
 		EchConfigList: "encryptedsni.com+https://1.1.1.1/dns-query",
@@ -23,6 +29,7 @@ func TestECHDial(t *testing.T) {
 			TLSConfig := config.GetTLSConfig()
 			TLSConfig.NextProtos = []string{"http/1.1"}
 			client := &http.Client{
+				Timeout: 30 * time.Second,
 				Transport: &http.Transport{
 					TLSClientConfig: TLSConfig,
 				},
