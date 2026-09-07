@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xtls/xray-core/common/errors"
@@ -61,7 +62,7 @@ type xdnsConnServer struct {
 	readQueue     chan *packet
 	writeQueueMap map[string]*queue
 
-	closed bool
+	closed atomic.Bool
 	mutex  sync.Mutex
 }
 
@@ -100,7 +101,7 @@ func (c *xdnsConnServer) clean() {
 		c.mutex.Lock()
 		defer c.mutex.Unlock()
 
-		if c.closed {
+		if c.closed.Load() {
 			return true
 		}
 
@@ -126,7 +127,7 @@ func (c *xdnsConnServer) clean() {
 }
 
 func (c *xdnsConnServer) ensureQueue(addr net.Addr) *queue {
-	if c.closed {
+	if c.closed.Load() {
 		return nil
 	}
 
@@ -147,7 +148,7 @@ func (c *xdnsConnServer) stash(queue *queue, p []byte) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if c.closed {
+	if c.closed.Load() {
 		return
 	}
 
@@ -161,7 +162,7 @@ func (c *xdnsConnServer) recvLoop() {
 	var buf [internet.UDPSize]byte
 
 	for {
-		if c.closed {
+		if c.closed.Load() {
 			break
 		}
 
@@ -226,7 +227,7 @@ func (c *xdnsConnServer) recvLoop() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.closed = true
+	c.closed.Store(true)
 	for key, q := range c.writeQueueMap {
 		close(q.queue)
 		close(q.stash)
@@ -326,13 +327,13 @@ func (c *xdnsConnServer) sendLoop() {
 			buf[2] |= 0x02
 		}
 
-		if c.closed {
+		if c.closed.Load() {
 			return
 		}
 
 		_, err = c.PacketConn.WriteTo(buf, rec.Addr)
 		if go_errors.Is(err, net.ErrClosed) {
-			c.closed = true
+			c.closed.Store(true)
 			break
 		}
 	}
@@ -381,7 +382,7 @@ func (c *xdnsConnServer) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 }
 
 func (c *xdnsConnServer) Close() error {
-	c.closed = true
+	c.closed.Store(true)
 	return c.PacketConn.Close()
 }
 
