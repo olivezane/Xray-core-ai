@@ -246,6 +246,10 @@ func (c *udpCustomServerConn) WriteTo(p []byte, addr net.Addr) (n int, err error
 		errors.LogError(context.Background(), "[mask] drop packet to ", addr, " with size ", len(p), " > header size mismatch")
 		return 0, nil
 	}
+	if len(evaluated)+len(p) > internet.UDPSize {
+		errors.LogError(context.Background(), "[mask] drop packet to ", addr, " with size ", len(p))
+		return 0, nil
+	}
 	c.header.state.set(udpStateKey(addr), ctx.vars)
 	copy(b, evaluated)
 	copy(b[len(evaluated):], p)
