@@ -30,32 +30,38 @@ const (
 	mphMatchTypeCount = 2 // Full and Domain
 )
 
-type mphRuleInfo struct {
-	rollingHash uint32
-	matchers    [mphMatchTypeCount][]uint32
-}
+// mphRuleIdx is the value stored in ruleInfos during building.
+// It is the rule index into rules/values/rollingHashes. Keeping the map
+// value small (4 bytes instead of a struct with two slice headers and a
+// hash) reduces peak memory by tens of MB for large geosite rule sets.
+type mphRuleIdx uint32
 
-// MphMatcherGroup is an implementation of MatcherGroup.
-// It implements Rabin-Karp algorithm and minimal perfect hash table for Full and Domain matcher.
 type MphMatcherGroup struct {
-	rules      []string   // RuleIdx -> pattern string, index 0 reserved for failed lookup
-	values     [][]uint32 // RuleIdx -> registered matcher values for the pattern (Full Matcher takes precedence)
-	level0     []uint32   // RollingHash & Mask -> seed for Memhash
-	level0Mask uint32     // Mask restricting RollingHash to 0 ~ len(level0)
-	level1     []uint32   // Memhash<seed> & Mask -> stored index for rules
-	level1Mask uint32     // Mask for restricting Memhash<seed> to 0 ~ len(level1)
-	ruleInfos  *map[string]mphRuleInfo
+	rules      []string // RuleIdx -> pattern string, index 0 reserved for failed lookup
+	values     []uint32 // Flat matcher values, grouped by rule index
+	valueOff   []uint32 // RuleIdx -> start offset in values; len is len(rules)+1
+	level0     []uint32 // RollingHash & Mask -> seed for Memhash
+	level0Mask uint32   // Mask restricting RollingHash to 0 ~ len(level0)
+	level1     []uint32 // Memhash<seed> & Mask -> stored index for rules
+	level1Mask uint32   // Mask for restricting Memhash<seed> to 0 ~ len(level1)
+	// Only used for building, destroyed after build completes.
+	rollingHashes []uint32      // RuleIdx -> rollingHash, parallel to rules
+	ruleValues    [2][][]uint32 // [matcherType]RuleIdx -> values; Full segment precedes Domain, matching MatcherGroup semantics
+	ruleInfos     *map[string]mphRuleIdx
 }
 
 func NewMphMatcherGroup() *MphMatcherGroup {
 	return &MphMatcherGroup{
-		rules:      []string{""},
-		values:     [][]uint32{nil},
-		level0:     nil,
-		level0Mask: 0,
-		level1:     nil,
-		level1Mask: 0,
-		ruleInfos:  &map[string]mphRuleInfo{}, // Only used for building, destroyed after build complete
+		rules:         []string{""},
+		values:        nil,
+		valueOff:      []uint32{0},
+		level0:        nil,
+		level0Mask:    0,
+		level1:        nil,
+		level1Mask:    0,
+		ruleValues:    [2][][]uint32{{nil}, {nil}},
+		rollingHashes: []uint32{0},
+		ruleInfos:     &map[string]mphRuleIdx{}, // Only used for building, destroyed after build complete
 	}
 }
 
@@ -74,15 +80,19 @@ func (g *MphMatcherGroup) AddDomainMatcher(matcher DomainMatcher, value uint32) 
 
 func (g *MphMatcherGroup) addPattern(suffixHash uint32, suffixPattern string, pattern string, matcherType Type, value uint32) uint32 {
 	fullPattern := pattern + suffixPattern
-	info, found := (*g.ruleInfos)[fullPattern]
+	idx, found := (*g.ruleInfos)[fullPattern]
 	if !found {
-		info = mphRuleInfo{rollingHash: RollingHash(suffixHash, pattern)}
+		idx = mphRuleIdx(len(g.rules))
 		g.rules = append(g.rules, fullPattern)
-		g.values = append(g.values, nil)
+		g.ruleValues[0] = append(g.ruleValues[0], nil)
+		g.ruleValues[1] = append(g.ruleValues[1], nil)
+		g.rollingHashes = append(g.rollingHashes, RollingHash(suffixHash, pattern))
+		(*g.ruleInfos)[fullPattern] = idx
 	}
-	info.matchers[matcherType] = append(info.matchers[matcherType], value)
-	(*g.ruleInfos)[fullPattern] = info
-	return info.rollingHash
+	// Values are kept in two segments (Full before Domain) so that the
+	// concatenation order matches the previous matchers[Full]+matchers[Domain].
+	g.ruleValues[matcherType][idx] = append(g.ruleValues[matcherType][idx], value)
+	return g.rollingHashes[idx]
 }
 
 // Build builds a minimal perfect hash table for insert rules.
@@ -97,13 +107,27 @@ func (g *MphMatcherGroup) Build() error {
 	// Create buckets based on all rule's rolling hash
 	buckets := make([][]uint32, len(g.level0))
 	for ruleIdx := 1; ruleIdx < len(g.rules); ruleIdx++ { // Traverse rules starting from index 1 (0 reserved for failed lookup)
-		ruleInfo := (*g.ruleInfos)[g.rules[ruleIdx]]
-		bucketIdx := ruleInfo.rollingHash & g.level0Mask
+		bucketIdx := g.rollingHashes[ruleIdx] & g.level0Mask
 		buckets[bucketIdx] = append(buckets[bucketIdx], uint32(ruleIdx))
-		g.values[ruleIdx] = append(ruleInfo.matchers[Full], ruleInfo.matchers[Domain]...) // nolint:gocritic
 	}
+
+	// Flatten per-rule values into a single backing array with offset table.
+	// This replaces the previous [][]uint32 (one slice header per rule, ~24B each
+	// for 300k+ geosite rules) with 2x4B per rule, cutting steady-state heap
+	// for the routing matcher by about 10MB.
+	g.values = make([]uint32, 0, ruleCount)
+	g.valueOff = make([]uint32, len(g.rules)+1)
+	for ruleIdx := 1; ruleIdx < len(g.rules); ruleIdx++ {
+		g.valueOff[ruleIdx] = uint32(len(g.values))
+		g.values = append(g.values, g.ruleValues[Full][ruleIdx]...)
+		g.values = append(g.values, g.ruleValues[Domain][ruleIdx]...)
+	}
+	g.valueOff[len(g.rules)] = uint32(len(g.values))
+	g.ruleValues = [2][][]uint32{}
+
 	g.ruleInfos = nil // Set ruleInfos nil to release memory
-	runtime.GC()      // peak mem
+	g.rollingHashes = nil
+	runtime.GC() // peak mem
 
 	// Sort buckets in descending order with respect to each bucket's size
 	bucketIdxs := make([]int, len(buckets))
@@ -160,14 +184,19 @@ func (g *MphMatcherGroup) Match(input string) []uint32 {
 		hash = hash*PrimeRK + uint32(input[i])
 		if input[i] == '.' {
 			if mphIdx := g.Lookup(hash, input[i:]); mphIdx != 0 {
-				matches = append(matches, g.values[mphIdx])
+				matches = append(matches, g.valueRange(mphIdx))
 			}
 		}
 	}
 	if mphIdx := g.Lookup(hash, input); mphIdx != 0 {
-		matches = append(matches, g.values[mphIdx])
+		matches = append(matches, g.valueRange(mphIdx))
 	}
 	return CompositeMatchesReverse(matches)
+}
+
+// valueRange returns the matcher values registered for the given rule index.
+func (g *MphMatcherGroup) valueRange(ruleIdx uint32) []uint32 {
+	return g.values[g.valueOff[ruleIdx]:g.valueOff[ruleIdx+1]]
 }
 
 // MatchAny implements MatcherGroup.MatchAny.
