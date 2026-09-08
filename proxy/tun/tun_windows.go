@@ -3,12 +3,14 @@
 package tun
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/binary"
 	go_errors "errors"
 	"net"
 	"net/netip"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/xtls/xray-core/common/errors"
@@ -29,13 +31,14 @@ func procyield(cycles uint32)
 type WindowsTun struct {
 	sync.RWMutex
 
-	options        *Config
-	adapter        *wintun.Adapter
-	session        wintun.Session
-	readWait       windows.Handle
-	luid           winipcfg.LUID
-	changeCallback winipcfg.ChangeCallback
-	closed         bool
+	options  *Config
+	adapter  *wintun.Adapter
+	session  wintun.Session
+	readWait windows.Handle
+	luid     winipcfg.LUID
+	cbr      winipcfg.ChangeCallback
+	cbi      winipcfg.ChangeCallback
+	closed   bool
 
 	// Track address families configured during Start() so Close() can clean them up.
 	hasIPv4, hasIPv6 bool
@@ -89,20 +92,39 @@ func open(name, desc string) (*wintun.Adapter, error) {
 }
 
 func (t *WindowsTun) Start() error {
-	allowedIPs := make([]netip.Prefix, 0, len(t.options.AutoSystemRoutingTable))
-	for _, route := range t.options.AutoSystemRoutingTable {
-		allowedIPs = append(allowedIPs, netip.MustParsePrefix(route))
+	var address4, address6 bool
+	addresses := make([]netip.Prefix, 0, len(t.options.Gateway))
+	for _, cidr := range t.options.Gateway {
+		prefix := netip.MustParsePrefix(cidr)
+		if prefix.Addr().Is4() {
+			address4 = true
+			t.hasIPv4 = true
+		} else {
+			address6 = true
+			t.hasIPv6 = true
+		}
+		addresses = append(addresses, prefix)
 	}
+
+	dns := make([]netip.Addr, 0, len(t.options.DNS))
+	for _, ip := range t.options.DNS {
+		dns = append(dns, netip.MustParseAddr(ip))
+	}
+
+	var route4, route6 bool
 	routesMap := make(map[winipcfg.RouteData]struct{})
-	for _, ip := range allowedIPs {
+	for _, cidr := range t.options.AutoSystemRoutingTable {
+		prefix := netip.MustParsePrefix(cidr)
 		route := winipcfg.RouteData{
-			Destination: ip.Masked(),
+			Destination: prefix.Masked(),
 			Metric:      0,
 		}
-		if ip.Addr().Is4() {
+		if prefix.Addr().Is4() {
+			route4 = true
 			t.hasIPv4 = true
 			route.NextHop = netip.IPv4Unspecified()
 		} else {
+			route6 = true
 			t.hasIPv6 = true
 			route.NextHop = netip.IPv6Unspecified()
 		}
@@ -113,24 +135,40 @@ func (t *WindowsTun) Start() error {
 		r := route
 		routesData = append(routesData, &r)
 	}
-	err := t.luid.SetRoutes(routesData)
-	if err != nil {
-		return errors.New("unable to set routes").Base(err)
-	}
 
-	if len(t.options.Gateway) > 0 {
-		addresses := make([]netip.Prefix, 0, len(t.options.Gateway))
-		for _, address := range t.options.Gateway {
-			addresses = append(addresses, netip.MustParsePrefix(address))
+	var retryTimes int
+	var firstErr error
+startOver:
+	if retryTimes > 0 {
+		if retryTimes > 15 {
+			return windows.ERROR_NOT_FOUND
 		}
-		err := t.luid.SetIPAddresses(addresses)
-		if err != nil {
-			return errors.New("unable to set ips").Base(err)
-		}
+		errors.LogErrorInner(context.Background(), firstErr, "Interface configuration failed, retrying attempt ", retryTimes, "/15")
+		time.Sleep(time.Second)
 	}
-
-	if t.hasIPv4 {
-		ipif, err := t.luid.IPInterface(windows.AF_INET)
+	retryTimes++
+	for _, family := range []winipcfg.AddressFamily{windows.AF_INET, windows.AF_INET6} {
+		if family == windows.AF_INET && route4 || family == windows.AF_INET6 && route6 {
+			err := t.luid.SetRoutesForFamily(family, routesData)
+			if err != nil {
+				firstErr = errors.New("unable to set routes").Base(err)
+				if err == windows.ERROR_NOT_FOUND {
+					goto startOver
+				}
+				return firstErr
+			}
+		}
+		if family == windows.AF_INET && address4 || family == windows.AF_INET6 && address6 {
+			err := t.luid.SetIPAddressesForFamily(family, addresses)
+			if err != nil {
+				firstErr = errors.New("unable to set ips").Base(err)
+				if err == windows.ERROR_NOT_FOUND {
+					goto startOver
+				}
+				return firstErr
+			}
+		}
+		ipif, err := t.luid.IPInterface(family)
 		if err != nil {
 			return err
 		}
@@ -138,56 +176,48 @@ func (t *WindowsTun) Start() error {
 		ipif.DadTransmits = 0
 		ipif.ManagedAddressConfigurationSupported = false
 		ipif.OtherStatefulConfigurationSupported = false
-		ipif.NLMTU = t.options.MTU
-		ipif.UseAutomaticMetric = false
-		ipif.Metric = 0
+		if family == windows.AF_INET && (address4 || route4) || family == windows.AF_INET6 && (address6 || route6) {
+			ipif.NLMTU = t.options.MTU
+		}
+		if family == windows.AF_INET && route4 || family == windows.AF_INET6 && route6 {
+			ipif.UseAutomaticMetric = false
+			ipif.Metric = 0
+		}
 		err = ipif.Set()
 		if err != nil {
-			return err
+			firstErr = errors.New("unable to set metric and MTU").Base(err)
+			if err == windows.ERROR_NOT_FOUND {
+				goto startOver
+			}
+			return firstErr
 		}
-	}
-	if t.hasIPv6 {
-		ipif, err := t.luid.IPInterface(windows.AF_INET6)
-		if err != nil {
-			return err
-		}
-		ipif.RouterDiscoveryBehavior = winipcfg.RouterDiscoveryDisabled
-		ipif.DadTransmits = 0
-		ipif.ManagedAddressConfigurationSupported = false
-		ipif.OtherStatefulConfigurationSupported = false
-		ipif.NLMTU = t.options.MTU
-		ipif.UseAutomaticMetric = false
-		ipif.Metric = 0
-		err = ipif.Set()
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(t.options.DNS) > 0 {
-		dns := make([]netip.Addr, 0, len(t.options.DNS))
-		for _, ip := range t.options.DNS {
-			dns = append(dns, netip.MustParseAddr(ip))
-		}
-		err := t.luid.SetDNS(windows.AF_INET, dns, nil)
-		if err != nil {
-			return err
-		}
-		err = t.luid.SetDNS(windows.AF_INET6, dns, nil)
-		if err != nil {
-			return err
+		if len(dns) > 0 {
+			err = t.luid.SetDNS(family, dns, nil)
+			if err != nil {
+				firstErr = errors.New("unable to set DNS").Base(err)
+				if err == windows.ERROR_NOT_FOUND {
+					goto startOver
+				}
+				return firstErr
+			}
 		}
 	}
 
 	if t.updater != nil {
-		t.changeCallback, err = winipcfg.RegisterInterfaceChangeCallback(func(notificationType winipcfg.MibNotificationType, iface *winipcfg.MibIPInterfaceRow) {
+		var err error
+		t.cbr, err = winipcfg.RegisterRouteChangeCallback(func(notificationType winipcfg.MibNotificationType, route *winipcfg.MibIPforwardRow2) {
+			t.updater.Update()
+		})
+		if err != nil {
+			return err
+		}
+		t.cbi, err = winipcfg.RegisterInterfaceChangeCallback(func(notificationType winipcfg.MibNotificationType, iface *winipcfg.MibIPInterfaceRow) {
 			t.updater.Update()
 		})
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -199,8 +229,11 @@ func (t *WindowsTun) Close() error {
 	}
 	t.closed = true
 
-	if t.changeCallback != nil {
-		t.changeCallback.Unregister()
+	if t.cbr != nil {
+		t.cbr.Unregister()
+	}
+	if t.cbi != nil {
+		t.cbi.Unregister()
 	}
 
 	// Flush routes, IP addresses, and DNS before closing the adapter.

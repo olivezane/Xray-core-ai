@@ -10,7 +10,7 @@ type ConfigCreator func() interface{}
 
 var globalTransportConfigCreatorCache = make(map[string]ConfigCreator)
 
-var strategy = [][]byte{
+var strategy = [11][3]byte{
 	//              name        strategy,   prefer, fallback
 	{0, 0, 0}, //   AsIs        none,       /,      /
 	{1, 0, 0}, //   UseIP       use,        both,   none
@@ -87,10 +87,6 @@ func (c *StreamConfig) GetEffectiveSecuritySettings() (interface{}, error) {
 
 func (c *StreamConfig) HasSecuritySettings() bool {
 	return len(c.SecuritySettings) > 0
-}
-
-func (c *ProxyConfig) HasTag() bool {
-	return c != nil && len(c.Tag) > 0
 }
 
 func (m SocketConfig_TProxyMode) IsEnabled() bool {
