@@ -10,8 +10,6 @@ import (
 )
 
 type Udpmask interface {
-	UDP()
-
 	WrapPacketConnClient(raw net.PacketConn, level int, levelCount int) (net.PacketConn, error)
 	WrapPacketConnServer(raw net.PacketConn, level int, levelCount int) (net.PacketConn, error)
 }
@@ -21,9 +19,7 @@ type UdpmaskManager struct {
 }
 
 func NewUdpmaskManager(udpmasks []Udpmask) *UdpmaskManager {
-	return &UdpmaskManager{
-		udpmasks: udpmasks,
-	}
+	return &UdpmaskManager{udpmasks: udpmasks}
 }
 
 func (m *UdpmaskManager) WrapPacketConnClient(raw net.PacketConn) (net.PacketConn, error) {
@@ -195,8 +191,6 @@ func (c *headerManagerConn) WriteTo(p []byte, addr net.Addr) (n int, err error) 
 }
 
 type Tcpmask interface {
-	TCP()
-
 	WrapConnClient(net.Conn) (net.Conn, error)
 	WrapConnServer(net.Conn) (net.Conn, error)
 }
@@ -206,9 +200,7 @@ type TcpmaskManager struct {
 }
 
 func NewTcpmaskManager(tcpmasks []Tcpmask) *TcpmaskManager {
-	return &TcpmaskManager{
-		tcpmasks: tcpmasks,
-	}
+	return &TcpmaskManager{tcpmasks: tcpmasks}
 }
 
 func (m *TcpmaskManager) WrapConnClient(raw net.Conn) (net.Conn, error) {

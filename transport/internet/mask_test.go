@@ -35,6 +35,7 @@ func (orderMask) UDP()                                          {}
 func (orderMask) WrapPacketConnClient(raw net.PacketConn, _, _ int) (net.PacketConn, error) {
 	return &orderMaskPacketConn{raw}, nil
 }
+
 func (orderMask) WrapPacketConnServer(raw net.PacketConn, _, _ int) (net.PacketConn, error) {
 	return raw, nil
 }
@@ -48,6 +49,7 @@ func (failingMask) UDP()                                          {}
 func (failingMask) WrapPacketConnClient(raw net.PacketConn, _, _ int) (net.PacketConn, error) {
 	return nil, io.ErrClosedPipe
 }
+
 func (failingMask) WrapPacketConnServer(raw net.PacketConn, _, _ int) (net.PacketConn, error) {
 	return raw, nil
 }

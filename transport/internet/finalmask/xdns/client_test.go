@@ -30,10 +30,10 @@ func (p *blockingPacketConn) Close() error {
 	return nil
 }
 
-func (p *blockingPacketConn) LocalAddr() net.Addr                       { return &net.UDPAddr{} }
-func (p *blockingPacketConn) SetDeadline(t time.Time) error             { return nil }
-func (p *blockingPacketConn) SetReadDeadline(t time.Time) error         { return nil }
-func (p *blockingPacketConn) SetWriteDeadline(t time.Time) error        { return nil }
+func (p *blockingPacketConn) LocalAddr() net.Addr                { return &net.UDPAddr{} }
+func (p *blockingPacketConn) SetDeadline(t time.Time) error      { return nil }
+func (p *blockingPacketConn) SetReadDeadline(t time.Time) error  { return nil }
+func (p *blockingPacketConn) SetWriteDeadline(t time.Time) error { return nil }
 
 // TestClientConcurrentWriteAndClose: Close() 无锁写 closed,而
 // sendLoop 每处理一个包都在无锁读 closed 并改写 resolverIdx,

@@ -11,7 +11,7 @@ import (
 // 该路径不会真正收发网络数据。
 type stubPacketConn struct{}
 
-func (stubPacketConn) ReadFrom(p []byte) (int, net.Addr, error) { return 0, nil, net.ErrClosed }
+func (stubPacketConn) ReadFrom(p []byte) (int, net.Addr, error)  { return 0, nil, net.ErrClosed }
 func (stubPacketConn) WriteTo(p []byte, a net.Addr) (int, error) { return 0, net.ErrClosed }
 func (stubPacketConn) Close() error                              { return nil }
 func (stubPacketConn) LocalAddr() net.Addr                       { return &net.UDPAddr{IP: net.IPv4zero} }

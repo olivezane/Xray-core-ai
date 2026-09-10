@@ -21,8 +21,7 @@ type SystemDialer interface {
 	DestIpAddress() net.IP
 }
 
-type DefaultSystemDialer struct {
-}
+type DefaultSystemDialer struct{}
 
 func resolveSrcAddr(network net.Network, src net.Address) net.Addr {
 	if src == nil || src == net.AnyIP {

@@ -24,6 +24,7 @@ func (m *recordingTcpMask) wrap(raw net.Conn) net.Conn {
 }
 
 func (m *recordingTcpMask) WrapConnClient(raw net.Conn) (net.Conn, error) { return m.wrap(raw), nil }
+
 func (m *recordingTcpMask) WrapConnServer(raw net.Conn) (net.Conn, error) { return m.wrap(raw), nil }
 
 // recordingMaskConn implements TcpMaskConn — only definable inside package

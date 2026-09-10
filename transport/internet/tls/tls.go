@@ -24,9 +24,9 @@ type Interface interface {
 }
 
 var (
-	_ buf.Writer      = (*Conn)(nil)
-	_ Interface        = (*Conn)(nil)
-	_ stat.Unwrapper   = (*Conn)(nil)
+	_ buf.Writer     = (*Conn)(nil)
+	_ Interface      = (*Conn)(nil)
+	_ stat.Unwrapper = (*Conn)(nil)
 )
 
 type Conn struct {
@@ -82,8 +82,10 @@ type UConn struct {
 	*utls.UConn
 }
 
-var _ Interface = (*UConn)(nil)
-var _ stat.Unwrapper = (*UConn)(nil)
+var (
+	_ Interface      = (*UConn)(nil)
+	_ stat.Unwrapper = (*UConn)(nil)
+)
 
 func (c *UConn) Unwrap() net.Conn {
 	return c.Conn.NetConn()

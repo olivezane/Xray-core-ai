@@ -46,7 +46,8 @@ type xicmpConnClient struct {
 	id       int
 	seq      atomic.Int32
 	readCh   chan packet
-	closedCh chan struct{}
+	closeCh  chan struct{}
+	wg       sync.WaitGroup
 	mu       sync.Mutex
 }
 
@@ -81,10 +82,11 @@ func NewConnClient(c *Config, raw net.PacketConn) (net.PacketConn, error) {
 		clientID: clientID,
 		id:       mathrand.Intn(65536),
 		readCh:   make(chan packet),
-		closedCh: make(chan struct{}),
+		closeCh:  make(chan struct{}),
 	}
 	conn.seq.Store(1)
 
+	conn.wg.Add(2)
 	go conn.recv4()
 	go conn.recv6()
 
@@ -97,7 +99,7 @@ func (c *xicmpConnClient) ring(a, b uint16) uint16 {
 
 func (c *xicmpConnClient) closed() bool {
 	select {
-	case <-c.closedCh:
+	case <-c.closeCh:
 		return true
 	default:
 		return false
@@ -105,8 +107,9 @@ func (c *xicmpConnClient) closed() bool {
 }
 
 func (c *xicmpConnClient) recv4() {
-	var b [internet.UDPSize]byte
+	defer c.wg.Done()
 
+	var b [internet.UDPSize]byte
 	for {
 		if c.closed() {
 			return
@@ -120,10 +123,11 @@ func (c *xicmpConnClient) recv4() {
 				case c.readCh <- packet{
 					err: err,
 				}:
-				case <-c.closedCh:
+				case <-c.closeCh:
 					return
 				}
 			}
+			errors.LogErrorInner(context.Background(), err, "recv4 err")
 			continue
 		}
 
@@ -167,7 +171,7 @@ func (c *xicmpConnClient) recv4() {
 			p:    p,
 			addr: addr,
 		}:
-		case <-c.closedCh:
+		case <-c.closeCh:
 			pool.Put(p)
 			return
 		}
@@ -175,11 +179,12 @@ func (c *xicmpConnClient) recv4() {
 }
 
 func (c *xicmpConnClient) recv6() {
-	var b [internet.UDPSize]byte
+	defer c.wg.Done()
 
+	var b [internet.UDPSize]byte
 	for {
 		if c.closed() {
-			break
+			return
 		}
 
 		n, addr, err := c.icmp6.ReadFrom(b[:])
@@ -190,10 +195,11 @@ func (c *xicmpConnClient) recv6() {
 				case c.readCh <- packet{
 					err: err,
 				}:
-				case <-c.closedCh:
+				case <-c.closeCh:
 					return
 				}
 			}
+			errors.LogErrorInner(context.Background(), err, "recv6 err")
 			continue
 		}
 
@@ -237,7 +243,7 @@ func (c *xicmpConnClient) recv6() {
 			p:    p,
 			addr: addr,
 		}:
-		case <-c.closedCh:
+		case <-c.closeCh:
 			pool.Put(p)
 			return
 		}
@@ -245,16 +251,15 @@ func (c *xicmpConnClient) recv6() {
 }
 
 func (c *xicmpConnClient) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	select {
-	case packet := <-c.readCh:
+	packet, ok := <-c.readCh
+	if ok {
 		if packet.p != nil {
 			n = copy(p, packet.p)
 			pool.Put(packet.p)
 		}
 		return n, packet.addr, packet.err
-	case <-c.closedCh:
-		return 0, nil, io.EOF
 	}
+	return 0, nil, io.EOF
 }
 
 func (c *xicmpConnClient) WriteTo(p []byte, addr net.Addr) (n int, err error) {
@@ -294,10 +299,9 @@ func (c *xicmpConnClient) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	}
 
 	if err != nil {
-		errors.LogErrorInner(context.Background(), err, "xicmp write")
+		errors.LogErrorInner(context.Background(), err, "send err")
 		return 0, err
 	}
-
 	return len(p), nil
 }
 
@@ -307,10 +311,19 @@ func (c *xicmpConnClient) Close() error {
 	if c.closed() {
 		return nil
 	}
-	close(c.closedCh)
+	close(c.closeCh)
 	_ = c.icmp4.Close()
 	_ = c.icmp6.Close()
 	_ = c.conn.Close()
+	c.wg.Wait()
+	select {
+	case p := <-c.readCh:
+		if p.p != nil {
+			pool.Put(p.p)
+		}
+	default:
+	}
+	close(c.readCh)
 	return nil
 }
 
