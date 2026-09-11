@@ -47,12 +47,11 @@ func TestMaskLevelOrder(t *testing.T) {
 	defer server.Close()
 
 	var order []string
+	m1 := &recordingTcpMask{name: "m1", rec: &order}
+	m2 := &recordingTcpMask{name: "m2", rec: &order}
+	m3 := &recordingTcpMask{name: "m3", rec: &order}
 	mss := &MemoryStreamConfig{
-		TcpmaskManager: NewTcpmaskManager([]Tcpmask{
-			&recordingTcpMask{name: "m1", rec: &order},
-			&recordingTcpMask{name: "m2", rec: &order},
-			&recordingTcpMask{name: "m3", rec: &order},
-		}),
+		TcpmaskManager: NewTcpmaskManager([]Tcpmask{m1, m2, m3}),
 	}
 	result, err := mss.TcpmaskManager.WrapConnClient(client)
 	if err != nil {
@@ -62,7 +61,7 @@ func TestMaskLevelOrder(t *testing.T) {
 	if len(order) != 3 || order[0] != "m3" || order[1] != "m2" || order[2] != "m1" {
 		t.Fatalf("wrap order = %v, want [m3 m2 m1]", order)
 	}
-	if result != mss.TcpmaskManager.tcpmasks[0].(*recordingTcpMask).last {
+	if result != m1.last {
 		t.Fatalf("outermost conn is %T, want m1's conn", result)
 	}
 }
@@ -73,11 +72,10 @@ func TestWrapListenerServerSideOrder(t *testing.T) {
 	defer server.Close()
 
 	var order []string
+	s1 := &recordingTcpMask{name: "s1", rec: &order}
+	s2 := &recordingTcpMask{name: "s2", rec: &order}
 	mss := &MemoryStreamConfig{
-		TcpmaskManager: NewTcpmaskManager([]Tcpmask{
-			&recordingTcpMask{name: "s1", rec: &order},
-			&recordingTcpMask{name: "s2", rec: &order},
-		}),
+		TcpmaskManager: NewTcpmaskManager([]Tcpmask{s1, s2}),
 	}
 	ln, err := WrapListener(mss, &chainListener{conn: server})
 	if err != nil {
@@ -90,7 +88,7 @@ func TestWrapListenerServerSideOrder(t *testing.T) {
 	if len(order) != 2 || order[0] != "s2" || order[1] != "s1" {
 		t.Fatalf("server wrap order = %v, want [s2 s1]", order)
 	}
-	if conn != mss.TcpmaskManager.tcpmasks[0].(*recordingTcpMask).last {
+	if conn != s1.last {
 		t.Fatalf("accepted conn is %T, want s1's conn", conn)
 	}
 }
