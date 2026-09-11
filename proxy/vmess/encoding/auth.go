@@ -2,11 +2,11 @@ package encoding
 
 import (
 	"crypto/md5"
+	"crypto/sha3"
 	"encoding/binary"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/crypto"
-	"golang.org/x/crypto/sha3"
 )
 
 // GenerateChacha20Poly1305Key generates a 32-byte key from a given 16-byte array.
@@ -20,12 +20,12 @@ func GenerateChacha20Poly1305Key(b []byte) []byte {
 }
 
 type ShakeSizeParser struct {
-	shake  sha3.ShakeHash
+	shake  *sha3.SHAKE
 	buffer [2]byte
 }
 
 func NewShakeSizeParser(nonce []byte) *ShakeSizeParser {
-	shake := sha3.NewShake128()
+	shake := sha3.NewSHAKE128()
 	common.Must2(shake.Write(nonce))
 	return &ShakeSizeParser{
 		shake: shake,

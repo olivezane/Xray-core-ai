@@ -85,3 +85,19 @@ func TestEquals(t *testing.T) {
 		t.Error("nil uuid equals non-nil uuid")
 	}
 }
+
+func BenchmarkUUIDString(b *testing.B) {
+	u := New()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = u.String()
+	}
+}
+
+func BenchmarkUUIDParseString(b *testing.B) {
+	str := "2418d087-648d-4990-86e8-19dca1d006d3"
+	b.ResetTimer()
+	for b.Loop() {
+		_, _ = ParseString(str)
+	}
+}

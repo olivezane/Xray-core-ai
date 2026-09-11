@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	goerrors "errors"
 	"io"
-	mrand "math/rand"
+	mrand "math/rand/v2"
 	gonet "net"
 	"net/netip"
 	"reflect"
@@ -100,10 +100,10 @@ func (c *udpHopConn) hop(addr *net.UDPAddr) {
 	newConn := c.conn
 	if c.remote || c.remoteOnce && c.addr == nil {
 		if len(c.remotePorts) > 0 {
-			newAddr.Port = int(c.remotePorts[mrand.Intn(len(c.remotePorts))])
+			newAddr.Port = int(c.remotePorts[mrand.IntN(len(c.remotePorts))])
 		}
 		if len(c.remoteIPs) > 0 {
-			newAddr.IP = randPrefix(c.remoteIPs[mrand.Intn(len(c.remoteIPs))])
+			newAddr.IP = randPrefix(c.remoteIPs[mrand.IntN(len(c.remoteIPs))])
 		}
 	}
 	if c.local {

@@ -2,7 +2,7 @@ package hysteria
 
 import (
 	"context"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 
 	"github.com/xtls/xray-core/common"
@@ -36,10 +36,10 @@ type padding struct {
 }
 
 func (p padding) String() string {
-	n := p.Min + rand.Intn(p.Max-p.Min)
+	n := p.Min + rand.IntN(p.Max-p.Min)
 	bs := make([]byte, n)
 	for i := range bs {
-		bs[i] = paddingChars[rand.Intn(len(paddingChars))]
+		bs[i] = paddingChars[rand.IntN(len(paddingChars))]
 	}
 	return string(bs)
 }

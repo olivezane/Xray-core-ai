@@ -1,7 +1,7 @@
 package bbr
 
 import (
-	"golang.org/x/exp/constraints"
+	"cmp"
 )
 
 // Implements Kathleen Nichols' algorithm for tracking the minimum (or maximum)
@@ -35,7 +35,9 @@ type WindowedFilterValue interface {
 }
 
 type WindowedFilterTime interface {
-	constraints.Integer | constraints.Float
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+		~float32 | ~float64
 }
 
 type WindowedFilter[V WindowedFilterValue, T WindowedFilterTime] struct {
@@ -52,24 +54,14 @@ type entry[V WindowedFilterValue, T WindowedFilterTime] struct {
 
 // Compares two values and returns true if the first is greater than or equal
 // to the second.
-func MaxFilter[O constraints.Ordered](a, b O) int {
-	if a > b {
-		return 1
-	} else if a < b {
-		return -1
-	}
-	return 0
+func MaxFilter[O cmp.Ordered](a, b O) int {
+	return cmp.Compare(a, b)
 }
 
 // Compares two values and returns true if the first is less than or equal
 // to the second.
-func MinFilter[O constraints.Ordered](a, b O) int {
-	if a < b {
-		return 1
-	} else if a > b {
-		return -1
-	}
-	return 0
+func MinFilter[O cmp.Ordered](a, b O) int {
+	return cmp.Compare(b, a)
 }
 
 func NewWindowedFilter[V WindowedFilterValue, T WindowedFilterTime](windowLength T, comparator func(V, V) int) *WindowedFilter[V, T] {

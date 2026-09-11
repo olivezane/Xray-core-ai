@@ -1,9 +1,10 @@
 package strmatcher
 
 import (
+	"cmp"
 	"math/bits"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
 	"unsafe"
 )
@@ -134,7 +135,9 @@ func (g *MphMatcherGroup) Build() error {
 	for bucketIdx := range buckets {
 		bucketIdxs[bucketIdx] = bucketIdx
 	}
-	sort.Slice(bucketIdxs, func(i, j int) bool { return len(buckets[bucketIdxs[i]]) > len(buckets[bucketIdxs[j]]) })
+	slices.SortFunc(bucketIdxs, func(i, j int) int {
+		return cmp.Compare(len(buckets[j]), len(buckets[i]))
+	})
 
 	// Exercise Hash, Displace, and Compress algorithm to construct minimal perfect hash table
 	occupied := make([]bool, len(g.level1)) // Whether a second-level hash has been already used

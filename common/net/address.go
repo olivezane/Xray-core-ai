@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"net"
+	"net/netip"
 	"strings"
 
 	"github.com/xtls/xray-core/common/errors"
@@ -88,9 +89,11 @@ func ParseAddress(addr string) Address {
 		addr = strings.TrimSpace(addr)
 	}
 
-	ip := net.ParseIP(addr)
-	if ip != nil {
-		return IPAddress(ip)
+	if nip, err := netip.ParseAddr(addr); err == nil {
+		if nip.Is4() || nip.Is4In6() {
+			return ipv4Address(nip.As4())
+		}
+		return ipv6Address(nip.As16())
 	}
 	return DomainAddress(addr)
 }

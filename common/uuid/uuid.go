@@ -16,16 +16,17 @@ type UUID [16]byte
 
 // String returns the string representation of this UUID.
 func (u *UUID) String() string {
-	bytes := u.Bytes()
-	result := hex.EncodeToString(bytes[0 : byteGroups[0]/2])
-	start := byteGroups[0] / 2
-	for i := 1; i < len(byteGroups); i++ {
-		nBytes := byteGroups[i] / 2
-		result += "-"
-		result += hex.EncodeToString(bytes[start : start+nBytes])
-		start += nBytes
-	}
-	return result
+	var buf [36]byte
+	hex.Encode(buf[0:8], u[0:4])
+	buf[8] = '-'
+	hex.Encode(buf[9:13], u[4:6])
+	buf[13] = '-'
+	hex.Encode(buf[14:18], u[6:8])
+	buf[18] = '-'
+	hex.Encode(buf[19:23], u[8:10])
+	buf[23] = '-'
+	hex.Encode(buf[24:36], u[10:16])
+	return string(buf[:])
 }
 
 // Bytes returns the bytes representation of this UUID.

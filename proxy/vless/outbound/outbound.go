@@ -476,29 +476,29 @@ func (r *Reverse) monitor() error {
 // TLS/REALITY wrappers.
 func extractConnBuffers(conn net.Conn, inner stat.Connection) (*bytes.Reader, *bytes.Buffer, error) {
 	var t reflect.Type
-	var p uintptr
+	var p unsafe.Pointer
 	switch c := conn.(type) {
 	case *encryption.CommonConn:
 		t = reflect.TypeOf(c).Elem()
-		p = uintptr(unsafe.Pointer(c))
+		p = unsafe.Pointer(c)
 	default:
 		switch c := inner.(type) {
 		case *tls.Conn:
 			t = reflect.TypeOf(c.Conn).Elem()
-			p = uintptr(unsafe.Pointer(c.Conn))
+			p = unsafe.Pointer(c.Conn)
 		case *tls.UConn:
 			t = reflect.TypeOf(c.Conn).Elem()
-			p = uintptr(unsafe.Pointer(c.Conn))
+			p = unsafe.Pointer(c.Conn)
 		case *reality.UConn:
 			t = reflect.TypeOf(c.Conn).Elem()
-			p = uintptr(unsafe.Pointer(c.Conn))
+			p = unsafe.Pointer(c.Conn)
 		default:
 			return nil, nil, errors.New("XTLS only supports TLS and REALITY directly for now.").AtWarning()
 		}
 	}
 	i, _ := t.FieldByName("input")
 	r, _ := t.FieldByName("rawInput")
-	return (*bytes.Reader)(unsafe.Pointer(p + i.Offset)), (*bytes.Buffer)(unsafe.Pointer(p + r.Offset)), nil
+	return (*bytes.Reader)(unsafe.Add(p, i.Offset)), (*bytes.Buffer)(unsafe.Add(p, r.Offset)), nil
 }
 
 func (r *Reverse) Start() error {

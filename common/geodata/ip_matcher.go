@@ -1,11 +1,11 @@
 package geodata
 
 import (
+	"cmp"
 	"context"
 	"net/netip"
 	"runtime"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 
@@ -844,12 +844,11 @@ func (f *IPSetFactory) GetOrCreateFromGeoIPRules(rules []*GeoIPRule) (*IPSet, er
 func buildGeoIPRulesKey(rules []*GeoIPRule) string {
 	rules = slices.Clone(rules)
 
-	sort.Slice(rules, func(i, j int) bool {
-		ri, rj := rules[i], rules[j]
-		if ri.File != rj.File {
-			return ri.File < rj.File
+	slices.SortFunc(rules, func(a, b *GeoIPRule) int {
+		if c := cmp.Compare(a.File, b.File); c != 0 {
+			return c
 		}
-		return ri.Code < rj.Code
+		return cmp.Compare(a.Code, b.Code)
 	})
 
 	var sb strings.Builder

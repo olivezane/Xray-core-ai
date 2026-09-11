@@ -1,7 +1,7 @@
 package strmatcher
 
 import (
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -26,24 +26,10 @@ func (g *SubstrMatcherGroup) Match(input string) []uint32 {
 			result = append(result, uint32(j)<<16|uint32(i)&0xffff) // uint32: position (higher 16 bit) | patternIdx (lower 16 bit)
 		}
 	}
-	// sort.Slice will trigger allocation no matter what input is. See https://github.com/golang/go/issues/17332
-	// We optimize the sorting by length to prevent memory allocation as possible.
-	switch len(result) {
-	case 0:
-		return nil
-	case 1:
-		// No need to sort
-	case 2:
-		// Do a simple swap if unsorted
-		if result[0] > result[1] {
-			result[0], result[1] = result[1], result[0]
-		}
-	default:
-		// Sort the match results in dictionary order, so that:
-		//   1. Pattern matched at smaller position (meaning matched further) takes precedence.
-		//   2. When patterns matched at same position, pattern with smaller index (meaning inserted early) takes precedence.
-		sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
-	}
+	// Sort the match results in dictionary order, so that:
+	//   1. Pattern matched at smaller position (meaning matched further) takes precedence.
+	//   2. When patterns matched at same position, pattern with smaller index (meaning inserted early) takes precedence.
+	slices.Sort(result)
 	for i, entry := range result {
 		result[i] = g.values[entry&0xffff] // Get pattern value from its index (the lower 16 bit)
 	}

@@ -8,7 +8,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
-	mathrand "math/rand"
+	mathrand "math/rand/v2"
 	"net"
 	"net/netip"
 	"sync"
@@ -80,7 +80,7 @@ func NewConnClient(c *Config, raw net.PacketConn) (net.PacketConn, error) {
 		udp:      c.DGRAM,
 		ips:      ips,
 		clientID: clientID,
-		id:       mathrand.Intn(65536),
+		id:       mathrand.IntN(65536),
 		readCh:   make(chan packet),
 		closeCh:  make(chan struct{}),
 	}
@@ -275,7 +275,7 @@ func (c *xicmpConnClient) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 
 	ip := addr.(*net.UDPAddr).IP
 	if len(c.ips) > 0 {
-		ip = c.ips[mathrand.Intn(len(c.ips))].AsSlice()
+		ip = c.ips[mathrand.IntN(len(c.ips))].AsSlice()
 	}
 
 	if c.udp {

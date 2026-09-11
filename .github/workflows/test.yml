@@ -68,6 +68,8 @@ jobs:
           cache: false
       - name: Check Format
         run: go run ./infra/vformat/main.go -mode check -pwd ./
+      - name: Go Vet
+        run: go vet ./...
 
   test:
     needs: check-assets

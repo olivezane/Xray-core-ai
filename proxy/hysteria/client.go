@@ -4,7 +4,7 @@ import (
 	"context"
 	go_errors "errors"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 
 	"github.com/apernet/quic-go"
 	"github.com/xtls/xray-core/common"
@@ -208,7 +208,7 @@ func (w *UDPWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 		err := w.SendMessage(msg)
 		var errTooLarge *quic.DatagramTooLargeError
 		if go_errors.As(err, &errTooLarge) {
-			msg.PacketID = uint16(rand.Intn(0xFFFF)) + 1
+			msg.PacketID = uint16(rand.IntN(0xFFFF)) + 1
 			fMsgs := FragUDPMessage(msg, int(errTooLarge.MaxDatagramPayloadSize))
 			for _, fMsg := range fMsgs {
 				err := w.SendMessage(&fMsg)

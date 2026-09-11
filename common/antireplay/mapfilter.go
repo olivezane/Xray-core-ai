@@ -32,8 +32,8 @@ func (filter *ReplayFilter[T]) Check(sum T) bool {
 
 	now := time.Now()
 	if now.Sub(filter.lastClean) >= filter.interval {
-		filter.poolB = filter.poolA
-		filter.poolA = make(map[T]struct{})
+		clear(filter.poolB)
+		filter.poolA, filter.poolB = filter.poolB, filter.poolA
 		filter.lastClean = now
 	}
 
