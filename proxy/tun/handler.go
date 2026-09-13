@@ -42,6 +42,33 @@ type Handler struct {
 	newStack func(context.Context, StackOptions, *Handler) (*stackGVisor, error)
 }
 
+type tunUDPStatsWriter struct {
+	writer  buf.Writer
+	counter stats.Counter
+}
+
+func (w *tunUDPStatsWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
+	for len(mb) > 0 {
+		remaining, packet := buf.SplitFirst(mb)
+		packetSize := packet.Len()
+		if err := w.writer.WriteMultiBuffer(buf.MultiBuffer{packet}); err != nil {
+			buf.ReleaseMulti(remaining)
+			return err
+		}
+		w.counter.Add(int64(packetSize))
+		mb = remaining
+	}
+	return nil
+}
+
+// ConnectionHandler interface with the only method that stack is going to push new connections to
+type ConnectionHandler interface {
+	HandleConnection(conn net.Conn, destination net.Destination)
+}
+
+// Handler implements ConnectionHandler
+var _ ConnectionHandler = (*Handler)(nil)
+
 // Handler implements common.Runnable
 var _ common.Runnable = (*Handler)(nil)
 
@@ -178,7 +205,8 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 		return
 	}
 	source := net.DestinationFromAddr(remote)
-	if t.uplinkCounter != nil || t.downlinkCounter != nil {
+	isUDP := destination.Network == net.Network_UDP
+	if !isUDP && (t.uplinkCounter != nil || t.downlinkCounter != nil) {
 		conn = &stat.CounterConnection{
 			Connection:   conn,
 			ReadCounter:  t.uplinkCounter,
@@ -210,9 +238,18 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 	})
 	errors.LogInfo(ctx, "processing from ", source, " to ", destination)
 
+	reader := &buf.TimeoutWrapperReader{Reader: buf.NewReader(conn)}
+	writer := buf.NewWriter(conn)
+	if isUDP {
+		reader.Counter = t.uplinkCounter
+		if t.downlinkCounter != nil {
+			writer = &tunUDPStatsWriter{writer: writer, counter: t.downlinkCounter}
+		}
+	}
+
 	link := &transport.Link{
-		Reader: &buf.TimeoutWrapperReader{Reader: buf.NewReader(conn)},
-		Writer: buf.NewWriter(conn),
+		Reader: reader,
+		Writer: writer,
 	}
 	if err := t.dispatcher.DispatchLink(ctx, destination, link); err != nil {
 		errors.LogError(ctx, errors.New("connection closed").Base(err))
