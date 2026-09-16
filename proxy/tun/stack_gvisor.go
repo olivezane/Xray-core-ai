@@ -55,6 +55,10 @@ func newGVisorStack(ctx context.Context, options StackOptions, handler Connectio
 		handler:     handler,
 	}
 
+	// the counterpart of the MIPS Stack's own line, so a log tells which stack
+	// is carrying the traffic
+	errors.LogInfo(ctx, "[tun] ", StackGVisor, " network stack: mtu=", options.MTU)
+
 	return gStack, nil
 }
 
@@ -65,11 +69,29 @@ func (t *stackGVisor) Start() error {
 		return err
 	}
 
-	ipStack, err := createStack(linkEndpoint)
+	ipStack, err := newStack()
 	if err != nil {
 		return err
 	}
 
+	// the handlers close over the stack, and gVisor delivers nothing until a
+	// NIC exists, so they are installed before the device is attached
+	t.endpoint = linkEndpoint
+	t.stack = ipStack
+	t.installHandlers(ipStack)
+
+	if err := attachNIC(ipStack, linkEndpoint); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// installHandlers gives the stack the transport handlers of the TUN inbound. It
+// has to run before the device is attached: gVisor documents
+// SetTransportProtocolHandler as initialization-only, and the receive path is
+// live as soon as the stack has a NIC.
+func (t *stackGVisor) installHandlers(ipStack *stack.Stack) {
 	tcpForwarder := tcp.NewForwarder(ipStack, 0, 65535, func(r *tcp.ForwarderRequest) {
 		go func(r *tcp.ForwarderRequest) {
 			var wq waiter.Queue
@@ -124,11 +146,6 @@ func (t *stackGVisor) Start() error {
 	})
 	ipStack.SetTransportProtocolHandler(icmp.ProtocolNumber4, t.handleICMPv4Packet)
 	ipStack.SetTransportProtocolHandler(icmp.ProtocolNumber6, t.handleICMPv6Packet)
-
-	t.stack = ipStack
-	t.endpoint = linkEndpoint
-
-	return nil
 }
 
 func (t *stackGVisor) writeRawUDPPacket(payload []byte, src net.Destination, dst net.Destination) error {
@@ -208,33 +225,15 @@ func (t *stackGVisor) Close() error {
 	return nil
 }
 
-// createStack configure gVisor ip stack
-func createStack(ep stack.LinkEndpoint) (*stack.Stack, error) {
+// newStack builds the gVisor Stack with its transport options. Nothing can be
+// delivered to it yet: only a NIC makes the stack's receive path live.
+func newStack() (*stack.Stack, error) {
 	opts := stack.Options{
 		NetworkProtocols:   []stack.NetworkProtocolFactory{ipv4.NewProtocol, ipv6.NewProtocol},
 		TransportProtocols: []stack.TransportProtocolFactory{tcp.NewProtocol, udp.NewProtocol, icmp.NewProtocol4, icmp.NewProtocol6},
 		HandleLocal:        false,
 	}
 	gStack := stack.New(opts)
-
-	err := gStack.CreateNIC(defaultNIC, ep)
-	if err != nil {
-		return nil, errors.New(err.String())
-	}
-
-	gStack.SetRouteTable([]tcpip.Route{
-		{Destination: header.IPv4EmptySubnet, NIC: defaultNIC},
-		{Destination: header.IPv6EmptySubnet, NIC: defaultNIC},
-	})
-
-	err = gStack.SetSpoofing(defaultNIC, true)
-	if err != nil {
-		return nil, errors.New(err.String())
-	}
-	err = gStack.SetPromiscuousMode(defaultNIC, true)
-	if err != nil {
-		return nil, errors.New(err.String())
-	}
 
 	cOpt := tcpip.CongestionControlOption("cubic")
 	gStack.SetTransportProtocolOption(tcp.ProtocolNumber, &cOpt)
@@ -252,7 +251,7 @@ func createStack(ep stack.LinkEndpoint) (*stack.Stack, error) {
 		Default: tcpRXBufDefSize,
 		Max:     tcpRXBufMaxSize,
 	}
-	err = gStack.SetTransportProtocolOption(tcp.ProtocolNumber, &tcpRXBufOpt)
+	err := gStack.SetTransportProtocolOption(tcp.ProtocolNumber, &tcpRXBufOpt)
 	if err != nil {
 		return nil, errors.New(err.String())
 	}
@@ -268,4 +267,27 @@ func createStack(ep stack.LinkEndpoint) (*stack.Stack, error) {
 	}
 
 	return gStack, nil
+}
+
+// attachNIC gives the stack the device it delivers packets through. This is the
+// moment the receive path goes live, so every handler the TUN inbound installs
+// is registered before it.
+func attachNIC(gStack *stack.Stack, ep stack.LinkEndpoint) error {
+	if err := gStack.CreateNIC(defaultNIC, ep); err != nil {
+		return errors.New(err.String())
+	}
+
+	gStack.SetRouteTable([]tcpip.Route{
+		{Destination: header.IPv4EmptySubnet, NIC: defaultNIC},
+		{Destination: header.IPv6EmptySubnet, NIC: defaultNIC},
+	})
+
+	if err := gStack.SetSpoofing(defaultNIC, true); err != nil {
+		return errors.New(err.String())
+	}
+	if err := gStack.SetPromiscuousMode(defaultNIC, true); err != nil {
+		return errors.New(err.String())
+	}
+
+	return nil
 }
