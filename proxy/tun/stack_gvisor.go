@@ -32,19 +32,21 @@ const (
 	tcpTXBufMaxSize = 6 << 20 // 6MiB
 )
 
+var _ Stack = (*stackGVisor)(nil)
+
 // stackGVisor is ip stack implemented by gVisor package
 type stackGVisor struct {
 	ctx         context.Context
 	tun         Tun
 	mtu         uint32
 	idleTimeout time.Duration
-	handler     *Handler
+	handler     ConnectionHandler
 	stack       *stack.Stack
 	endpoint    stack.LinkEndpoint
 }
 
-// NewStack builds new ip stack (using gVisor)
-func NewStack(ctx context.Context, options StackOptions, handler *Handler) (*stackGVisor, error) {
+// newGVisorStack builds new ip stack (using gVisor)
+func newGVisorStack(ctx context.Context, options StackOptions, handler ConnectionHandler) (*stackGVisor, error) {
 	gStack := &stackGVisor{
 		ctx:         ctx,
 		tun:         options.Tun,

@@ -24,6 +24,9 @@ type udpConnectionHandler struct {
 
 	handleConnection func(conn net.Conn, dest net.Destination)
 	writePacket      func(data []byte, src net.Destination, dst net.Destination) error
+	// onFinished is called with the client address of a session that ended. It
+	// may be nil.
+	onFinished func(src net.Destination)
 }
 
 func newUdpConnectionHandler(handleConnection func(conn net.Conn, dest net.Destination), writePacket func(data []byte, src net.Destination, dst net.Destination) error) *udpConnectionHandler {
@@ -34,6 +37,12 @@ func newUdpConnectionHandler(handleConnection func(conn net.Conn, dest net.Desti
 	}
 
 	return handler
+}
+
+// SetOnFinished registers a callback for the client address of a session that
+// ended. It must be called before the handler starts serving datagrams.
+func (u *udpConnectionHandler) SetOnFinished(onFinished func(src net.Destination)) {
+	u.onFinished = onFinished
 }
 
 // HandlePacket handles UDP packets coming from tun, to forward to the dispatcher
@@ -86,6 +95,10 @@ func (u *udpConnectionHandler) connectionFinished(src net.Destination) {
 		close(conn.egress)
 	}
 	u.Unlock()
+
+	if found && u.onFinished != nil {
+		u.onFinished(src)
+	}
 }
 
 // udp connection abstraction

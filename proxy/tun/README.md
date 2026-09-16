@@ -42,6 +42,23 @@ Here is simple Xray config snippet to enable the inbound:
 `desc` sets the Windows Wintun adapter tunnel type and defaults to `Wintun`.
 It is ignored on other platforms.
 
+## NETWORK STACK
+
+The inbound runs one user-space network stack, selected by `stack`:
+
+- unset or `"gvisor"` (default): the gVisor stack, unchanged behaviour.
+- `"mipstack"`: the MIPS Stack, the pure-Go user-space IP stack of mihomo, `github.com/metacubex/mipstack`.
+
+The short name `"mips"` is not a stack name, because this repository already uses it for a CPU architecture.
+
+On a MIPS Stack, `tcpCongestion` selects the congestion control algorithm for intercepted TCP connections: unset or `"cubic"` (default), `"bbr"`, `"bbr3"`, or `"reno"`. Setting it while `stack` is `"gvisor"` is a configuration error, because the gVisor stack ignores it.
+
+A MIPS Stack takes its local addresses from `gateway`, the same field that configures the device. With no `gateway` it owns no address and works purely as a transparent forwarder, which is what this inbound does in any case. It also enforces the user level's connection idle timeout on intercepted TCP connections; the gVisor stack does not.
+
+UDP behaviour is the same on both stacks: one session per client, so a client using several remote servers at once keeps that one session (FullCone), and replies still appear to come from the remote the client addressed. On a MIPS Stack the reply capability of each client and remote pair is released when the session ends or the connection idle timeout expires, or after five minutes of inactivity when the user level disables that timeout.
+
+ICMP behaviour is the same on both stacks on both address families: Echo Requests are answered locally, every other ICMP type is ignored.
+
 ## SUPPORTED FEATURES
 
 - IPv4 and IPv6

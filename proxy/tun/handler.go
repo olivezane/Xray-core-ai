@@ -27,7 +27,7 @@ import (
 type Handler struct {
 	ctx             context.Context
 	config          *Config
-	stack           *stackGVisor
+	stack           Stack
 	tun             Tun
 	updater         *InterfaceUpdater
 	policyManager   policy.Manager
@@ -39,7 +39,7 @@ type Handler struct {
 
 	// injection points for tests; nil defaults to the platform constructors
 	newTun   func(*Config) (Tun, error)
-	newStack func(context.Context, StackOptions, *Handler) (*stackGVisor, error)
+	newStack func(context.Context, StackOptions, ConnectionHandler) (Stack, error)
 }
 
 type tunUDPStatsWriter struct {
@@ -152,9 +152,12 @@ func (t *Handler) Start() error {
 	errors.LogInfo(t.ctx, tunName, " created")
 
 	tunStackOptions := StackOptions{
-		Tun:         tunInterface,
-		MTU:         t.config.MTU,
-		IdleTimeout: t.policyManager.ForLevel(t.config.UserLevel).Timeouts.ConnectionIdle,
+		Tun:           tunInterface,
+		MTU:           t.config.MTU,
+		IdleTimeout:   t.policyManager.ForLevel(t.config.UserLevel).Timeouts.ConnectionIdle,
+		Stack:         t.config.Stack,
+		TCPCongestion: t.config.TcpCongestion,
+		Gateway:       t.config.Gateway,
 	}
 	newStack := t.newStack
 	if newStack == nil {

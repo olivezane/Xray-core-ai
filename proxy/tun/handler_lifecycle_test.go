@@ -100,7 +100,7 @@ func TestStartClosesDeviceWhenIndexFails(t *testing.T) {
 func TestStartClosesDeviceWhenStackConstructionFails(t *testing.T) {
 	fake := &fakeTun{}
 	h := newTestHandler(fake)
-	h.newStack = func(context.Context, StackOptions, *Handler) (*stackGVisor, error) {
+	h.newStack = func(context.Context, StackOptions, ConnectionHandler) (Stack, error) {
 		return nil, errors.New("cannot build stack")
 	}
 
