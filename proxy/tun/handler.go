@@ -122,8 +122,7 @@ func (t *Handler) Start() error {
 		internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
 			iface := updater.Get()
 			if iface == nil {
-				errors.LogInfo(context.Background(), "[tun] falied to set interface > iface == nil")
-				return errors.New("iface not found")
+				return nil
 			}
 			return c.Control(func(fd uintptr) {
 				addrPort, _ := netip.ParseAddrPort(address)
