@@ -23,7 +23,7 @@ func (s *sha256Stream) Read(p []byte) (n int, err error) {
 	for len(p) > len(s.buf) {
 		h := sha256.New()
 		h.Write(s.seed)
-		h.Write([]byte(fmt.Sprintf("-%d", s.counter)))
+		h.Write(fmt.Appendf(nil, "-%d", s.counter))
 		s.counter++
 		s.buf = append(s.buf, h.Sum(nil)...)
 	}

@@ -309,18 +309,30 @@ func (h *Handler) init(ctx context.Context) error {
 	bind.downFunc = dev.Down
 	bind.reserved = h.conf.Reserved
 	var cfg strings.Builder
-	cfg.WriteString("private_key=" + h.conf.SecretKey + "\n")
+	cfg.WriteString("private_key=")
+	cfg.WriteString(h.conf.SecretKey)
+	cfg.WriteString("\n")
 	for _, peer := range h.conf.Peers {
-		cfg.WriteString("public_key=" + peer.PublicKey + "\n")
+		cfg.WriteString("public_key=")
+		cfg.WriteString(peer.PublicKey)
+		cfg.WriteString("\n")
 		if peer.PreSharedKey != "" {
-			cfg.WriteString("preshared_key=" + peer.PreSharedKey + "\n")
+			cfg.WriteString("preshared_key=")
+			cfg.WriteString(peer.PreSharedKey)
+			cfg.WriteString("\n")
 		}
-		cfg.WriteString("endpoint=" + peer.Endpoint + "\n")
+		cfg.WriteString("endpoint=")
+		cfg.WriteString(peer.Endpoint)
+		cfg.WriteString("\n")
 		for _, ip := range peer.AllowedIps {
-			cfg.WriteString("allowed_ip=" + ip + "\n")
+			cfg.WriteString("allowed_ip=")
+			cfg.WriteString(ip)
+			cfg.WriteString("\n")
 		}
 		if peer.KeepAlive != "" {
-			cfg.WriteString("persistent_keepalive_interval=" + peer.KeepAlive + "\n")
+			cfg.WriteString("persistent_keepalive_interval=")
+			cfg.WriteString(peer.KeepAlive)
+			cfg.WriteString("\n")
 		}
 	}
 	err := dev.IpcSet(cfg.String())

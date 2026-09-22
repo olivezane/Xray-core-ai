@@ -145,16 +145,24 @@ func (s *Server) AddUser(ctx context.Context, user *protocol.MemoryUser) error {
 		return errors.New("invalid public key")
 	}
 	var sb strings.Builder
-	sb.WriteString("public_key=" + hex.EncodeToString(peer.Pub[:]) + "\n")
+	sb.WriteString("public_key=")
+	sb.WriteString(hex.EncodeToString(peer.Pub[:]))
+	sb.WriteString("\n")
 	sb.WriteString("replace_allowed_ips=true\n")
 	for i := range peer.AllowedIPs {
-		sb.WriteString("allowed_ip=" + peer.AllowedIPs[i].String() + "\n")
+		sb.WriteString("allowed_ip=")
+		sb.WriteString(peer.AllowedIPs[i].String())
+		sb.WriteString("\n")
 	}
 	if peer.PreSharedKey != "" {
-		sb.WriteString("preshared_key=" + peer.PreSharedKey + "\n")
+		sb.WriteString("preshared_key=")
+		sb.WriteString(peer.PreSharedKey)
+		sb.WriteString("\n")
 	}
 	if peer.KeepAlive != "" {
-		sb.WriteString("persistent_keepalive_interval=" + peer.KeepAlive + "\n")
+		sb.WriteString("persistent_keepalive_interval=")
+		sb.WriteString(peer.KeepAlive)
+		sb.WriteString("\n")
 	}
 	err := s.dev.IpcSet(sb.String())
 	if err != nil {
@@ -296,18 +304,28 @@ func (s *Server) Start() error {
 	}
 	dev := device.NewDevice(s.tun, bind, logger)
 	var cfg strings.Builder
-	cfg.WriteString("private_key=" + s.conf.SecretKey + "\n")
+	cfg.WriteString("private_key=")
+	cfg.WriteString(s.conf.SecretKey)
+	cfg.WriteString("\n")
 	s.users.Range(func(key, value any) bool {
 		peer := value.(*protocol.MemoryUser).Account.(*MemoryAccount)
-		cfg.WriteString("public_key=" + hex.EncodeToString(peer.Pub[:]) + "\n")
+		cfg.WriteString("public_key=")
+		cfg.WriteString(hex.EncodeToString(peer.Pub[:]))
+		cfg.WriteString("\n")
 		for i := range peer.AllowedIPs {
-			cfg.WriteString("allowed_ip=" + peer.AllowedIPs[i].String() + "\n")
+			cfg.WriteString("allowed_ip=")
+			cfg.WriteString(peer.AllowedIPs[i].String())
+			cfg.WriteString("\n")
 		}
 		if peer.PreSharedKey != "" {
-			cfg.WriteString("preshared_key=" + peer.PreSharedKey + "\n")
+			cfg.WriteString("preshared_key=")
+			cfg.WriteString(peer.PreSharedKey)
+			cfg.WriteString("\n")
 		}
 		if peer.KeepAlive != "" {
-			cfg.WriteString("persistent_keepalive_interval=" + peer.KeepAlive + "\n")
+			cfg.WriteString("persistent_keepalive_interval=")
+			cfg.WriteString(peer.KeepAlive)
+			cfg.WriteString("\n")
 		}
 		return true
 	})
