@@ -574,5 +574,8 @@ func procDefaultInterface(tunIndex int) *net.Interface {
 			return iface
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return nil
+	}
 	return nil
 }
