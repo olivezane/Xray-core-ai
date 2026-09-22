@@ -176,10 +176,8 @@ func (c *VMessOutboundConfig) Build() (proto.Message, error) {
 
 			user.Account = serial.ToTypedMessage(account.Build())
 			spec.User = user
-			break
 		}
 		config.Receiver = spec
-		break
 	}
 	return config, nil
 }

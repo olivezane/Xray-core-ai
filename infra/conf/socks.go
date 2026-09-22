@@ -129,10 +129,8 @@ func (v *SocksClientConfig) Build() (proto.Message, error) {
 			}
 			user.Account = serial.ToTypedMessage(account.Build())
 			server.User = user
-			break
 		}
 		config.Server = server
-		break
 	}
 	return config, nil
 }

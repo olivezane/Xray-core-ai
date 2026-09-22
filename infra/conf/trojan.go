@@ -85,8 +85,6 @@ func (c *TrojanClientConfig) Build() (proto.Message, error) {
 				}),
 			},
 		}
-
-		break
 	}
 
 	return config, nil

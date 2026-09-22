@@ -111,10 +111,8 @@ func (v *HTTPClientConfig) Build() (proto.Message, error) {
 			}
 			user.Account = serial.ToTypedMessage(account.Build())
 			server.User = user
-			break
 		}
 		config.Server = server
-		break
 	}
 	config.Header = make([]*http.Header, 0, 32)
 	for key, value := range v.Headers {

@@ -7,5 +7,4 @@ func (fl *FileLocker) Acquire() error {
 
 // Release lock
 func (fl *FileLocker) Release() {
-	return
 }

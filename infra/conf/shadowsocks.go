@@ -269,7 +269,6 @@ func (v *ShadowsocksClientConfig) Build() (proto.Message, error) {
 		}
 
 		config.Server = ss
-		break
 	}
 
 	return config, nil
