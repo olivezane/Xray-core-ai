@@ -226,7 +226,7 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 	})
 	errors.LogInfo(ctx, "processing from ", source, " to ", destination)
 
-	reader := &buf.TimeoutWrapperReader{Reader: buf.NewReader(conn)}
+	reader := &buf.TimeoutWrapperReader{Reader: newUplinkReader(conn, t.uplinkCounter)}
 	writer := buf.NewWriter(conn)
 	if isUDP {
 		reader.Counter = t.uplinkCounter
