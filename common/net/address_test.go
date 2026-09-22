@@ -166,7 +166,7 @@ func TestInvalidAddressConvertion(t *testing.T) {
 }
 
 func BenchmarkParseAddressIPv4(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		addr := ParseAddress("8.8.8.8")
 		if addr.Family() != AddressFamilyIPv4 {
 			panic("not ipv4")
@@ -175,7 +175,7 @@ func BenchmarkParseAddressIPv4(b *testing.B) {
 }
 
 func BenchmarkParseAddressIPv6(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		addr := ParseAddress("2001:4860:0:2001::68")
 		if addr.Family() != AddressFamilyIPv6 {
 			panic("not ipv6")
@@ -184,7 +184,7 @@ func BenchmarkParseAddressIPv6(b *testing.B) {
 }
 
 func BenchmarkParseAddressDomain(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		addr := ParseAddress("example.com")
 		if addr.Family() != AddressFamilyDomain {
 			panic("not domain")

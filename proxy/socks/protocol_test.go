@@ -113,8 +113,7 @@ func BenchmarkReadUsernamePassword(b *testing.B) {
 	buffer := buf.New()
 	buffer.Write(input)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _, err := ReadUsernamePassword(buffer)
 		common.Must(err)
 		buffer.Clear()

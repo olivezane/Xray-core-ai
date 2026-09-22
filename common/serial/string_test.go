@@ -52,7 +52,7 @@ func BenchmarkConcat(b *testing.B) {
 	input := []interface{}{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}
 
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = Concat(input...)
 	}
 }

@@ -416,9 +416,7 @@ func BenchmarkIPMatcher4CN(b *testing.B) {
 	matcher := buildIPMatcher("geoip:cn")
 	ip := net.IP{8, 8, 8, 8}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = matcher.Match(ip)
 	}
 }
@@ -429,9 +427,7 @@ func BenchmarkIPMatcher6US(b *testing.B) {
 	matcher := buildIPMatcher("geoip:us")
 	ip := xnet.ParseAddress("2001:4860:4860::8888").IP()
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = matcher.Match(ip)
 	}
 }

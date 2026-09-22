@@ -11,8 +11,7 @@ func BenchmarkMapFilter(b *testing.B) {
 	var sample [16]byte
 	reader := bufio.NewReader(rand.Reader)
 	reader.Read(sample[:])
-	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		reader.Read(sample[:])
 		filter.Check(sample)
 	}

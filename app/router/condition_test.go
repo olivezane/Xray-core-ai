@@ -405,8 +405,7 @@ func BenchmarkMphDomainMatcher(b *testing.B) {
 		testCases = append(testCases, TestCase{Domain: strconv.Itoa(i) + ".not-exists.com", Output: false})
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		for _, testCase := range testCases {
 			_ = matcher.ApplyDomain(testCase.Domain)
 		}
@@ -423,9 +422,7 @@ func BenchmarkMultiGeoIPMatcher(b *testing.B) {
 
 	ctx := withOutbound(&session.Outbound{Target: net.TCPDestination(net.ParseAddress("8.8.8.8"), 80)})
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = matcher.Apply(ctx)
 	}
 }

@@ -50,7 +50,7 @@ func BenchmarkExecuteOne(b *testing.B) {
 	noop := func() error {
 		return nil
 	}
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		common.Must(Run(context.Background(), noop))
 	}
 }
@@ -59,7 +59,7 @@ func BenchmarkExecuteTwo(b *testing.B) {
 	noop := func() error {
 		return nil
 	}
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		common.Must(Run(context.Background(), noop, noop))
 	}
 }

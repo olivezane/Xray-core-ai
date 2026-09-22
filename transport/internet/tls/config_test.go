@@ -87,9 +87,7 @@ func BenchmarkCertificateIssuing(b *testing.B) {
 	tlsConfig := c.GetTLSConfig()
 	lenCerts := len(tlsConfig.Certificates)
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = tlsConfig.GetCertificate(&gotls.ClientHelloInfo{
 			ServerName: "www.example.com",
 		})
