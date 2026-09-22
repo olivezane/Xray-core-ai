@@ -20,6 +20,8 @@ type TunConfig struct {
 	UserLevel              uint32   `json:"userLevel"`
 	AutoSystemRoutingTable []string `json:"autoSystemRoutingTable"`
 	AutoOutboundsInterface *string  `json:"autoOutboundsInterface"`
+	Stack                  string   `json:"stack"`
+	TCPCongestion          string   `json:"tcpCongestion"`
 }
 
 func (v *TunConfig) Build() (proto.Message, error) {
@@ -31,6 +33,8 @@ func (v *TunConfig) Build() (proto.Message, error) {
 		DNS:                    v.DNS,
 		UserLevel:              v.UserLevel,
 		AutoSystemRoutingTable: v.AutoSystemRoutingTable,
+		Stack:                  v.Stack,
+		TcpCongestion:          v.TCPCongestion,
 	}
 	if v.AutoOutboundsInterface != nil {
 		config.AutoOutboundsInterface = *v.AutoOutboundsInterface

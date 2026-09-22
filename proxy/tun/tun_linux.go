@@ -228,6 +228,12 @@ func (t *LinuxTun) newEndpoint() (stack.LinkEndpoint, error) {
 	})
 }
 
+// FDs returns the file descriptor backing the tun device, used by the MIPS
+// Stack's packet device to move packets through it.
+func (t *LinuxTun) FDs() []int {
+	return []int{t.tunFd}
+}
+
 func setinterface(network, address string, fd uintptr, iface *net.Interface) error {
 	return unix.BindToDevice(int(fd), iface.Name)
 }

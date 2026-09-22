@@ -37,13 +37,13 @@ type stackGVisor struct {
 	ctx         context.Context
 	tun         Tun
 	idleTimeout time.Duration
-	handler     *Handler
+	handler     ConnectionHandler
 	stack       *stack.Stack
 	endpoint    stack.LinkEndpoint
 }
 
-// NewStack builds new ip stack (using gVisor)
-func NewStack(ctx context.Context, options StackOptions, handler *Handler) (Stack, error) {
+// newGVisorStack builds new ip stack (using gVisor)
+func newGVisorStack(ctx context.Context, options StackOptions, handler ConnectionHandler) (*stackGVisor, error) {
 	gStack := &stackGVisor{
 		ctx:         ctx,
 		tun:         options.Tun,
