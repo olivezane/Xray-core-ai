@@ -338,7 +338,7 @@ func (s *Server) Start() error {
 		return err
 	}
 	s.dev = dev
-	createForwarder(s.stack, s.HandleConnection)
+	CreateForwarder(s.stack, s.HandleConnection)
 	return nil
 }
 

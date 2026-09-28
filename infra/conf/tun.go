@@ -22,6 +22,7 @@ type TunConfig struct {
 	AutoOutboundsInterface *string  `json:"autoOutboundsInterface"`
 	Stack                  string   `json:"stack"`
 	TCPCongestion          string   `json:"tcpCongestion"`
+	AutoSystemDNS          bool     `json:"autoSystemDNS"`
 }
 
 func (v *TunConfig) Build() (proto.Message, error) {
@@ -35,6 +36,7 @@ func (v *TunConfig) Build() (proto.Message, error) {
 		AutoSystemRoutingTable: v.AutoSystemRoutingTable,
 		Stack:                  v.Stack,
 		TcpCongestion:          v.TCPCongestion,
+		AutoSystemDns:          v.AutoSystemDNS,
 	}
 	if v.AutoOutboundsInterface != nil {
 		config.AutoOutboundsInterface = *v.AutoOutboundsInterface
