@@ -48,6 +48,8 @@ github.com/metacubex/mipstack v0.0.0-20260919101445-802d64336f8c h1:yqFyHJfj4AXZ
 github.com/metacubex/mipstack v0.0.0-20260919101445-802d64336f8c/go.mod h1:+bbwALZI0pbi2auSG5A3ptdpV2DZ2eLObziXo+P7oj0=
 github.com/metacubex/mipstack v0.0.0-20260922000335-dbef50b1df45 h1:q+JWw5cv5hsppSVIq0/+TPwnLem9Zc8zqqzYduJJ4yU=
 github.com/metacubex/mipstack v0.0.0-20260922000335-dbef50b1df45/go.mod h1:+bbwALZI0pbi2auSG5A3ptdpV2DZ2eLObziXo+P7oj0=
+github.com/metacubex/mipstack v0.0.0-20260926151545-332a03e253ef h1:Byx3R7dvNYfBC2Mu3b3n7MY8YF1li0woae6rKGxA4Pw=
+github.com/metacubex/mipstack v0.0.0-20260926151545-332a03e253ef/go.mod h1:+bbwALZI0pbi2auSG5A3ptdpV2DZ2eLObziXo+P7oj0=
 github.com/miekg/dns v1.1.73 h1:uhT8nJxmTrPJYClxVxTCX+CVn6qnzSiybRk72Z6DgrE=
 github.com/miekg/dns v1.1.73/go.mod h1:RW2Obtfd5NZHvOFe3zYG0W8koWOQtAzyHaLo8vASBuQ=
 github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
