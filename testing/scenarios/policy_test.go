@@ -9,6 +9,7 @@ import (
 	"github.com/xtls/xray-core/app/policy"
 	"github.com/xtls/xray-core/app/proxyman"
 	"github.com/xtls/xray-core/common"
+	"github.com/xtls/xray-core/common/errors"
 	clog "github.com/xtls/xray-core/common/log"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
@@ -36,7 +37,7 @@ func startQuickClosingTCPServer() (net.Listener, error) {
 				break
 			}
 			b := make([]byte, 1024)
-			conn.Read(b)
+			_, _ = conn.Read(b)
 			conn.Close()
 		}
 	}()
@@ -142,7 +143,7 @@ func TestVMessClosing(t *testing.T) {
 	common.Must(err)
 	defer CloseAllServers(servers)
 
-	if err := testTCPConn(clientPort, 1024, time.Second*2)(); err != io.EOF {
+	if err := testTCPConn(clientPort, 1024, time.Second*2)(); !errors.Is(err, io.EOF) {
 		t.Error(err)
 	}
 }

@@ -35,7 +35,7 @@ func (c *CounterConnection) Write(b []byte) (int, error) {
 
 func TryUnwrapStatsConn(conn net.Conn) net.Conn {
 	if conn == nil {
-		return conn
+		return nil
 	}
 	if conn, ok := conn.(*CounterConnection); ok {
 		return conn.Connection

@@ -4,6 +4,7 @@ package xmc
 import (
 	"bytes"
 	"fmt"
+	"github.com/xtls/xray-core/common/errors"
 	"io"
 )
 
@@ -117,7 +118,7 @@ func readVarintWithLength(r io.Reader) (Varint, int, error) {
 			return 0, 0, fmt.Errorf("read varint: %w", err)
 		}
 		if index == 4 && currentByte&0xf0 != 0 {
-			return 0, 0, fmt.Errorf("read varint: too large")
+			return 0, 0, errors.New("read varint: too large")
 		}
 		value |= int32(currentByte&SEGMENT_BITS) << (7 * index)
 
@@ -125,16 +126,16 @@ func readVarintWithLength(r io.Reader) (Varint, int, error) {
 			parsed := Varint(value)
 			length := index + 1
 			if length != varintSize(parsed) {
-				return 0, 0, fmt.Errorf("read varint: non-canonical encoding")
+				return 0, 0, errors.New("read varint: non-canonical encoding")
 			}
 			return parsed, length, nil
 		}
 	}
-	return 0, 0, fmt.Errorf("read varint: too large")
+	return 0, 0, errors.New("read varint: too large")
 }
 
 func (v *Varint) writeTo(w io.Writer) error {
-	value := uint32(*v)
+	value := uint32(*v) //nolint:gosec // values are bounded by the XMC protocol field widths
 
 	for {
 		currentByte := byte(value & SEGMENT_BITS)
@@ -157,7 +158,7 @@ func (v *Varint) writeTo(w io.Writer) error {
 }
 
 func varintSize(value Varint) int {
-	uintValue := uint32(value)
+	uintValue := uint32(value) //nolint:gosec // values are bounded by the XMC protocol field widths
 	size := 0
 	for range 5 {
 		size++
@@ -196,7 +197,7 @@ func (v *String) readFrom(r io.Reader) error {
 
 func (v *String) writeTo(w io.Writer) error {
 	strBytes := []byte(*v)
-	length := Varint(len(strBytes))
+	length := Varint(len(strBytes)) //nolint:gosec // values are bounded by the XMC protocol field widths
 
 	err := length.writeTo(w)
 	if err != nil {
@@ -251,7 +252,7 @@ func (v *Long) readFrom(r io.Reader) error {
 
 func (v *Long) writeTo(w io.Writer) error {
 	buf := []byte{
-		byte(*v >> 56), byte((*v >> 48) & 0xFF), byte((*v >> 40) & 0xFF), byte((*v >> 32) & 0xFF),
+		byte(*v >> 56), byte((*v >> 48) & 0xFF), byte((*v >> 40) & 0xFF), byte((*v >> 32) & 0xFF), //nolint:gosec // explicit byte extraction from a shift
 		byte((*v >> 24) & 0xFF), byte((*v >> 16) & 0xFF), byte((*v >> 8) & 0xFF), byte(*v & 0xFF),
 	}
 
@@ -351,7 +352,7 @@ func (v *RestBytes) writeTo(w io.Writer) error {
 }
 
 func (v *Bytes) writeTo(w io.Writer) error {
-	length := Varint(len(*v))
+	length := Varint(len(*v)) //nolint:gosec // values are bounded by the XMC protocol field widths
 	err := length.writeTo(w)
 	if err != nil {
 		return fmt.Errorf("write bytes length: %w", err)
@@ -404,15 +405,15 @@ func encodePacket(packetID int, fields ...field) ([]byte, error) {
 		return nil, fmt.Errorf("write packet: bad length: %d", dataBuf.Len())
 	}
 
-	packetIDVarint := Varint(packetID)
+	packetIDVarint := Varint(packetID) //nolint:gosec // values are bounded by the XMC protocol field widths
 	bodyLength := varintSize(packetIDVarint) + dataBuf.Len()
 	if bodyLength > maxPacketBodyLength {
 		return nil, fmt.Errorf("write packet: bad length: %d", bodyLength)
 	}
 
 	var frame bytes.Buffer
-	frame.Grow(varintSize(Varint(bodyLength)) + bodyLength)
-	frameLength := Varint(bodyLength)
+	frame.Grow(varintSize(Varint(bodyLength)) + bodyLength) //nolint:gosec // values are bounded by the XMC protocol field widths
+	frameLength := Varint(bodyLength)                       //nolint:gosec // values are bounded by the XMC protocol field widths
 	if err := frameLength.writeTo(&frame); err != nil {
 		return nil, fmt.Errorf("write packet length: %w", err)
 	}

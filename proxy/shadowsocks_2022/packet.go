@@ -104,27 +104,27 @@ func (c *UDPCodec) EncodeClientPacket(dest net.Destination, payload []byte) (*bu
 			outBuf.Release()
 			return nil, err
 		}
-		outBuf.Write(nonce[:])
+		_, _ = outBuf.Write(nonce[:])
 
 		var hdr [16 + 1 + 8 + 2]byte
 		binary.BigEndian.PutUint64(hdr[0:8], sessID)
 		binary.BigEndian.PutUint64(hdr[8:16], packetID)
 		hdr[16] = HeaderTypeClient
-		binary.BigEndian.PutUint64(hdr[17:25], uint64(time.Now().Unix()))
+		binary.BigEndian.PutUint64(hdr[17:25], uint64(time.Now().Unix())) //nolint:gosec // Unix timestamps are positive
 		binary.BigEndian.PutUint16(hdr[25:27], uint16(paddingLen))
-		outBuf.Write(hdr[:])
+		_, _ = outBuf.Write(hdr[:])
 		if paddingLen > 0 {
-			outBuf.Write(zeroPadding[:paddingLen])
+			_, _ = outBuf.Write(zeroPadding[:paddingLen])
 		}
 
 		if err := WriteAddressPort(outBuf, dest); err != nil {
 			outBuf.Release()
 			return nil, err
 		}
-		outBuf.Write(payload)
+		_, _ = outBuf.Write(payload)
 
 		plainBytes := outBuf.Bytes()[PacketNonceSize:]
-		outBuf.Extend(int32(c.chachaCipher.Overhead()))
+		outBuf.Extend(int32(c.chachaCipher.Overhead())) //nolint:gosec // bounded by the buffer size / buf.Size
 		c.chachaCipher.Seal(plainBytes[:0], nonce[:], plainBytes, nil)
 		return outBuf, nil
 	}
@@ -144,28 +144,28 @@ func (c *UDPCodec) EncodeClientPacket(dest net.Destination, payload []byte) (*bu
 
 	var encryptedHeader [16]byte
 	c.blockCipher.Encrypt(encryptedHeader[:], rawHeader[:])
-	outBuf.Write(encryptedHeader[:])
+	_, _ = outBuf.Write(encryptedHeader[:])
 
 	bodyAead := c.clientBodyCipher
 
 	var hdr [1 + 8 + 2]byte
 	hdr[0] = HeaderTypeClient
-	binary.BigEndian.PutUint64(hdr[1:9], uint64(time.Now().Unix()))
+	binary.BigEndian.PutUint64(hdr[1:9], uint64(time.Now().Unix())) //nolint:gosec // Unix timestamps are positive
 	binary.BigEndian.PutUint16(hdr[9:11], uint16(paddingLen))
-	outBuf.Write(hdr[:])
+	_, _ = outBuf.Write(hdr[:])
 	if paddingLen > 0 {
-		outBuf.Write(zeroPadding[:paddingLen])
+		_, _ = outBuf.Write(zeroPadding[:paddingLen])
 	}
 
 	if err := WriteAddressPort(outBuf, dest); err != nil {
 		outBuf.Release()
 		return nil, err
 	}
-	outBuf.Write(payload)
+	_, _ = outBuf.Write(payload)
 
 	plainBytes := outBuf.Bytes()[16:]
 	bodyNonce := rawHeader[4:16]
-	outBuf.Extend(int32(bodyAead.Overhead()))
+	outBuf.Extend(int32(bodyAead.Overhead())) //nolint:gosec // bounded by the buffer size / buf.Size
 	bodyAead.Seal(plainBytes[:0], bodyNonce, plainBytes, nil)
 	return outBuf, nil
 }
@@ -221,7 +221,7 @@ func parsePlainUDPPacket(sessionID, packetID uint64, bodyPlain []byte) (DecodedU
 
 	headerType := bodyPlain[0]
 	epoch := binary.BigEndian.Uint64(bodyPlain[1:9])
-	diff := int(math.Abs(float64(time.Now().Unix() - int64(epoch))))
+	diff := int(math.Abs(float64(time.Now().Unix() - int64(epoch)))) //nolint:gosec // the epoch skew is a small number of seconds
 	if diff > 30 {
 		return DecodedUDPPacket{}, ErrBadTimestamp
 	}
@@ -394,15 +394,15 @@ func (s *ServerUDPSession) EncodeServerPacket(method *CipherMethod, clientSessio
 		binary.BigEndian.PutUint64(hdr[0:8], serverSessionID)
 		binary.BigEndian.PutUint64(hdr[8:16], serverPacketID)
 		hdr[16] = HeaderTypeServer
-		binary.BigEndian.PutUint64(hdr[17:25], uint64(time.Now().Unix()))
+		binary.BigEndian.PutUint64(hdr[17:25], uint64(time.Now().Unix())) //nolint:gosec // Unix timestamps are positive
 		binary.BigEndian.PutUint64(hdr[25:33], clientSessionID)
 		binary.BigEndian.PutUint16(hdr[33:35], 0)
-		plainBuf.Write(hdr[:])
+		_, _ = plainBuf.Write(hdr[:])
 
 		if err := WriteAddressPort(plainBuf, dest); err != nil {
 			return nil, err
 		}
-		plainBuf.Write(payload)
+		_, _ = plainBuf.Write(payload)
 
 		sealed := s.ServerChaCha.Seal(nil, nonce[:], plainBuf.Bytes(), nil)
 		res := make([]byte, PacketNonceSize+len(sealed))
@@ -424,15 +424,15 @@ func (s *ServerUDPSession) EncodeServerPacket(method *CipherMethod, clientSessio
 
 	var hdr [1 + 8 + 8 + 2]byte
 	hdr[0] = HeaderTypeServer
-	binary.BigEndian.PutUint64(hdr[1:9], uint64(time.Now().Unix()))
+	binary.BigEndian.PutUint64(hdr[1:9], uint64(time.Now().Unix())) //nolint:gosec // Unix timestamps are positive
 	binary.BigEndian.PutUint64(hdr[9:17], clientSessionID)
 	binary.BigEndian.PutUint16(hdr[17:19], 0)
-	bodyBuf.Write(hdr[:])
+	_, _ = bodyBuf.Write(hdr[:])
 
 	if err := WriteAddressPort(bodyBuf, dest); err != nil {
 		return nil, err
 	}
-	bodyBuf.Write(payload)
+	_, _ = bodyBuf.Write(payload)
 
 	bodyNonce := rawHeader[4:16]
 	sealedBody := s.ServerCipher.Seal(nil, bodyNonce, bodyBuf.Bytes(), nil)
@@ -504,7 +504,7 @@ func (r *UDPReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 			continue
 		}
 		buffer.Clear()
-		buffer.Write(decoded.Payload)
+		_, _ = buffer.Write(decoded.Payload)
 		dest := decoded.Destination
 		buffer.UDP = &dest
 		return buf.MultiBuffer{buffer}, nil

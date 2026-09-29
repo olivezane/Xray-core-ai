@@ -15,7 +15,7 @@ func TestBufferClear(t *testing.T) {
 	defer buffer.Release()
 
 	payload := "Bytes"
-	buffer.Write([]byte(payload))
+	_, _ = buffer.WriteString(payload)
 	if diff := cmp.Diff(buffer.Bytes(), []byte(payload)); diff != "" {
 		t.Error(diff)
 	}
@@ -106,7 +106,7 @@ func TestBufferResize(t *testing.T) {
 func TestBufferSlice(t *testing.T) {
 	{
 		b := New()
-		common.Must2(b.Write([]byte("abcd")))
+		common.Must2(b.WriteString("abcd"))
 		bytes := b.BytesFrom(-2)
 		if diff := cmp.Diff(bytes, []byte{'c', 'd'}); diff != "" {
 			t.Error(diff)
@@ -115,7 +115,7 @@ func TestBufferSlice(t *testing.T) {
 
 	{
 		b := New()
-		common.Must2(b.Write([]byte("abcd")))
+		common.Must2(b.WriteString("abcd"))
 		bytes := b.BytesTo(-2)
 		if diff := cmp.Diff(bytes, []byte{'a', 'b'}); diff != "" {
 			t.Error(diff)
@@ -124,7 +124,7 @@ func TestBufferSlice(t *testing.T) {
 
 	{
 		b := New()
-		common.Must2(b.Write([]byte("abcd")))
+		common.Must2(b.WriteString("abcd"))
 		bytes := b.BytesRange(-3, -1)
 		if diff := cmp.Diff(bytes, []byte{'b', 'c'}); diff != "" {
 			t.Error(diff)

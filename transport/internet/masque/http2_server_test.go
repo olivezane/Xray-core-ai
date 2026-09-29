@@ -55,14 +55,18 @@ func newHTTP2ClientPeer(t *testing.T, handler http.Handler) (*http2ClientPeer, [
 	f := p.readFrame()
 	require.IsType(t, &http2.SettingsFrame{}, f)
 	var settings []http2.Setting
-	f.(*http2.SettingsFrame).ForeachSetting(func(s http2.Setting) error {
+	if err := f.(*http2.SettingsFrame).ForeachSetting(func(s http2.Setting) error { //nolint:forcetypeassert // f was asserted to be a *http2.SettingsFrame just above
 		settings = append(settings, s)
 		return nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 	f = p.readFrame()
 	require.IsType(t, &http2.WindowUpdateFrame{}, f)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, uint32(http2ConnectionWindow-http2DefaultWindow), f.(*http2.WindowUpdateFrame).Increment)
 	f = p.readFrame()
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.True(t, f.(*http2.SettingsFrame).IsAck())
 	require.NoError(t, p.fr.WriteSettingsAck())
 	return p, settings
@@ -70,7 +74,7 @@ func newHTTP2ClientPeer(t *testing.T, handler http.Handler) (*http2ClientPeer, [
 
 func (p *http2ClientPeer) readFrame() http2.Frame {
 	p.t.Helper()
-	p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_ = p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	f, err := p.fr.ReadFrame()
 	require.NoError(p.t, err)
 	return f
@@ -141,7 +145,7 @@ func TestHTTP2ServerRoundTrip(t *testing.T) {
 	payload := make([]byte, 3*http2ConnectionWindow/2)
 	rand.Read(payload)
 	go func() {
-		pw.Write(payload)
+		_, _ = pw.Write(payload)
 		pw.Close()
 	}()
 	echoed := sha256.New()
@@ -156,12 +160,15 @@ func TestHTTP2ServerStatus(t *testing.T) {
 	p.writeConnect(1)
 	f := p.readFrame()
 	require.IsType(t, &http2.MetaHeadersFrame{}, f)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, "404", f.(*http2.MetaHeadersFrame).PseudoValue("status"))
 	var body []byte
 	for {
 		f = p.readFrame()
 		require.IsType(t, &http2.DataFrame{}, f)
+		//nolint:forcetypeassert // the test asserts the frame type before using it
 		body = append(body, f.(*http2.DataFrame).Data()...)
+		//nolint:forcetypeassert // the test asserts the frame type before using it
 		if f.(*http2.DataFrame).StreamEnded() {
 			break
 		}
@@ -169,6 +176,7 @@ func TestHTTP2ServerStatus(t *testing.T) {
 	require.Equal(t, "404 page not found\n", string(body))
 	f = p.readFrame()
 	require.IsType(t, &http2.RSTStreamFrame{}, f)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, http2.ErrCodeNo, f.(*http2.RSTStreamFrame).ErrCode)
 }
 
@@ -189,6 +197,7 @@ func TestHTTP2ServerMalformedRequests(t *testing.T) {
 			p.writeHeaders(1, false, tc.fields...)
 			f := p.readFrame()
 			require.IsType(t, &http2.RSTStreamFrame{}, f)
+			//nolint:forcetypeassert // the test asserts the frame type before using it
 			require.Equal(t, http2.ErrCodeProtocol, f.(*http2.RSTStreamFrame).ErrCode)
 		})
 	}
@@ -211,6 +220,7 @@ func TestHTTP2ServerRefusesExtraStreams(t *testing.T) {
 	f := p.readFrame()
 	require.IsType(t, &http2.RSTStreamFrame{}, f)
 	require.Equal(t, uint32(2*http2MaxConcurrentStreams+1), f.Header().StreamID)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, http2.ErrCodeRefusedStream, f.(*http2.RSTStreamFrame).ErrCode)
 }
 
@@ -226,6 +236,7 @@ func TestHTTP2ServerClientReset(t *testing.T) {
 	}))
 	p.writeConnect(1)
 	f := p.readFrame()
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, "200", f.(*http2.MetaHeadersFrame).PseudoValue("status"))
 	require.NoError(t, p.fr.WriteRSTStream(1, http2.ErrCodeCancel))
 	select {
@@ -247,7 +258,9 @@ func TestHTTP2ServerAnswersPings(t *testing.T) {
 	require.NoError(t, p.fr.WritePing(false, data))
 	f := p.readFrame()
 	require.IsType(t, &http2.PingFrame{}, f)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.True(t, f.(*http2.PingFrame).IsAck())
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, data, f.(*http2.PingFrame).Data)
 }
 
@@ -266,7 +279,7 @@ func TestHTTP2ServerRejectsOverflow(t *testing.T) {
 			}
 		}
 	}()
-	p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_ = p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	_, err := io.Copy(io.Discard, p.conn)
 	require.NoError(t, err)
 }
@@ -275,7 +288,7 @@ func TestHTTP2ServerBadPreface(t *testing.T) {
 	conn := serveHTTP2Pipe(t, http.NotFoundHandler())
 	_, err := io.WriteString(conn, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
 	require.NoError(t, err)
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	n, err := io.Copy(io.Discard, conn)
 	require.NoError(t, err)
 	require.Zero(t, n)

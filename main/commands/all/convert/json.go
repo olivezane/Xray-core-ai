@@ -41,7 +41,7 @@ func executeTypedMessageToJson(cmd *base.Command, args []string) {
 	var injectTypeInfo bool
 	cmd.Flag.BoolVar(&injectTypeInfo, "t", false, "")
 	cmd.Flag.BoolVar(&injectTypeInfo, "type", false, "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 
 	if cmd.Flag.NArg() < 1 {
 		base.Fatalf("empty input list")

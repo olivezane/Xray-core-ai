@@ -36,9 +36,13 @@ type Server struct {
 // NewServer creates a new HTTP inbound handler.
 func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
 	s := &Server{
 		config:        config,
-		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager: pm,
 	}
 
 	return s, nil
@@ -53,11 +57,6 @@ func (s *Server) policy() policy.Session {
 // Network implements proxy.Inbound.
 func (*Server) Network() []net.Network {
 	return []net.Network{net.Network_TCP, net.Network_UNIX}
-}
-
-func isTimeout(err error) bool {
-	nerr, ok := errors.Cause(err).(net.Error)
-	return ok && nerr.Timeout()
 }
 
 func parseBasicAuth(auth string) (username, password string, ok bool) {
@@ -159,7 +158,7 @@ Start:
 	keepAlive := (strings.TrimSpace(strings.ToLower(request.Header.Get("Proxy-Connection"))) == "keep-alive")
 
 	err = s.handlePlainHTTP(ctx, request, conn, dest, dispatcher)
-	if err == errWaitAnother {
+	if errors.Is(err, errWaitAnother) {
 		if keepAlive {
 			goto Start
 		}
@@ -205,7 +204,7 @@ func (s *Server) handlePlainHTTP(ctx context.Context, request *http.Request, wri
 		// RFC 2068 (HTTP/1.1) requires URL to be absolute URL in HTTP proxy.
 		response := &http.Response{
 			Status:        "Bad Request",
-			StatusCode:    400,
+			StatusCode:    http.StatusBadRequest,
 			Proto:         "HTTP/1.1",
 			ProtoMajor:    1,
 			ProtoMinor:    1,
@@ -281,7 +280,7 @@ func (s *Server) handlePlainHTTP(ctx context.Context, request *http.Request, wri
 			errors.LogWarningInner(ctx, err, "failed to read response from ", request.Host)
 			response = &http.Response{
 				Status:        "Service Unavailable",
-				StatusCode:    503,
+				StatusCode:    http.StatusServiceUnavailable,
 				Proto:         "HTTP/1.1",
 				ProtoMajor:    1,
 				ProtoMinor:    1,
@@ -313,7 +312,7 @@ func (s *Server) handlePlainHTTP(ctx context.Context, request *http.Request, wri
 func readResponseAndHandle100Continue(r *bufio.Reader, req *http.Request, writer io.Writer) (*http.Response, error) {
 	// have a little look of response
 	peekBytes, err := r.Peek(56)
-	if err == nil || err == bufio.ErrBufferFull {
+	if err == nil || errors.Is(err, bufio.ErrBufferFull) {
 		str := string(peekBytes)
 		ResponseLine, _, _ := strings.Cut(str, "\r\n")
 		_, status, _ := strings.Cut(ResponseLine, " ")
@@ -334,14 +333,14 @@ func readResponseAndHandle100Continue(r *bufio.Reader, req *http.Request, writer
 					return nil, errors.New("too big http 1xx response")
 				}
 			}
-			writer.Write(ResponseHeader1xx)
+			_, _ = writer.Write(ResponseHeader1xx)
 		}
 	}
 	return http.ReadResponse(r, req)
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewServer(ctx, config.(*ServerConfig))
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config *ServerConfig) (any, error) {
+		return NewServer(ctx, config)
 	}))
 }

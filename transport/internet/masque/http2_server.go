@@ -109,12 +109,12 @@ func serveHTTP2(ctx context.Context, conn net.Conn, handler http.Handler) {
 
 	br := bufio.NewReader(conn)
 	preface := make([]byte, len(http2.ClientPreface))
-	conn.SetReadDeadline(time.Now().Add(http2HandshakeTimeout))
+	_ = conn.SetReadDeadline(time.Now().Add(http2HandshakeTimeout))
 	if _, err := io.ReadFull(br, preface); err != nil || string(preface) != http2.ClientPreface {
 		c.fail(errHTTP2BadPreface)
 		return
 	}
-	conn.SetReadDeadline(time.Time{})
+	_ = conn.SetReadDeadline(time.Time{})
 
 	c.fr = http2.NewFramer(c.bw, br)
 	c.fr.SetMaxReadFrameSize(http2DefaultFrameSize)
@@ -178,9 +178,11 @@ func (c *http2ServerConn) keepAlive() {
 			return
 		}
 		if idle >= http2KeepAlivePeriod {
-			go c.write(func(fr *http2.Framer) error {
-				return fr.WritePing(false, [8]byte{})
-			})
+			go func() {
+				_ = c.write(func(fr *http2.Framer) error {
+					return fr.WritePing(false, [8]byte{})
+				})
+			}()
 		}
 	}
 }
@@ -189,8 +191,7 @@ func (c *http2ServerConn) readLoop() {
 	for {
 		f, err := c.fr.ReadFrame()
 		if err != nil {
-			var streamErr http2.StreamError
-			if go_errors.As(err, &streamErr) {
+			if streamErr, ok := go_errors.AsType[http2.StreamError](err); ok {
 				if err := c.resetStream(streamErr); err != nil {
 					c.fail(err)
 					return
@@ -247,6 +248,7 @@ func (c *http2ServerConn) applySettings(f *http2.SettingsFrame) error {
 		if err := s.Valid(); err != nil {
 			return err
 		}
+		//nolint:exhaustive // settings we do not implement are ignored, per RFC 9113
 		switch s.ID {
 		case http2.SettingMaxFrameSize:
 			c.maxFrameSize = s.Val
@@ -416,7 +418,7 @@ func (c *http2ServerConn) handleData(f *http2.DataFrame) error {
 			return nil
 		}
 		return c.write(func(fr *http2.Framer) error {
-			return fr.WriteWindowUpdate(0, uint32(size))
+			return fr.WriteWindowUpdate(0, uint32(size)) //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 		})
 	}
 	st.recvWindow -= size
@@ -461,9 +463,11 @@ func (c *http2ServerConn) abortStream(id uint32, err error, reset bool) {
 	st.out.CloseWithError(err)
 	st.cancel()
 	if reset {
-		go c.write(func(fr *http2.Framer) error {
-			return fr.WriteRSTStream(id, http2.ErrCodeCancel)
-		})
+		go func() {
+			_ = c.write(func(fr *http2.Framer) error {
+				return fr.WriteRSTStream(id, http2.ErrCodeCancel)
+			})
+		}()
 	}
 }
 
@@ -512,7 +516,7 @@ func (st *http2ServerStream) writeHeader(code int) {
 
 	if err := c.write(func(fr *http2.Framer) error {
 		c.hbuf.Reset()
-		c.henc.WriteField(hpack.HeaderField{Name: ":status", Value: strconv.Itoa(code)})
+		_ = c.henc.WriteField(hpack.HeaderField{Name: ":status", Value: strconv.Itoa(code)})
 		for _, k := range slices.Sorted(maps.Keys(header)) {
 			name := strings.ToLower(k)
 			switch name {
@@ -520,7 +524,7 @@ func (st *http2ServerStream) writeHeader(code int) {
 				continue
 			}
 			for _, v := range header[k] {
-				c.henc.WriteField(hpack.HeaderField{Name: name, Value: v})
+				_ = c.henc.WriteField(hpack.HeaderField{Name: name, Value: v})
 			}
 		}
 		block := c.hbuf.Bytes()
@@ -652,12 +656,12 @@ func (b *http2RequestBody) Read(p []byte) (int, error) {
 	if streamUpdate > 0 || connUpdate > 0 {
 		if err := c.write(func(fr *http2.Framer) error {
 			if connUpdate > 0 {
-				if err := fr.WriteWindowUpdate(0, uint32(connUpdate)); err != nil {
+				if err := fr.WriteWindowUpdate(0, uint32(connUpdate)); err != nil { //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 					return err
 				}
 			}
 			if streamUpdate > 0 {
-				return fr.WriteWindowUpdate(st.id, uint32(streamUpdate))
+				return fr.WriteWindowUpdate(st.id, uint32(streamUpdate)) //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 			}
 			return nil
 		}); err != nil {

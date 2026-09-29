@@ -101,7 +101,7 @@ func (w *walWriter) flushLoop() {
 		case <-ticker.C:
 			w.mu.Lock()
 			if !w.closed && w.err == nil && len(w.buf) > 0 && w.readyToFlush() {
-				w.flushLocked()
+				_ = w.flushLocked()
 			}
 			done := w.closed || w.err != nil
 			w.mu.Unlock()
@@ -168,7 +168,7 @@ func (w *walWriter) upload(seq int64, chunk []byte) {
 			w.err = errors.New("failed to store segment").Base(err)
 		}
 		w.mu.Unlock()
-		w.storage.Put(w.ctx, objectName(w.prefix, seq, errSuffix), nil)
+		_ = w.storage.Put(w.ctx, objectName(w.prefix, seq, errSuffix), nil)
 	}
 }
 
@@ -180,7 +180,9 @@ func (w *walWriter) Close() error {
 	}
 	w.closed = true
 	for len(w.buf) > 0 && w.err == nil {
-		w.flushLocked()
+		if err := w.flushLocked(); err != nil {
+			return err
+		}
 	}
 	w.mu.Unlock()
 
@@ -333,7 +335,7 @@ func (r *walReader) poll() (advanced, eof bool, err error) {
 
 		chunks, err := r.fetch(batch)
 		if err != nil {
-			if err == errNotFound {
+			if errors.Is(err, errNotFound) {
 				return advanced, false, nil
 			}
 			return advanced, false, err
@@ -353,7 +355,7 @@ func (r *walReader) poll() (advanced, eof bool, err error) {
 }
 
 func (r *walReader) nextBatch(pending map[int64]Entry) (batch []Entry, done bool) {
-	for i := 0; i < r.concurrency; i++ {
+	for i := range r.concurrency {
 		entry, ok := pending[r.seq+int64(i)]
 		if !ok {
 			break
@@ -418,7 +420,7 @@ func (r *walReader) discardLoop() {
 			go func(name string) {
 				defer wg.Done()
 				defer func() { <-sem }()
-				r.storage.Delete(r.ctx, name)
+				_ = r.storage.Delete(r.ctx, name)
 			}(name)
 		}
 	}

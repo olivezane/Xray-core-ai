@@ -22,8 +22,10 @@ func getStatCounter(v *core.Instance, tag string) (stats.Counter, stats.Counter)
 	var uplinkCounter stats.Counter
 	var downlinkCounter stats.Counter
 
+	//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 	policy := v.GetFeature(policy.ManagerType()).(policy.Manager)
 	if len(tag) > 0 && policy.ForSystem().Stats.InboundUplink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := v.GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "inbound>>>" + tag + ">>>traffic>>>uplink"
 		c, _ := statsManager.GetOrRegisterCounter(name)
@@ -32,6 +34,7 @@ func getStatCounter(v *core.Instance, tag string) (stats.Counter, stats.Counter)
 		}
 	}
 	if len(tag) > 0 && policy.ForSystem().Stats.InboundDownlink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := v.GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "inbound>>>" + tag + ">>>traffic>>>downlink"
 		c, _ := statsManager.GetOrRegisterCounter(name)
@@ -62,7 +65,7 @@ func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *
 		src.Address = receiverConfig.Listen.AsAddress()
 	}
 	if receiverConfig.PortList != nil && len(receiverConfig.PortList.Range) > 0 {
-		src.Port = net.Port(receiverConfig.PortList.Range[0].From)
+		src.Port = net.Port(receiverConfig.PortList.Range[0].From) //nolint:gosec // ports come from the config layer, which rejects values above 65535
 	}
 	mss, err := internet.ToMemoryStreamConfig(receiverConfig.StreamSettings)
 	if err != nil {
@@ -134,7 +137,7 @@ func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *
 
 					worker := &tcpWorker{
 						address:         address,
-						port:            net.Port(port),
+						port:            net.Port(port), //nolint:gosec // ports come from the config layer, which rejects values above 65535
 						proxy:           p,
 						stream:          mss,
 						recvOrigDest:    receiverConfig.ReceiveOriginalDestination,
@@ -153,7 +156,7 @@ func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *
 						tag:             tag,
 						proxy:           p,
 						address:         address,
-						port:            net.Port(port),
+						port:            net.Port(port), //nolint:gosec // ports come from the config layer, which rejects values above 65535
 						dispatcher:      h.mux,
 						sniffingRequest: sniffingRequest,
 						uplinkCounter:   uplinkCounter,
@@ -192,8 +195,7 @@ func (h *AlwaysOnInboundHandler) Close() error {
 	for _, worker := range h.workers {
 		errs = append(errs, worker.Close())
 	}
-	errs = append(errs, h.mux.Close())
-	errs = append(errs, common.Close(h.proxy))
+	errs = append(errs, h.mux.Close(), common.Close(h.proxy))
 	if err := errors.Combine(errs...); err != nil {
 		return errors.New("failed to close all resources").Base(err)
 	}

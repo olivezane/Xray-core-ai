@@ -26,7 +26,7 @@ type Server struct {
 // NewServer creates a new mux.Server.
 func NewServer(ctx context.Context) *Server {
 	s := &Server{}
-	core.RequireFeatures(ctx, func(d routing.Dispatcher) {
+	_ = core.RequireFeatures(ctx, func(d routing.Dispatcher) {
 		s.dispatcher = d
 	})
 	return s
@@ -116,7 +116,7 @@ func handle(ctx context.Context, s *Session, output buf.Writer) {
 	}
 
 	writer.Close()
-	s.Close(false)
+	_ = s.Close(false)
 }
 
 func (w *ServerWorker) monitor() {
@@ -140,7 +140,7 @@ func (w *ServerWorker) monitor() {
 }
 
 func (w *ServerWorker) ActiveConnections() uint32 {
-	return uint32(w.sessionManager.Size())
+	return uint32(w.sessionManager.Size()) //nolint:gosec // sizes fit comfortably in uint32
 }
 
 func (w *ServerWorker) Closed() bool {
@@ -213,9 +213,11 @@ func (w *ServerWorker) handleStatusNew(ctx context.Context, meta *FrameMetadata,
 			}
 			x.Status = Initializing
 			XUDPManager.Unlock()
-			x.Mux.Close(false) // detach from previous Mux
+			_ = x.Mux.Close(false) // detach from previous Mux
 			b := buf.New()
-			b.Write(mb[0].Bytes())
+			if _, err := b.Write(mb[0].Bytes()); err != nil {
+				return err
+			}
 			b.UDP = mb[0].UDP
 			if err = x.Mux.output.WriteMultiBuffer(mb); err != nil {
 				x.Interrupt()
@@ -237,7 +239,7 @@ func (w *ServerWorker) handleStatusNew(ctx context.Context, meta *FrameMetadata,
 				err = errors.New("XUDP new ", meta.GlobalID).Base(errors.New("failed to dispatch request to ", meta.Target).Base(err))
 				return err // it will break the whole Mux connection
 			}
-			link.Writer.WriteMultiBuffer(mb) // it's meaningless to test a new pipe
+			_ = link.Writer.WriteMultiBuffer(mb) // it's meaningless to test a new pipe
 			x.Mux = &Session{
 				input:  link.Reader,
 				output: link.Writer,
@@ -254,7 +256,7 @@ func (w *ServerWorker) handleStatusNew(ctx context.Context, meta *FrameMetadata,
 		}
 		x.Status = Active
 		if !w.sessionManager.Add(x.Mux) {
-			x.Mux.Close(false)
+			_ = x.Mux.Close(false)
 			return errors.New("failed to add new session")
 		}
 		go handle(ctx, x.Mux, w.link.Writer)
@@ -264,7 +266,9 @@ func (w *ServerWorker) handleStatusNew(ctx context.Context, meta *FrameMetadata,
 	link, err := w.dispatcher.Dispatch(ctx, meta.Target)
 	if err != nil {
 		if meta.Option.Has(OptionData) {
-			buf.Copy(NewStreamReader(reader), buf.Discard)
+			if err := buf.Copy(NewStreamReader(reader), buf.Discard); err != nil {
+				return err
+			}
 		}
 		return errors.New("failed to dispatch request.").Base(err)
 	}
@@ -279,7 +283,7 @@ func (w *ServerWorker) handleStatusNew(ctx context.Context, meta *FrameMetadata,
 		s.transferType = protocol.TransferTypePacket
 	}
 	if !w.sessionManager.Add(s) {
-		s.Close(false)
+		_ = s.Close(false)
 		return errors.New("failed to add new session")
 	}
 	go handle(ctx, s, w.link.Writer)
@@ -291,7 +295,7 @@ func (w *ServerWorker) handleStatusNew(ctx context.Context, meta *FrameMetadata,
 	err = buf.Copy(rr, s.output)
 
 	if err != nil && buf.IsWriteError(err) {
-		s.Close(false)
+		_ = s.Close(false)
 		return buf.Copy(rr, buf.Discard)
 	}
 	return err
@@ -316,7 +320,7 @@ func (w *ServerWorker) handleStatusKeep(meta *FrameMetadata, reader *buf.Buffere
 
 	if err != nil && buf.IsWriteError(err) {
 		errors.LogInfoInner(context.Background(), err, "failed to write to downstream writer. closing session ", s.ID)
-		s.Close(false)
+		_ = s.Close(false)
 		return buf.Copy(rr, buf.Discard)
 	}
 
@@ -325,7 +329,7 @@ func (w *ServerWorker) handleStatusKeep(meta *FrameMetadata, reader *buf.Buffere
 
 func (w *ServerWorker) handleStatusEnd(meta *FrameMetadata, reader *buf.BufferedReader) error {
 	if s, found := w.sessionManager.Get(meta.SessionID); found {
-		s.Close(false)
+		_ = s.Close(false)
 	}
 	if meta.Option.Has(OptionData) {
 		return buf.Copy(NewStreamReader(reader), buf.Discard)
@@ -374,7 +378,7 @@ func (w *ServerWorker) run(ctx context.Context) {
 		default:
 			err := w.handleFrame(ctx, reader)
 			if err != nil {
-				if errors.Cause(err) != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					errors.LogInfoInner(ctx, err, "unexpected EOF")
 				}
 				return

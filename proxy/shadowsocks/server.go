@@ -43,10 +43,15 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	}
 
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
+	//nolint:forcetypeassert // session.ConeKey is only ever set to a bool
 	s := &Server{
 		config:        config,
 		validator:     validator,
-		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager: pm,
 		cone:          ctx.Value(session.ConeKey).(bool),
 	}
 
@@ -125,7 +130,7 @@ func (s *Server) handleUDPPayload(ctx context.Context, conn stat.Connection, dis
 			return
 		}
 
-		conn.Write(data.Bytes())
+		_, _ = conn.Write(data.Bytes())
 		data.Release()
 	})
 	defer udpServer.RemoveRay()
@@ -146,7 +151,9 @@ func (s *Server) handleUDPPayload(ctx context.Context, conn stat.Connection, dis
 
 			if inbound.User != nil {
 				validator := new(Validator)
-				validator.Add(inbound.User)
+				if err := validator.Add(inbound.User); err != nil {
+					return err
+				}
 				request, data, err = DecodeUDPPacket(validator, payload)
 			} else {
 				request, data, err = DecodeUDPPacket(s.validator, payload)
@@ -214,7 +221,7 @@ func (s *Server) handleConnection(ctx context.Context, conn stat.Connection, dis
 		})
 		return errors.New("failed to create request from: ", conn.RemoteAddr()).Base(err)
 	}
-	conn.SetReadDeadline(time.Time{})
+	_ = conn.SetReadDeadline(time.Time{})
 
 	inbound := session.InboundFromContext(ctx)
 	if inbound == nil {
@@ -293,7 +300,7 @@ func (s *Server) handleConnection(ctx context.Context, conn stat.Connection, dis
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewServer(ctx, config.(*ServerConfig))
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config *ServerConfig) (any, error) {
+		return NewServer(ctx, config)
 	}))
 }

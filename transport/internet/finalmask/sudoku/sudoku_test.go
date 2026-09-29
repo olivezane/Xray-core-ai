@@ -2,6 +2,7 @@ package sudoku
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdh"
 	"crypto/rand"
 	cryptotls "crypto/tls"
@@ -22,6 +23,7 @@ import (
 	"github.com/xtls/xray-core/app/dispatcher"
 	"github.com/xtls/xray-core/app/log"
 	"github.com/xtls/xray-core/app/proxyman"
+	"github.com/xtls/xray-core/common/errors"
 	clog "github.com/xtls/xray-core/common/log"
 	xnet "github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
@@ -814,7 +816,7 @@ func bitsInByte(b byte) int {
 
 func analyzePureChunks(tables []*table, chunks [][]byte) (map[int]int, int, error) {
 	if len(tables) == 0 {
-		return nil, 0, fmt.Errorf("no sudoku tables")
+		return nil, 0, errors.New("no sudoku tables")
 	}
 	used := make(map[int]int)
 	decoded := 0
@@ -841,7 +843,7 @@ func analyzePureChunks(tables []*table, chunks [][]byte) (map[int]int, int, erro
 			hintBuf = hintBuf[:0]
 		}
 		if len(hintBuf) != 0 {
-			return nil, 0, fmt.Errorf("leftover pure hints")
+			return nil, 0, errors.New("leftover pure hints")
 		}
 	}
 	return used, decoded, nil
@@ -850,7 +852,7 @@ func analyzePureChunks(tables []*table, chunks [][]byte) (map[int]int, int, erro
 func analyzePackedChunks(tables []*table, chunks [][]byte) (map[int]int, int, error) {
 	layouts := tablesToLayouts(tables)
 	if len(layouts) == 0 {
-		return nil, 0, fmt.Errorf("no sudoku layouts")
+		return nil, 0, errors.New("no sudoku layouts")
 	}
 	used := make(map[int]int)
 	decoded := 0
@@ -924,6 +926,7 @@ func cloneConfig(cfg *Config) *Config {
 	if cfg == nil {
 		return nil
 	}
+	//nolint:forcetypeassert // proto.Clone preserves the dynamic type
 	out := proto.Clone(cfg).(*Config)
 	return out
 }
@@ -945,13 +948,14 @@ func defaultApps(cfg *core.Config) *core.Config {
 func buildE2EBinary(t *testing.T) string {
 	t.Helper()
 	e2eBinaryOnce.Do(func() {
+		//nolint:usetesting // the binary must outlive the first test that triggers the build
 		tempDir, err := os.MkdirTemp("", "xray-sudoku-e2e-*")
 		if err != nil {
 			errE2EBinary = err
 			return
 		}
 		e2eBinaryPath = filepath.Join(tempDir, "xray.test")
-		cmd := exec.Command("go", "build", "-o", e2eBinaryPath, "./main")
+		cmd := exec.CommandContext(context.Background(), "go", "build", "-o", e2eBinaryPath, "./main") //nolint:gosec // constant command; the only variable is the temp output path
 		cmd.Dir = repoRoot(t)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -999,7 +1003,7 @@ func runXray(t *testing.T, bin string, cfg *core.Config) *exec.Cmd {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(bin, "-config=stdin:", "-format=pb")
+	cmd := exec.CommandContext(context.Background(), bin, "-config=stdin:", "-format=pb")
 	cmd.Stdin = bytes.NewReader(cfgBytes)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -1029,7 +1033,7 @@ func stopCmd(cmd *exec.Cmd) {
 
 func startTCPRelay(t *testing.T, listenPort int, target string) *tcpRelay {
 	t.Helper()
-	ln, err := stdnet.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", listenPort))
+	ln, err := (&stdnet.ListenConfig{}).Listen(context.Background(), "tcp", fmt.Sprintf("127.0.0.1:%d", listenPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1049,7 +1053,7 @@ func startTCPRelay(t *testing.T, listenPort int, target string) *tcpRelay {
 				}
 				return
 			}
-			targetConn, err := stdnet.Dial("tcp", target)
+			targetConn, err := (&stdnet.Dialer{}).DialContext(context.Background(), "tcp", target)
 			if err != nil {
 				_ = conn.Close()
 				continue
@@ -1059,7 +1063,7 @@ func startTCPRelay(t *testing.T, listenPort int, target string) *tcpRelay {
 			r.captures = append(r.captures, capture)
 			r.mu.Unlock()
 			r.wg.Add(1)
-			go func(client, server stdnet.Conn, cap *tcpCapture) {
+			go func(client, server stdnet.Conn, capRec *tcpCapture) {
 				defer r.wg.Done()
 				defer client.Close()
 				defer server.Close()
@@ -1067,14 +1071,14 @@ func startTCPRelay(t *testing.T, listenPort int, target string) *tcpRelay {
 				inner.Add(2)
 				go func() {
 					defer inner.Done()
-					_, _ = io.Copy(server, io.TeeReader(client, &captureWriter{capture: cap, dir: "c2s"}))
+					_, _ = io.Copy(server, io.TeeReader(client, &captureWriter{capture: capRec, dir: "c2s"}))
 					if tcp, ok := server.(*stdnet.TCPConn); ok {
 						_ = tcp.CloseWrite()
 					}
 				}()
 				go func() {
 					defer inner.Done()
-					_, _ = io.Copy(client, io.TeeReader(server, &captureWriter{capture: cap, dir: "s2c"}))
+					_, _ = io.Copy(client, io.TeeReader(server, &captureWriter{capture: capRec, dir: "s2c"}))
 					if tcp, ok := client.(*stdnet.TCPConn); ok {
 						_ = tcp.CloseWrite()
 					}
@@ -1123,7 +1127,7 @@ func (w *captureWriter) Write(p []byte) (int, error) {
 
 func startUDPRelay(t *testing.T, listenPort, targetPort int) *udpRelay {
 	t.Helper()
-	conn, err := stdnet.ListenPacket("udp", fmt.Sprintf("127.0.0.1:%d", listenPort))
+	conn, err := (&stdnet.ListenConfig{}).ListenPacket(context.Background(), "udp", fmt.Sprintf("127.0.0.1:%d", listenPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1146,6 +1150,7 @@ func startUDPRelay(t *testing.T, listenPort, targetPort int) *udpRelay {
 				return
 			}
 			payload := append([]byte{}, buf[:n]...)
+			//nolint:forcetypeassert // the socket was created by this test as a UDP socket
 			udpAddr := addr.(*stdnet.UDPAddr)
 			if udpAddr.IP.Equal(r.target.IP) && udpAddr.Port == r.target.Port {
 				r.captureMu.Lock()
@@ -1198,7 +1203,7 @@ type xorEchoServer struct {
 
 func startXOREchoServer(t *testing.T) *xorEchoServer {
 	t.Helper()
-	ln, err := stdnet.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&stdnet.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1236,11 +1241,12 @@ func startXOREchoServer(t *testing.T) *xorEchoServer {
 }
 
 func (s *xorEchoServer) Address() xnet.Address {
+	//nolint:forcetypeassert // the listener was created by this test as a TCP listener
 	return xnet.IPAddress(s.ln.Addr().(*stdnet.TCPAddr).IP)
 }
 
 func (s *xorEchoServer) Port() xnet.Port {
-	return xnet.Port(s.ln.Addr().(*stdnet.TCPAddr).Port)
+	return xnet.Port(s.ln.Addr().(*stdnet.TCPAddr).Port) //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 }
 
 func (s *xorEchoServer) Close() {
@@ -1258,7 +1264,7 @@ func startTLSEchoDecoy(t *testing.T, c *cert.Certificate) *tlsDecoy {
 	config := &cryptotls.Config{
 		Certificates: []cryptotls.Certificate{keyPair},
 	}
-	ln, err := stdnet.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&stdnet.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1287,6 +1293,7 @@ func startTLSEchoDecoy(t *testing.T, c *cert.Certificate) *tlsDecoy {
 }
 
 func (d *tlsDecoy) Port() int {
+	//nolint:forcetypeassert // the listener was created by this test as a TCP listener
 	return d.ln.Addr().(*stdnet.TCPAddr).Port
 }
 
@@ -1344,7 +1351,7 @@ func waitTCPConn(t *testing.T, port int, timeout time.Duration) stdnet.Conn {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for {
-		conn, err := stdnet.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 500*time.Millisecond)
+		conn, err := (&stdnet.Dialer{Timeout: 500 * time.Millisecond}).DialContext(context.Background(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 		if err == nil {
 			return conn
 		}

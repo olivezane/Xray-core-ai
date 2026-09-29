@@ -45,7 +45,7 @@ func TestDatagram(t *testing.T) {
 			DisablePathManager:             true,
 		}
 
-		pktConn := common.Must2(net.ListenPacket("udp", "127.0.0.1:0"))
+		pktConn := common.Must2((&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0"))
 		tr := &quic.Transport{Conn: pktConn}
 		l := common.Must2(tr.Listen(tlsConf, quicConf))
 
@@ -73,7 +73,7 @@ func TestDatagram(t *testing.T) {
 					t.Error(err)
 				}
 				recv <- qErr.MaxDatagramPayloadSize
-				defer conn.CloseWithError(0, "")
+				_ = conn.CloseWithError(0, "")
 			}
 		}()
 
@@ -84,7 +84,7 @@ func TestDatagram(t *testing.T) {
 
 	t.Run("With ChromeParrot", func(t *testing.T) {
 		tlsConf := &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec // the test talks to the throwaway server it started itself
 		}
 
 		quicConf := &quic.Config{
@@ -102,13 +102,13 @@ func TestDatagram(t *testing.T) {
 			DisablePathManager:             true,
 		}
 
-		pktConn := common.Must2(net.ListenPacket("udp", "127.0.0.1:0"))
+		pktConn := common.Must2((&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0"))
 		tr := &quic.Transport{Conn: pktConn, ConnectionIDGenerator: quic.ZeroLengthConnectionIDGenerator{}}
 		conn := common.Must2(tr.DialEarly(context.Background(), addr, tlsConf, quicConf))
 
 		defer pktConn.Close()
 		defer tr.Close()
-		defer conn.CloseWithError(0, "")
+		defer func() { _ = conn.CloseWithError(0, "") }()
 
 		var buf [1500]byte
 		err := conn.SendDatagram(buf[:])
@@ -123,7 +123,7 @@ func TestDatagram(t *testing.T) {
 
 	t.Run("Without ChromeParrot", func(t *testing.T) {
 		tlsConf := &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec // the test talks to the throwaway server it started itself
 			NextProtos:         []string{"h3"},
 		}
 
@@ -142,13 +142,13 @@ func TestDatagram(t *testing.T) {
 			DisablePathManager:             true,
 		}
 
-		pktConn := common.Must2(net.ListenPacket("udp", "127.0.0.1:0"))
+		pktConn := common.Must2((&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0"))
 		tr := &quic.Transport{Conn: pktConn}
 		conn := common.Must2(tr.DialEarly(context.Background(), addr, tlsConf, quicConf))
 
 		defer pktConn.Close()
 		defer tr.Close()
-		defer conn.CloseWithError(0, "")
+		defer func() { _ = conn.CloseWithError(0, "") }()
 
 		var buf [1500]byte
 		err := conn.SendDatagram(buf[:])

@@ -43,7 +43,7 @@ func TestClientDatagramCheck(t *testing.T) {
 	}
 	ln, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	require.NoError(t, err)
-	go func() { s.Serve(ln) }()
+	go func() { _ = s.Serve(ln) }()
 	defer s.Close()
 
 	h3conn := dialHTTP3(t, ln.LocalAddr().String())
@@ -76,14 +76,16 @@ func TestNewClientConnSharesHTTP3Connection(t *testing.T) {
 	})
 	mux.HandleFunc("GET /hello", func(http.ResponseWriter, *http.Request) {})
 	s := http3.Server{Handler: mux, TLSConfig: tlsConf, EnableDatagrams: true}
-	go func() { s.Serve(ln) }()
+	go func() { _ = s.Serve(ln) }()
 	defer s.Close()
 
 	h3conn := dialHTTP3(t, ln.LocalAddr().String())
 	httpClient := &http.Client{Transport: h3conn, Timeout: time.Second}
 	checkHTTP := func() {
 		t.Helper()
-		rsp, err := httpClient.Get(url + "/hello")
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url+"/hello", nil)
+		require.NoError(t, err)
+		rsp, err := httpClient.Do(req)
 		require.NoError(t, err)
 		rsp.Body.Close()
 		require.Equal(t, http.StatusOK, rsp.StatusCode)

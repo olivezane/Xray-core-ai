@@ -18,6 +18,7 @@ import (
 	"github.com/xtls/xray-core/app/stats"
 	statscmd "github.com/xtls/xray-core/app/stats/command"
 	"github.com/xtls/xray-core/common"
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
@@ -448,7 +449,7 @@ func TestCommanderAddRemoveUser(t *testing.T) {
 	common.Must(err)
 	defer CloseAllServers(servers)
 
-	if err := testTCPConn(clientPort, 1024, time.Second*5)(); err != io.EOF &&
+	if err := testTCPConn(clientPort, 1024, time.Second*5)(); !errors.Is(err, io.EOF) &&
 		/*We might wish to drain the connection*/
 		(err != nil && !strings.HasSuffix(err.Error(), "i/o timeout")) {
 		t.Fatal("expected error: ", err)

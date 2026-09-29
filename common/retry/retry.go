@@ -1,4 +1,4 @@
-package retry // import "github.com/xtls/xray-core/common/retry"
+package retry
 
 import (
 	"time"

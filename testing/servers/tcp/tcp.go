@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/xtls/xray-core/common/buf"
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/task"
 	"github.com/xtls/xray-core/transport/internet"
@@ -38,12 +39,14 @@ func (server *Server) StartContext(ctx context.Context, sockopt *internet.Socket
 		return net.Destination{}, err
 	}
 
+	//nolint:forcetypeassert // the socket was created by this package as a TCP socket
 	localAddr := listener.Addr().(*net.TCPAddr)
-	server.Port = net.Port(localAddr.Port)
+	server.Port = net.Port(localAddr.Port) //nolint:gosec // Port of a net.Addr is always 0..65535
 	server.listener = listener
+	//nolint:forcetypeassert // the listener was created as a TCP listener
 	go server.acceptConnections(listener.(*net.TCPListener))
 
-	return net.TCPDestination(net.IPAddress(localAddr.IP), net.Port(localAddr.Port)), nil
+	return net.TCPDestination(net.IPAddress(localAddr.IP), net.Port(localAddr.Port)), nil //nolint:gosec // Port of a net.Addr is always 0..65535
 }
 
 func (server *Server) acceptConnections(listener *net.TCPListener) {
@@ -60,7 +63,7 @@ func (server *Server) acceptConnections(listener *net.TCPListener) {
 
 func (server *Server) handleConnection(conn net.Conn) {
 	if len(server.SendFirst) > 0 {
-		conn.Write(server.SendFirst)
+		_, _ = conn.Write(server.SendFirst)
 	}
 
 	pReader, pWriter := pipe.New(pipe.WithoutSizeLimit())
@@ -70,7 +73,7 @@ func (server *Server) handleConnection(conn net.Conn) {
 		for {
 			b := buf.New()
 			if _, err := b.ReadFrom(conn); err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					return nil
 				}
 				return err
@@ -87,7 +90,7 @@ func (server *Server) handleConnection(conn net.Conn) {
 		for {
 			mb, err := pReader.ReadMultiBuffer()
 			if err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					return nil
 				}
 				return err

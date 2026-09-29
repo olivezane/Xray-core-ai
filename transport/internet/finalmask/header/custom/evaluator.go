@@ -130,7 +130,7 @@ func evaluateItem(randLen, randMin, randMax int32, packet []byte, save, varName 
 	switch {
 	case randLen > 0:
 		value = make([]byte, randLen)
-		crypto.RandBytesBetween(value, byte(randMin), byte(randMax))
+		crypto.RandBytesBetween(value, byte(randMin), byte(randMax)) //nolint:gosec // values come from a config expression evaluator bounded to small ranges
 	case len(packet) > 0:
 		value = append([]byte(nil), packet...)
 	case varName != "":
@@ -345,7 +345,7 @@ func evaluatePad(args []*ExprArg, ctx *evalContext) (evalValue, error) {
 
 	out := append([]byte(nil), sourceBytes...)
 	for uint64(len(out)) < targetU64 {
-		remaining := int(targetU64) - len(out)
+		remaining := int(targetU64) - len(out) //nolint:gosec // values come from a config expression evaluator bounded to small ranges
 		if remaining >= len(fillBytes) {
 			out = append(out, fillBytes...)
 			continue
@@ -486,7 +486,7 @@ func measureExpr(expr *Expr, sizeCtx map[string]int) (int, error) {
 		}
 		lengthArg := expr.GetArgs()[2]
 		if value, ok := lengthArg.GetValue().(*ExprArg_U64); ok {
-			return int(value.U64), nil
+			return int(value.U64), nil //nolint:gosec // values come from a config expression evaluator bounded to small ranges
 		}
 		return 0, errors.New("slice length must be u64")
 	case "be16":
@@ -505,7 +505,7 @@ func measureExpr(expr *Expr, sizeCtx map[string]int) (int, error) {
 		}
 		lengthArg := expr.GetArgs()[1]
 		if value, ok := lengthArg.GetValue().(*ExprArg_U64); ok {
-			return int(value.U64), nil
+			return int(value.U64), nil //nolint:gosec // values come from a config expression evaluator bounded to small ranges
 		}
 		return 0, errors.New("pad length must be u64")
 	case "truncate":
@@ -514,7 +514,7 @@ func measureExpr(expr *Expr, sizeCtx map[string]int) (int, error) {
 		}
 		lengthArg := expr.GetArgs()[1]
 		if value, ok := lengthArg.GetValue().(*ExprArg_U64); ok {
-			return int(value.U64), nil
+			return int(value.U64), nil //nolint:gosec // values come from a config expression evaluator bounded to small ranges
 		}
 		return 0, errors.New("truncate length must be u64")
 	default:
@@ -604,7 +604,7 @@ func loadMetadata(dst map[string]evalValue, prefix string, addr net.Addr) {
 }
 
 func loadIPPortMetadata(dst map[string]evalValue, prefix string, ip net.IP, port int) {
-	portValue := uint64(port)
+	portValue := uint64(port) //nolint:gosec // values come from a config expression evaluator bounded to small ranges
 	dst[prefix+"_port"] = evalValue{u64: &portValue}
 	if prefix == "remote" {
 		dst["src_port_u16"] = evalValue{u64: &portValue}

@@ -15,8 +15,8 @@ import (
 func GetRandomizer() *rand.Rand {
 	// Seed the PRNG with the hash of CPU info, increasing the overall probable space.
 	fnvHash := fnv.New64()
-	fnvHash.Write([]byte(strconv.Itoa(cpuid.CPU.Family) + strconv.Itoa(cpuid.CPU.Model) + strconv.Itoa(cpuid.CPU.PhysicalCores) + strconv.Itoa(cpuid.CPU.LogicalCores) + strconv.Itoa(cpuid.CPU.CacheLine) + strconv.Itoa(cpuid.CPU.ThreadsPerCore)))
-	return rand.New(rand.NewSource(int64(fnvHash.Sum64())))
+	_, _ = fnvHash.Write([]byte(strconv.Itoa(cpuid.CPU.Family) + strconv.Itoa(cpuid.CPU.Model) + strconv.Itoa(cpuid.CPU.PhysicalCores) + strconv.Itoa(cpuid.CPU.LogicalCores) + strconv.Itoa(cpuid.CPU.CacheLine) + strconv.Itoa(cpuid.CPU.ThreadsPerCore)))
+	return rand.New(rand.NewSource(int64(fnvHash.Sum64()))) //nolint:gosec // the seed only needs to vary, not to be exact
 }
 
 var globalRng *rand.Rand = GetRandomizer()
@@ -43,7 +43,7 @@ func CurlVersion() string {
 	var timeCurrent int64 = time.Now().Unix() / 86400
 	var timeStart int64 = time.Date(2023, 3, 20, 0, 0, 0, 0, time.UTC).Unix() / 86400
 	var timeDiff int = int((timeCurrent - timeStart - 60)) - int(math.Floor(math.Pow(globalRng.Float64(), 2)*165))
-	var minorValue int = int(timeDiff / 57) // The release cadence is actually 56.67 days.
+	var minorValue int = timeDiff / 57 // The release cadence is actually 56.67 days.
 	return "8." + strconv.Itoa(minorValue) + ".0"
 }
 

@@ -49,6 +49,7 @@ func getHTTPClient(ctx context.Context, dest net.Destination, streamSettings *in
 	realityConfig := reality.ConfigFromStreamSettings(streamSettings)
 
 	if browser_dialer.HasBrowserDialer() && realityConfig == nil {
+		//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 		return &BrowserDialerClient{transportConfig: streamSettings.ProtocolSettings.(*Config)}, nil
 	}
 
@@ -64,6 +65,7 @@ func getHTTPClient(ctx context.Context, dest net.Destination, streamSettings *in
 	xmuxManager, found := globalDialerMap[key]
 
 	if !found {
+		//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 		transportConfig := streamSettings.ProtocolSettings.(*Config)
 		xmuxConfig := new(XmuxConfig)
 		if transportConfig.Xmux != nil {
@@ -77,6 +79,7 @@ func getHTTPClient(ctx context.Context, dest net.Destination, streamSettings *in
 	}
 
 	xmuxClient := xmuxManager.GetXmuxClient(ctx)
+	//nolint:forcetypeassert // xmux only stores DialerClient values
 	return xmuxClient.XmuxConn.(DialerClient), xmuxClient
 }
 
@@ -114,6 +117,7 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 		gotlsConfig = tlsConfig.GetTLSConfig(tls.WithDestination(dest))
 	}
 
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	transportConfig := streamSettings.ProtocolSettings.(*Config)
 
 	dialContext := func(ctxInner context.Context) (net.Conn, error) {
@@ -135,6 +139,7 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 		if gotlsConfig != nil {
 			if fingerprint := tls.GetFingerprint(tlsConfig.Fingerprint); fingerprint != nil {
 				conn = tls.UClient(conn, gotlsConfig, fingerprint)
+				//nolint:forcetypeassert // utls.UClient always returns *utls.UConn
 				if err := conn.(*tls.UConn).HandshakeContext(ctxInner); err != nil {
 					return nil, err
 				}
@@ -147,7 +152,9 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 	}
 
 	var keepAlivePeriod time.Duration
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	if streamSettings.ProtocolSettings.(*Config).Xmux != nil {
+		//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 		keepAlivePeriod = time.Duration(streamSettings.ProtocolSettings.(*Config).Xmux.HKeepAlivePeriod) * time.Second //nolint:durationcheck // HKeepAlivePeriod is a scalar count of seconds
 	}
 
@@ -200,6 +207,7 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 					if err != nil {
 						return nil, errors.New("failed to dial to dest").Base(err)
 					}
+					//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
 					pktConn = conn.(*finalmask.PacketConnWrapper).PacketConn
 					udpAddr = conn.RemoteAddr()
 				} else {
@@ -230,7 +238,7 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 				if err != nil {
 					return nil, err
 				}
-				context.AfterFunc(conn.Context(), func() { tr.Close(); pktConn.Close() })
+				context.AfterFunc(conn.Context(), func() { _ = tr.Close(); _ = pktConn.Close() })
 
 				switch quicParams.Congestion {
 				case "reno":
@@ -300,6 +308,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		dest.Network = net.Network_UDP
 	}
 
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	transportConfiguration := streamSettings.ProtocolSettings.(*Config)
 	var requestURL url.URL
 
@@ -373,6 +382,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		} else {
 			requestURL2.Scheme = "http"
 		}
+		//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 		config2 := memory2.ProtocolSettings.(*Config)
 		requestURL2.Host = config2.Host
 		if requestURL2.Host == "" && tlsConfig2 != nil {

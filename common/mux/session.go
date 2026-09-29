@@ -56,7 +56,7 @@ func (m *SessionManager) Allocate(Strategy *ClientStrategy) *Session {
 	defer m.Unlock()
 
 	MaxConcurrency := int(Strategy.MaxConcurrency)
-	MaxConnection := uint16(Strategy.MaxConnection)
+	MaxConnection := uint16(Strategy.MaxConnection) //nolint:gosec // mux frames and session counts are bounded well below the field width
 
 	if m.closed || (MaxConcurrency > 0 && len(m.sessions) >= MaxConcurrency) || (MaxConnection > 0 && m.count >= MaxConnection) {
 		return nil
@@ -145,7 +145,7 @@ func (m *SessionManager) Close() error {
 	m.closed = true
 
 	for _, s := range m.sessions {
-		s.Close(true)
+		_ = s.Close(true)
 	}
 
 	m.sessions = nil
@@ -184,10 +184,13 @@ func (s *Session) Close(locked bool) error {
 	} else {
 		// Stop existing handle(), then trigger writer.Close().
 		// Note that s.output may be dispatcher.SizeStatWriter.
+		//nolint:forcetypeassert // the mux session installs the pipe reader itself
 		s.input.(*pipe.Reader).ReturnAnError(io.EOF)
 		runtime.Gosched()
 		// If the error set by ReturnAnError still exists, clear it.
-		s.input.(*pipe.Reader).Recover()
+		if err := s.input.(*pipe.Reader).Recover(); err != nil { //nolint:forcetypeassert // s.input is the *pipe.Reader this session was constructed with
+			return err
+		}
 		XUDPManager.Lock()
 		if s.XUDP.Status == Active {
 			s.XUDP.Expire = time.Now().Add(time.Minute)

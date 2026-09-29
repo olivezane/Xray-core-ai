@@ -56,6 +56,6 @@ func (r *lazyReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 		buffer.Release()
 		return nil, err
 	}
-	buffer.Resize(0, int32(n))
+	buffer.Resize(0, int32(n)) //nolint:gosec // read length is bounded by the buffer size
 	return buf.MultiBuffer{buffer}, err
 }

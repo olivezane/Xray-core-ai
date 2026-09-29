@@ -35,21 +35,10 @@ func xor(b []byte) []byte {
 	return r
 }
 
-func readFrom(conn net.Conn, timeout time.Duration, length int) []byte {
-	b := make([]byte, length)
-	deadline := time.Now().Add(timeout)
-	conn.SetReadDeadline(deadline)
-	n, err := io.ReadFull(conn, b[:length])
-	if err != nil {
-		fmt.Println("Unexpected error from readFrom:", err)
-	}
-	return b[:n]
-}
-
 func readFrom2(conn net.Conn, timeout time.Duration, length int) ([]byte, error) {
 	b := make([]byte, length)
 	deadline := time.Now().Add(timeout)
-	conn.SetReadDeadline(deadline)
+	_ = conn.SetReadDeadline(deadline)
 	n, err := io.ReadFull(conn, b[:length])
 	if err != nil {
 		return nil, err
@@ -109,7 +98,7 @@ func genTestBinaryPath() {
 				return err
 			}
 			tempDir = dir
-			testBinaryCleanFn = func() { os.RemoveAll(dir) }
+			testBinaryCleanFn = func() { _ = os.RemoveAll(dir) }
 			return nil
 		}))
 		file := filepath.Join(tempDir, "xray.test")
@@ -132,13 +121,13 @@ func CloseAllServers(servers []*exec.Cmd) {
 	})
 	for _, server := range servers {
 		if runtime.GOOS == "windows" {
-			server.Process.Kill()
+			_ = server.Process.Kill()
 		} else {
-			server.Process.Signal(syscall.SIGTERM)
+			_ = server.Process.Signal(syscall.SIGTERM)
 		}
 	}
 	for _, server := range servers {
-		server.Process.Wait()
+		_, _ = server.Process.Wait()
 	}
 	log.Record(&log.GeneralMessage{
 		Severity: log.Severity_Info,
@@ -152,11 +141,11 @@ func CloseServer(server *exec.Cmd) {
 		Content:  "Closing server.",
 	})
 	if runtime.GOOS == "windows" {
-		server.Process.Kill()
+		_ = server.Process.Kill()
 	} else {
-		server.Process.Signal(syscall.SIGTERM)
+		_ = server.Process.Signal(syscall.SIGTERM)
 	}
-	server.Process.Wait()
+	_, _ = server.Process.Wait()
 	log.Record(&log.GeneralMessage{
 		Severity: log.Severity_Info,
 		Content:  "Server closed.",
@@ -164,9 +153,11 @@ func CloseServer(server *exec.Cmd) {
 }
 
 func withDefaultApps(config *core.Config) *core.Config {
-	config.App = append(config.App, serial.ToTypedMessage(&dispatcher.Config{}))
-	config.App = append(config.App, serial.ToTypedMessage(&proxyman.InboundConfig{}))
-	config.App = append(config.App, serial.ToTypedMessage(&proxyman.OutboundConfig{}))
+	config.App = append(config.App,
+		serial.ToTypedMessage(&dispatcher.Config{}),
+		serial.ToTypedMessage(&proxyman.InboundConfig{}),
+		serial.ToTypedMessage(&proxyman.OutboundConfig{}),
+	)
 	return config
 }
 

@@ -66,13 +66,13 @@ func TestMultiBufferSliceBySizeLarge(t *testing.T) {
 
 func TestMultiBufferSplitFirst(t *testing.T) {
 	b1 := New()
-	b1.WriteString("b1")
+	_, _ = b1.WriteString("b1")
 
 	b2 := New()
-	b2.WriteString("b2")
+	_, _ = b2.WriteString("b2")
 
 	b3 := New()
-	b3.WriteString("b3")
+	_, _ = b3.WriteString("b3")
 
 	var mb MultiBuffer
 	mb = append(mb, b1, b2, b3)
@@ -181,7 +181,7 @@ func TestCompactWithConsumed(t *testing.T) {
 	for range 8192 {
 		common.Must2(a.WriteString("a"))
 	}
-	a.Read(make([]byte, 2))
+	_, _ = a.Read(make([]byte, 2))
 
 	b := New()
 	for range 2 {
@@ -191,7 +191,7 @@ func TestCompactWithConsumed(t *testing.T) {
 	mb := MultiBuffer{a, b}
 	cmb := Compact(mb)
 	mbc := &MultiBufferContainer{mb}
-	mbc.Read(make([]byte, 8190))
+	_, _ = mbc.Read(make([]byte, 8190))
 
 	if w := cmb.String(); w != "bb" {
 		t.Error("unexpected Compact result ", w)

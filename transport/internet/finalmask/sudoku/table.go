@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/xtls/xray-core/common"
+	"github.com/xtls/xray-core/common/errors"
 )
 
 type table struct {
@@ -28,7 +29,6 @@ type tableCacheKey struct {
 }
 
 var (
-	tableCache    sync.Map
 	tableSetCache sync.Map
 
 	basePatternsOnce sync.Once
@@ -54,20 +54,9 @@ func (l *byteLayout) isHint(b byte) bool {
 	return l.hintMask == 0x40 && b == '\n'
 }
 
-func getTable(config *Config) (*table, error) {
-	tables, err := getTables(config)
-	if err != nil {
-		return nil, err
-	}
-	if len(tables) == 0 {
-		return nil, fmt.Errorf("empty sudoku table set")
-	}
-	return tables[0], nil
-}
-
 func getTables(config *Config) ([]*table, error) {
 	if config == nil {
-		return nil, fmt.Errorf("nil sudoku config")
+		return nil, errors.New("nil sudoku config")
 	}
 
 	mode, err := normalizeASCII(config.GetAscii())
@@ -86,6 +75,7 @@ func getTables(config *Config) ([]*table, error) {
 		customTable: strings.Join(patterns, "\x00"),
 	}
 	if cached, ok := tableSetCache.Load(cacheKey); ok {
+		//nolint:forcetypeassert // the table cache only ever stores []*table
 		return cached.([]*table), nil
 	}
 
@@ -103,6 +93,7 @@ func getTables(config *Config) ([]*table, error) {
 	}
 
 	actual, _ := tableSetCache.LoadOrStore(cacheKey, tables)
+	//nolint:forcetypeassert // the table cache only ever stores []*table
 	return actual.([]*table), nil
 }
 
@@ -196,7 +187,7 @@ func normalizeCustomTable(pattern string) (string, error) {
 		}
 	}
 	if xCount != 2 || pCount != 2 || vCount != 4 {
-		return "", fmt.Errorf("customTable must contain exactly 2 x, 2 p and 4 v")
+		return "", errors.New("customTable must contain exactly 2 x, 2 p and 4 v")
 	}
 	return cleaned, nil
 }
@@ -219,7 +210,7 @@ func asciiLayout() *byteLayout {
 	}
 
 	encodeGroup := func(group byte) byte {
-		b := byte(0x40 | (group & 0x3f))
+		b := 0x40 | (group & 0x3f)
 		if b == 0x7f {
 			return '\n'
 		}
@@ -280,7 +271,7 @@ func customLayout(pattern string) (*byteLayout, error) {
 
 	var xBits, pBits, vBits []uint8
 	for i, c := range pattern {
-		bit := uint8(7 - i)
+		bit := uint8(7 - i) //nolint:gosec // explicit bit extraction from a 6-bit field
 		switch c {
 		case 'x':
 			xBits = append(xBits, bit)
@@ -338,7 +329,7 @@ func customLayout(pattern string) (*byteLayout, error) {
 	}
 	slices.Sort(padding)
 	if len(padding) == 0 {
-		return nil, fmt.Errorf("customTable produced empty padding pool")
+		return nil, errors.New("customTable produced empty padding pool")
 	}
 
 	decodeGroup := func(b byte) (byte, bool) {
@@ -391,7 +382,7 @@ func buildTable(password string, layout *byteLayout) (*table, error) {
 	}
 
 	hash := sha256.Sum256([]byte(password))
-	seed := int64(binary.BigEndian.Uint64(hash[:8]))
+	seed := int64(binary.BigEndian.Uint64(hash[:8])) //nolint:gosec // explicit bit extraction from a 6-bit field
 	rng := rand.New(rand.NewSource(seed))
 	rng.Shuffle(len(order), func(i, j int) {
 		order[i], order[j] = order[j], order[i]

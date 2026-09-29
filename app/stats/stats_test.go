@@ -18,9 +18,11 @@ func TestStatsChannelRunnable(t *testing.T) {
 	raw, err := common.CreateObject(context.Background(), &Config{})
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 	m := raw.(stats.Manager)
 
 	ch1, err := m.RegisterChannel("test.channel.1")
+	//nolint:forcetypeassert // the stats channel registry only ever stores *Channel
 	c1 := ch1.(*Channel)
 	common.Must(err)
 
@@ -35,6 +37,7 @@ func TestStatsChannelRunnable(t *testing.T) {
 	}
 
 	ch2, err := m.RegisterChannel("test.channel.2")
+	//nolint:forcetypeassert // the stats channel registry only ever stores *Channel
 	c2 := ch2.(*Channel)
 	common.Must(err)
 
@@ -70,6 +73,7 @@ func TestStatsChannelRunnable(t *testing.T) {
 	}
 
 	ch3, err := m.RegisterChannel("test.channel.3")
+	//nolint:forcetypeassert // the stats channel registry only ever stores *Channel
 	c3 := ch3.(*Channel)
 	common.Must(err)
 

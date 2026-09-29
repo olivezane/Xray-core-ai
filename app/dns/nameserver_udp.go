@@ -140,7 +140,7 @@ func (s *ClassicNameServer) HandleResponse(ctx context.Context, packet *udp_prot
 }
 
 func (s *ClassicNameServer) newReqID() uint16 {
-	return uint16(s.reqID.Add(1))
+	return uint16(s.reqID.Add(1)) //nolint:gosec // DNS request IDs wrap around by design, a uint16 counter is required
 }
 
 func (s *ClassicNameServer) addPendingRequest(req *udpDnsRequest) {

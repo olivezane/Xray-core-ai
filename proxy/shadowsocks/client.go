@@ -37,9 +37,13 @@ func NewClient(ctx context.Context, config *ClientConfig) (*Client, error) {
 	}
 
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
 	client := &Client{
 		server:        server,
-		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager: pm,
 	}
 	return client, nil
 }
@@ -123,7 +127,7 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 				return errors.New("failed to write request").Base(err)
 			}
 
-			if err = buf.CopyOnceTimeout(link.Reader, bodyWriter, time.Millisecond*100); err != nil && err != buf.ErrNotTimeoutReader && err != buf.ErrReadTimeout {
+			if err = buf.CopyOnceTimeout(link.Reader, bodyWriter, time.Millisecond*100); err != nil && !errors.Is(err, buf.ErrNotTimeoutReader) && !errors.Is(err, buf.ErrReadTimeout) {
 				return errors.New("failed to write A request payload").Base(err)
 			}
 
@@ -195,7 +199,7 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewClient(ctx, config.(*ClientConfig))
+	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config *ClientConfig) (any, error) {
+		return NewClient(ctx, config)
 	}))
 }

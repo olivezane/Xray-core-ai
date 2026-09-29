@@ -79,7 +79,7 @@ func ParseProxyRequest(r *http.Request) (*ProxyRequest, error) {
 	if !ok {
 		return nil, &ProxyRequestParseError{
 			HTTPStatus: http.StatusBadRequest,
-			Err:        fmt.Errorf("missing Capsule-Protocol header"),
+			Err:        errors.New("missing Capsule-Protocol header"),
 		}
 	}
 	if !isCapsuleProtocolEnabled(capsuleHeaderValues) {

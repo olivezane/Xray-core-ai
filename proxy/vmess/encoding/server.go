@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"hash/fnv"
 	"io"
+	"math"
 	"sync"
 	"time"
 
@@ -127,7 +128,7 @@ func parseSecurityType(b byte) protocol.SecurityType {
 func (s *ServerSession) DecodeRequestHeader(reader io.Reader, isDrain bool) (*protocol.RequestHeader, error) {
 	buffer := buf.New()
 
-	drainer, err := drain.NewBehaviorSeedLimitedDrainer(int64(s.userValidator.GetBehaviorSeed()), 16+38, 3266, 64)
+	drainer, err := drain.NewBehaviorSeedLimitedDrainer(int64(s.userValidator.GetBehaviorSeed()), 16+38, 3266, 64) //nolint:gosec // the seed only perturbs the drainer, a wrap-around is harmless
 	if err != nil {
 		return nil, errors.New("failed to initialize drainer").Base(err)
 	}
@@ -159,6 +160,7 @@ func (s *ServerSession) DecodeRequestHeader(reader io.Reader, isDrain bool) (*pr
 
 	switch {
 	case foundAEAD:
+		//nolint:forcetypeassert // the account is created by proxy/vmess's own NewAccount
 		vmessAccount = user.Account.(*vmess.MemoryAccount)
 		var fixedSizeCmdKey [16]byte
 		copy(fixedSizeCmdKey[:], vmessAccount.ID.CmdKey())
@@ -204,6 +206,7 @@ func (s *ServerSession) DecodeRequestHeader(reader io.Reader, isDrain bool) (*pr
 	// 1 bytes reserved
 	request.Command = protocol.RequestCommand(buffer.Byte(37))
 
+	//nolint:exhaustive // Rvs is not a valid request command; the address stays empty and is rejected later
 	switch request.Command {
 	case protocol.RequestCommandMux:
 		request.Address = net.DomainAddress("v1.mux.cool")
@@ -266,7 +269,7 @@ func (s *ServerSession) DecodeRequestBody(request *protocol.RequestHeader, reade
 		aead := crypto.NewAesGcm(s.requestBodyKey[:])
 		auth := &crypto.AEADAuthenticator{
 			AEAD:                    aead,
-			NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], uint32(aead.NonceSize())),
+			NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], aead.NonceSize()),
 			AdditionalDataGenerator: crypto.GenerateEmptyBytes(),
 		}
 		if request.Option.Has(protocol.RequestOptionAuthenticatedLength) {
@@ -275,7 +278,7 @@ func (s *ServerSession) DecodeRequestBody(request *protocol.RequestHeader, reade
 
 			lengthAuth := &crypto.AEADAuthenticator{
 				AEAD:                    AuthenticatedLengthKeyAEAD,
-				NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], uint32(aead.NonceSize())),
+				NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], aead.NonceSize()),
 				AdditionalDataGenerator: crypto.GenerateEmptyBytes(),
 			}
 			sizeParser = NewAEADSizeParser(lengthAuth)
@@ -287,7 +290,7 @@ func (s *ServerSession) DecodeRequestBody(request *protocol.RequestHeader, reade
 
 		auth := &crypto.AEADAuthenticator{
 			AEAD:                    aead,
-			NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], uint32(aead.NonceSize())),
+			NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], aead.NonceSize()),
 			AdditionalDataGenerator: crypto.GenerateEmptyBytes(),
 		}
 		if request.Option.Has(protocol.RequestOptionAuthenticatedLength) {
@@ -297,7 +300,7 @@ func (s *ServerSession) DecodeRequestBody(request *protocol.RequestHeader, reade
 
 			lengthAuth := &crypto.AEADAuthenticator{
 				AEAD:                    AuthenticatedLengthKeyAEAD,
-				NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], uint32(aead.NonceSize())),
+				NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], aead.NonceSize()),
 				AdditionalDataGenerator: crypto.GenerateEmptyBytes(),
 			}
 			sizeParser = NewAEADSizeParser(lengthAuth)
@@ -337,7 +340,10 @@ func (s *ServerSession) EncodeResponseHeader(header *protocol.ResponseHeader, wr
 
 	aeadResponseHeaderLengthEncryptionBuffer := bytes.NewBuffer(nil)
 
-	decryptedResponseHeaderLengthBinaryDeserializeBuffer := uint16(aeadEncryptedHeaderBuffer.Len())
+	if aeadEncryptedHeaderBuffer.Len() > math.MaxUint16 {
+		panic("VMess response header is too large")
+	}
+	decryptedResponseHeaderLengthBinaryDeserializeBuffer := uint16(aeadEncryptedHeaderBuffer.Len()) //nolint:gosec // bounded by the check above
 
 	common.Must(binary.Write(aeadResponseHeaderLengthEncryptionBuffer, binary.BigEndian, decryptedResponseHeaderLengthBinaryDeserializeBuffer))
 
@@ -373,7 +379,7 @@ func (s *ServerSession) EncodeResponseBody(request *protocol.RequestHeader, writ
 		aead := crypto.NewAesGcm(s.responseBodyKey[:])
 		auth := &crypto.AEADAuthenticator{
 			AEAD:                    aead,
-			NonceGenerator:          GenerateChunkNonce(s.responseBodyIV[:], uint32(aead.NonceSize())),
+			NonceGenerator:          GenerateChunkNonce(s.responseBodyIV[:], aead.NonceSize()),
 			AdditionalDataGenerator: crypto.GenerateEmptyBytes(),
 		}
 		if request.Option.Has(protocol.RequestOptionAuthenticatedLength) {
@@ -382,7 +388,7 @@ func (s *ServerSession) EncodeResponseBody(request *protocol.RequestHeader, writ
 
 			lengthAuth := &crypto.AEADAuthenticator{
 				AEAD:                    AuthenticatedLengthKeyAEAD,
-				NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], uint32(aead.NonceSize())),
+				NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], aead.NonceSize()),
 				AdditionalDataGenerator: crypto.GenerateEmptyBytes(),
 			}
 			sizeParser = NewAEADSizeParser(lengthAuth)
@@ -394,7 +400,7 @@ func (s *ServerSession) EncodeResponseBody(request *protocol.RequestHeader, writ
 
 		auth := &crypto.AEADAuthenticator{
 			AEAD:                    aead,
-			NonceGenerator:          GenerateChunkNonce(s.responseBodyIV[:], uint32(aead.NonceSize())),
+			NonceGenerator:          GenerateChunkNonce(s.responseBodyIV[:], aead.NonceSize()),
 			AdditionalDataGenerator: crypto.GenerateEmptyBytes(),
 		}
 		if request.Option.Has(protocol.RequestOptionAuthenticatedLength) {
@@ -404,7 +410,7 @@ func (s *ServerSession) EncodeResponseBody(request *protocol.RequestHeader, writ
 
 			lengthAuth := &crypto.AEADAuthenticator{
 				AEAD:                    AuthenticatedLengthKeyAEAD,
-				NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], uint32(aead.NonceSize())),
+				NonceGenerator:          GenerateChunkNonce(s.requestBodyIV[:], aead.NonceSize()),
 				AdditionalDataGenerator: crypto.GenerateEmptyBytes(),
 			}
 			sizeParser = NewAEADSizeParser(lengthAuth)

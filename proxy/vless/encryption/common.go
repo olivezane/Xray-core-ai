@@ -48,8 +48,9 @@ func (c *CommonConn) Write(b []byte) (int, error) {
 	if len(b) == 0 {
 		return 0, nil
 	}
+	//nolint:forcetypeassert // the pool only ever stores []byte
 	outBytes := OutBytesPool.Get().([]byte)
-	defer OutBytesPool.Put(outBytes)
+	defer OutBytesPool.Put(outBytes) //nolint:staticcheck // SA6002: the pool is typed []byte by its exported API; switching to *[]byte is a benchmark-first change
 	for n := 0; n < len(b); {
 		b := b[n:]
 		if len(b) > 8192 {
@@ -58,12 +59,12 @@ func (c *CommonConn) Write(b []byte) (int, error) {
 		n += len(b)
 		headerAndData := outBytes[:5+len(b)+16]
 		EncodeHeader(headerAndData, len(b)+16)
-		max := false
+		isMax := false
 		if bytes.Equal(c.AEAD.Nonce[:], MaxNonce) {
-			max = true
+			isMax = true
 		}
 		c.AEAD.Seal(headerAndData[:5], nil, b, headerAndData[:5])
-		if max {
+		if isMax {
 			c.AEAD = NewAEAD(headerAndData, c.UnitedKey, c.UseAES)
 		}
 		if c.PreWrite != nil {
@@ -194,7 +195,7 @@ func IncreaseNonce(nonce []byte) []byte {
 var MaxNonce = bytes.Repeat([]byte{255}, 12)
 
 func EncodeLength(l int) []byte {
-	return []byte{byte(l >> 8), byte(l)}
+	return []byte{byte(l >> 8), byte(l)} //nolint:gosec // explicit byte extraction from a shift
 }
 
 func DecodeLength(b []byte) int {
@@ -205,8 +206,8 @@ func EncodeHeader(h []byte, l int) {
 	h[0] = 23
 	h[1] = 3
 	h[2] = 3
-	h[3] = byte(l >> 8)
-	h[4] = byte(l)
+	h[3] = byte(l >> 8) //nolint:gosec // explicit byte extraction from a shift
+	h[4] = byte(l)      //nolint:gosec // explicit byte extraction for the length prefix
 }
 
 func DecodeHeader(h []byte) (l int, err error) {

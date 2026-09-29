@@ -475,12 +475,12 @@ func ReshapeMultiBuffer(ctx context.Context, buffer buf.MultiBuffer) buf.MultiBu
 	var toPrint strings.Builder
 	for i, buffer1 := range buffer {
 		if buffer1.Len() >= buf.Size-21 {
-			index := int32(bytes.LastIndex(buffer1.Bytes(), TlsApplicationDataStart))
+			index := int32(bytes.LastIndex(buffer1.Bytes(), TlsApplicationDataStart)) //nolint:gosec // padding and content lengths are bounded by the first packet size
 			if index < 21 || index > buf.Size-21 {
 				index = buf.Size / 2
 			}
 			buffer2 := buf.New()
-			buffer2.Write(buffer1.BytesFrom(index))
+			_, _ = buffer2.Write(buffer1.BytesFrom(index))
 			buffer1.Resize(0, index)
 			mb2 = append(mb2, buffer1, buffer2)
 			toPrint.WriteString(" " + strconv.Itoa(int(buffer1.Len())) + " " + strconv.Itoa(int(buffer2.Len())))
@@ -501,30 +501,30 @@ func XtlsPadding(b *buf.Buffer, command byte, userUUID *[]byte, longPadding bool
 	if b != nil {
 		contentLen = b.Len()
 	}
-	if contentLen < int32(testseed[0]) && longPadding {
+	if contentLen < int32(testseed[0]) && longPadding { //nolint:gosec // padding and content lengths are bounded by the first packet size
 		l, err := rand.Int(rand.Reader, big.NewInt(int64(testseed[1])))
 		if err != nil {
 			errors.LogDebugInner(ctx, err, "failed to generate padding")
 		}
-		paddingLen = int32(l.Int64()) + int32(testseed[2]) - contentLen
+		paddingLen = int32(l.Int64()) + int32(testseed[2]) - contentLen //nolint:gosec // padding and content lengths are bounded by the first packet size
 	} else {
 		l, err := rand.Int(rand.Reader, big.NewInt(int64(testseed[3])))
 		if err != nil {
 			errors.LogDebugInner(ctx, err, "failed to generate padding")
 		}
-		paddingLen = int32(l.Int64())
+		paddingLen = int32(l.Int64()) //nolint:gosec // padding and content lengths are bounded by the first packet size
 	}
 	if paddingLen > buf.Size-21-contentLen {
 		paddingLen = buf.Size - 21 - contentLen
 	}
 	newbuffer := buf.New()
 	if userUUID != nil {
-		newbuffer.Write(*userUUID)
+		_, _ = newbuffer.Write(*userUUID)
 		*userUUID = nil
 	}
-	newbuffer.Write([]byte{command, byte(contentLen >> 8), byte(contentLen), byte(paddingLen >> 8), byte(paddingLen)})
+	_, _ = newbuffer.Write([]byte{command, byte(contentLen >> 8), byte(contentLen), byte(paddingLen >> 8), byte(paddingLen)}) //nolint:gosec // G115: explicit low-byte extraction from a value bounded by the wire format
 	if b != nil {
-		newbuffer.Write(b.Bytes())
+		_, _ = newbuffer.Write(b.Bytes())
 		b.Release()
 	}
 	newbuffer.Extend(paddingLen)
@@ -579,23 +579,23 @@ func XtlsUnpadding(b *buf.Buffer, s *TrafficState, isUplink bool, ctx context.Co
 			}
 			*remainingCommand--
 		} else if *remainingContent > 0 {
-			len := *remainingContent
-			if b.Len() < len {
-				len = b.Len()
+			n := *remainingContent
+			if b.Len() < n {
+				n = b.Len()
 			}
-			data, err := b.ReadBytes(len)
+			data, err := b.ReadBytes(n)
 			if err != nil {
 				return newbuffer
 			}
-			newbuffer.Write(data)
-			*remainingContent -= len
+			_, _ = newbuffer.Write(data)
+			*remainingContent -= n
 		} else { // remainingPadding > 0
-			len := *remainingPadding
-			if b.Len() < len {
-				len = b.Len()
+			n := *remainingPadding
+			if b.Len() < n {
+				n = b.Len()
 			}
-			b.Advance(len)
-			*remainingPadding -= len
+			b.Advance(n)
+			*remainingPadding -= n
 		}
 		if *remainingCommand <= 0 && *remainingContent <= 0 && *remainingPadding <= 0 { // this block done
 			if *currentCommand == 0 {
@@ -605,7 +605,7 @@ func XtlsUnpadding(b *buf.Buffer, s *TrafficState, isUplink bool, ctx context.Co
 				*remainingContent = -1
 				*remainingPadding = -1
 				if b.Len() > 0 { // shouldn't happen
-					newbuffer.Write(b.Bytes())
+					_, _ = newbuffer.Write(b.Bytes())
 				}
 				break
 			}
@@ -780,7 +780,7 @@ func CopyRawConnIfExist(ctx context.Context, readerConn net.Conn, writerConn net
 			if statWriter != nil {
 				statWriter.Counter.Add(w) // user stats
 			}
-			if err != nil && errors.Cause(err) != io.EOF {
+			if err != nil && !errors.Is(err, io.EOF) {
 				return err
 			}
 			return nil
@@ -796,7 +796,7 @@ func CopyRawConnIfExist(ctx context.Context, readerConn net.Conn, writerConn net
 			}
 		}
 		if err != nil {
-			if errors.Cause(err) == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return err

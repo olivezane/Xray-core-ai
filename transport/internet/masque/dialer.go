@@ -38,6 +38,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 	if tlsConfig == nil {
 		return nil, errors.New("tls config is nil")
 	}
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	config := streamSettings.ProtocolSettings.(*Config)
 	if usesHTTP2(tlsConfig) {
 		return dialHTTP2(ctx, dest, streamSettings, tlsConfig, config)
@@ -80,6 +81,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		if err != nil {
 			return nil, errors.New("failed to dial to dest").Base(err)
 		}
+		//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
 		pktConn = conn.(*finalmask.PacketConnWrapper).PacketConn
 		udpAddr = conn.RemoteAddr()
 	} else {
@@ -106,7 +108,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		pktConn.Close()
 		return nil, err
 	}
-	context.AfterFunc(qconn.Context(), func() { tr.Close(); pktConn.Close() })
+	context.AfterFunc(qconn.Context(), func() { _ = tr.Close(); _ = pktConn.Close() })
 
 	switch quicParams.Congestion {
 	case "reno":
@@ -115,16 +117,16 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 	case "force-brutal":
 		congestion.UseBrutal(qconn, quicParams.BrutalUp, quicParams.BrutalDisableLossCompensation)
 	default:
-		qconn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeNoError), "")
+		_ = qconn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeNoError), "")
 		return nil, errors.New("unknown congestion control: ", quicParams.Congestion)
 	}
 
 	cc := (&http3.Transport{EnableDatagrams: true, DisableCompression: true}).NewClientConn(qconn)
 	conn, err := establish(ctx, connectip.NewClientConn(cc), quicConn{qconn}, func() {
-		qconn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeRequestCanceled), "")
+		_ = qconn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeRequestCanceled), "")
 	}, config, authority(config, gotlsConfig.ServerName, dest.Port))
 	if err != nil {
-		qconn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeNoError), "")
+		_ = qconn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeNoError), "")
 		return nil, err
 	}
 	return conn, nil
@@ -153,6 +155,7 @@ func dialHTTP2(ctx context.Context, dest net.Destination, streamSettings *intern
 	} else {
 		conn = tls.Client(conn, gotlsConfig)
 	}
+	//nolint:forcetypeassert // the conn came from the TLS transport, which implements tls.Interface
 	tlsConn := conn.(tls.Interface)
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		conn.Close()
@@ -165,12 +168,12 @@ func dialHTTP2(ctx context.Context, dest net.Destination, streamSettings *intern
 
 	cc, err := newHTTP2ClientConn(conn)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
-	mconn, err := establish(ctx, connectip.NewHTTP2ClientConn(cc), cc, func() { cc.Close() }, config, authority(config, gotlsConfig.ServerName, dest.Port))
+	mconn, err := establish(ctx, connectip.NewHTTP2ClientConn(cc), cc, func() { _ = cc.Close() }, config, authority(config, gotlsConfig.ServerName, dest.Port))
 	if err != nil {
-		cc.Close()
+		_ = cc.Close()
 		return nil, err
 	}
 	return mconn, nil

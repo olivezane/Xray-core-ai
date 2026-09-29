@@ -31,8 +31,7 @@ func Combine(maybeError ...error) error {
 }
 
 func AllEqual(expected error, actual error) bool {
-	switch errs := actual.(type) {
-	case multiError:
+	if errs, ok := errors.AsType[multiError](actual); ok {
 		if len(errs) == 0 {
 			return false
 		}
@@ -42,7 +41,6 @@ func AllEqual(expected error, actual error) bool {
 			}
 		}
 		return true
-	default:
-		return errors.Is(errs, expected)
 	}
+	return errors.Is(actual, expected)
 }

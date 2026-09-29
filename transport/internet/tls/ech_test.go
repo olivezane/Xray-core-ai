@@ -1,6 +1,7 @@
 package tls
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"slices"
@@ -42,7 +43,12 @@ func TestECHDial(t *testing.T) {
 							TLSClientConfig: TLSConfig,
 						},
 					}
-					resp, err := client.Get("https://cloudflare.com/cdn-cgi/trace")
+					req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://cloudflare.com/cdn-cgi/trace", nil)
+					if err != nil {
+						t.Error("ECH request: ", err)
+						return
+					}
+					resp, err := client.Do(req)
 					if err != nil {
 						t.Error("ECH dial failed: ", err)
 						return
@@ -84,7 +90,7 @@ func TestECHDialFail(t *testing.T) {
 		EchConfigList: "udp://0.0.0.0",
 	}
 	tlsConfig := config.GetTLSConfig()
-	ApplyECH(config, tlsConfig)
+	_ = ApplyECH(config, tlsConfig)
 	if !slices.Equal(tlsConfig.EncryptedClientHelloConfigList, []byte{1, 1, 4, 5, 1, 4}) {
 		t.Error("ECH config should be invalid when query failed", " but got ", tlsConfig.EncryptedClientHelloConfigList)
 	}

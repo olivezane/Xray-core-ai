@@ -1,6 +1,8 @@
 package splithttp_test
 
 import (
+	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -86,11 +88,11 @@ func Test_FillPacketRequest_GetBody(t *testing.T) {
 	data := []byte("hello xray")
 	payload := buf.MergeBytes(nil, data)
 
-	req, err := http.NewRequest("POST", "https://example.com/", nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://example.com/", nil)
 	common.Must(err)
 
 	config := &Config{}
-	config.FillPacketRequest(req, "sess", "0", payload)
+	_ = config.FillPacketRequest(req, "sess", "0", payload)
 
 	if req.GetBody == nil {
 		t.Fatalf("Expected GetBody to be set")
@@ -99,7 +101,7 @@ func Test_FillPacketRequest_GetBody(t *testing.T) {
 	first, err := io.ReadAll(req.Body)
 	common.Must(err)
 
-	if string(data) != string(first) {
+	if !bytes.Equal(data, first) {
 		t.Fatalf("Body mismatch. Format %q and %q are not equal", data, first)
 	}
 
@@ -109,7 +111,7 @@ func Test_FillPacketRequest_GetBody(t *testing.T) {
 	second, err := io.ReadAll(body2)
 	common.Must(err)
 
-	if string(data) != string(second) {
+	if !bytes.Equal(data, second) {
 		t.Fatalf("Replayed body mismatch. Format %q and %q are not equal", data, second)
 	}
 }

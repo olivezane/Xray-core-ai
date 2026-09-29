@@ -23,8 +23,8 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewServer(ctx, config.(*ServerConfig))
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config *ServerConfig) (any, error) {
+		return NewServer(ctx, config)
 	}))
 }
 
@@ -70,9 +70,10 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Inbound, error) {
 		saltFilter: antireplay.NewMapFilter[[32]byte](60),
 		user: &protocol.MemoryUser{
 			Email: config.Email,
-			Level: uint32(config.Level),
+			Level: uint32(config.Level), //nolint:gosec // the user level is a small config value
 		},
-		udpCodec:      udpCodec,
+		udpCodec: udpCodec,
+		//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
 	}, nil
 }
@@ -123,7 +124,7 @@ func (i *Inbound) processTCP(ctx context.Context, conn net.Conn, dispatcher rout
 	if err != nil {
 		return err
 	}
-	conn.SetReadDeadline(time.Time{})
+	_ = conn.SetReadDeadline(time.Time{})
 	dest := reqHeader.Destination
 
 	writer, err := WriteTCPResponse(conn, i.method, i.psk, saltSlice, nil)
@@ -147,13 +148,15 @@ func (i *Inbound) processTCP(ctx context.Context, conn net.Conn, dispatcher rout
 
 	if len(reqHeader.EarlyData) > 0 {
 		earlyBuf := buf.New()
-		earlyBuf.Write(reqHeader.EarlyData)
+		if _, err := earlyBuf.Write(reqHeader.EarlyData); err != nil {
+			return err
+		}
 		if err := link.Writer.WriteMultiBuffer(buf.MultiBuffer{earlyBuf}); err != nil {
 			return err
 		}
 	}
 
-	sessionPolicy = i.policyManager.ForLevel(uint32(i.user.Level))
+	sessionPolicy = i.policyManager.ForLevel(i.user.Level)
 	ctx, cancel := context.WithCancel(ctx)
 	timer := signal.CancelAfterInactivity(ctx, cancel, sessionPolicy.Timeouts.ConnectionIdle)
 	ctx = policy.ContextWithBufferPolicy(ctx, sessionPolicy.Buffer)
@@ -217,7 +220,7 @@ func (i *Inbound) processUDP(ctx context.Context, conn stat.Connection, dispatch
 					link:   link,
 					cancel: cancel,
 				}
-				sessionPolicy := i.policyManager.ForLevel(uint32(i.user.Level))
+				sessionPolicy := i.policyManager.ForLevel(i.user.Level)
 				newEntry.timer = signal.CancelAfterInactivity(sessCtx, func() {
 					udpConns.Delete(decoded.SessionID)
 					common.Interrupt(link.Reader)
@@ -257,7 +260,9 @@ func (i *Inbound) processUDP(ctx context.Context, conn stat.Connection, dispatch
 
 			entry.timer.Update()
 			payloadBuf := buf.New()
-			payloadBuf.Write(decoded.Payload)
+			if _, err := payloadBuf.Write(decoded.Payload); err != nil {
+				return err
+			}
 			b.Release()
 			_ = entry.link.Writer.WriteMultiBuffer(buf.MultiBuffer{payloadBuf})
 		}

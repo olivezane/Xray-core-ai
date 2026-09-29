@@ -7,6 +7,7 @@
 package connectip
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,7 +17,7 @@ import (
 )
 
 func newRequest(target string) *http.Request {
-	req := httptest.NewRequest(http.MethodGet, target, nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, target, nil)
 	req.Method = http.MethodConnect
 	req.Proto = requestProtocol
 	req.Header.Add("Capsule-Protocol", capsuleProtocolHeaderValue)
@@ -68,7 +69,9 @@ func TestProxyRequestParsing(t *testing.T) {
 		req.Proto = "not-connect-ip"
 		_, err := ParseProxyRequest(req)
 		require.EqualError(t, err, "unexpected protocol: not-connect-ip")
-		require.Equal(t, http.StatusNotImplemented, err.(*ProxyRequestParseError).HTTPStatus)
+		var parseErr *ProxyRequestParseError
+		require.ErrorAs(t, err, &parseErr)
+		require.Equal(t, http.StatusNotImplemented, parseErr.HTTPStatus)
 	})
 
 	t.Run("HTTP/2", func(t *testing.T) {
@@ -86,7 +89,9 @@ func TestProxyRequestParsing(t *testing.T) {
 		req.Header.Set(":protocol", "websocket")
 		_, err := ParseProxyRequest(req)
 		require.EqualError(t, err, "unexpected protocol: websocket")
-		require.Equal(t, http.StatusNotImplemented, err.(*ProxyRequestParseError).HTTPStatus)
+		var parseErr *ProxyRequestParseError
+		require.ErrorAs(t, err, &parseErr)
+		require.Equal(t, http.StatusNotImplemented, parseErr.HTTPStatus)
 	})
 
 	t.Run("wrong request method", func(t *testing.T) {
@@ -94,7 +99,9 @@ func TestProxyRequestParsing(t *testing.T) {
 		req.Method = http.MethodHead
 		_, err := ParseProxyRequest(req)
 		require.EqualError(t, err, "expected CONNECT request, got HEAD")
-		require.Equal(t, http.StatusMethodNotAllowed, err.(*ProxyRequestParseError).HTTPStatus)
+		var parseErr *ProxyRequestParseError
+		require.ErrorAs(t, err, &parseErr)
+		require.Equal(t, http.StatusMethodNotAllowed, parseErr.HTTPStatus)
 	})
 
 	t.Run("missing Capsule-Protocol header", func(t *testing.T) {
@@ -102,7 +109,9 @@ func TestProxyRequestParsing(t *testing.T) {
 		req.Header.Del("Capsule-Protocol")
 		_, err := ParseProxyRequest(req)
 		require.EqualError(t, err, "missing Capsule-Protocol header")
-		require.Equal(t, http.StatusBadRequest, err.(*ProxyRequestParseError).HTTPStatus)
+		var parseErr *ProxyRequestParseError
+		require.ErrorAs(t, err, &parseErr)
+		require.Equal(t, http.StatusBadRequest, parseErr.HTTPStatus)
 	})
 
 	for _, tc := range []struct {
@@ -131,7 +140,9 @@ func TestProxyRequestParsing(t *testing.T) {
 				return
 			}
 			require.ErrorContains(t, err, "invalid capsule header value")
-			require.Equal(t, http.StatusBadRequest, err.(*ProxyRequestParseError).HTTPStatus)
+			var parseErr *ProxyRequestParseError
+			require.ErrorAs(t, err, &parseErr)
+			require.Equal(t, http.StatusBadRequest, parseErr.HTTPStatus)
 		})
 	}
 }

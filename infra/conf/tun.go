@@ -103,14 +103,14 @@ func GetAvailableTunName() (string, error) {
 	)
 }
 
-func randomInt(min, max int) (int, error) {
+func randomInt(minVal, maxVal int) (int, error) {
 	value, err := rand.Int(
 		rand.Reader,
-		big.NewInt(int64(max-min+1)),
+		big.NewInt(int64(maxVal-minVal+1)),
 	)
 	if err != nil {
 		return 0, err
 	}
 
-	return min + int(value.Int64()), nil
+	return minVal + int(value.Int64()), nil
 }

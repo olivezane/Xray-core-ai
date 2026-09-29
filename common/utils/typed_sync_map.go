@@ -38,8 +38,8 @@ func (m *TypedSyncMap[K, V]) CompareAndDelete(key K, old V) (deleted bool) {
 // CompareAndSwap swaps the old and new values for key
 // if the value stored in the map is equal to old.
 // The old value must be of a comparable type.
-func (m *TypedSyncMap[K, V]) CompareAndSwap(key K, old V, new V) (swapped bool) {
-	return m.syncMap.CompareAndSwap(key, old, new)
+func (m *TypedSyncMap[K, V]) CompareAndSwap(key K, old V, newValue V) (swapped bool) {
+	return m.syncMap.CompareAndSwap(key, old, newValue)
 }
 
 // Delete deletes the value for a key.
@@ -54,6 +54,7 @@ func (m *TypedSyncMap[K, V]) Load(key K) (value V, ok bool) {
 	anyValue, ok := m.syncMap.Load(key)
 	// anyValue might be nil
 	if anyValue != nil {
+		//nolint:forcetypeassert // the typed sync map only ever stores V
 		value = anyValue.(V)
 	}
 	return value, ok
@@ -64,6 +65,7 @@ func (m *TypedSyncMap[K, V]) Load(key K) (value V, ok bool) {
 func (m *TypedSyncMap[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
 	anyValue, loaded := m.syncMap.LoadAndDelete(key)
 	if anyValue != nil {
+		//nolint:forcetypeassert // the typed sync map only ever stores V
 		value = anyValue.(V)
 	}
 	return value, loaded
@@ -75,6 +77,7 @@ func (m *TypedSyncMap[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
 func (m *TypedSyncMap[K, V]) LoadOrStore(key K, value V) (actual V, loaded bool) {
 	anyActual, loaded := m.syncMap.LoadOrStore(key, value)
 	if anyActual != nil {
+		//nolint:forcetypeassert // the typed sync map only ever stores V
 		actual = anyActual.(V)
 	}
 	return actual, loaded
@@ -93,6 +96,7 @@ func (m *TypedSyncMap[K, V]) LoadOrStore(key K, value V) (actual V, loaded bool)
 // false after a constant number of calls.
 func (m *TypedSyncMap[K, V]) Range(f func(key K, value V) bool) {
 	m.syncMap.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // the typed sync map only ever stores K
 		return f(key.(K), value.(V))
 	})
 }
@@ -106,6 +110,7 @@ func (m *TypedSyncMap[K, V]) Store(key K, value V) {
 func (m *TypedSyncMap[K, V]) Swap(key K, value V) (previous V, loaded bool) {
 	anyPrevious, loaded := m.syncMap.Swap(key, value)
 	if anyPrevious != nil {
+		//nolint:forcetypeassert // the typed sync map only ever stores V
 		previous = anyPrevious.(V)
 	}
 	return previous, loaded

@@ -3,6 +3,7 @@
 package buf_test
 
 import (
+	"context"
 	"crypto/rand"
 	"net"
 	"testing"
@@ -24,7 +25,7 @@ func TestReadvReader(t *testing.T) {
 	common.Must(err)
 	defer tcpServer.Close()
 
-	conn, err := net.Dial("tcp", dest.NetAddr())
+	conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", dest.NetAddr())
 	common.Must(err)
 	defer conn.Close()
 
@@ -46,6 +47,7 @@ func TestReadvReader(t *testing.T) {
 		}
 	}()
 
+	//nolint:forcetypeassert // the listener was created as a TCP listener
 	rawConn, err := conn.(*net.TCPConn).SyscallConn()
 	common.Must(err)
 

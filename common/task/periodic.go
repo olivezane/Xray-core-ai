@@ -44,7 +44,7 @@ func (t *Periodic) checkedExecute() error {
 	}
 
 	t.timer = time.AfterFunc(t.Interval, func() {
-		t.checkedExecute()
+		_ = t.checkedExecute()
 	})
 
 	return nil

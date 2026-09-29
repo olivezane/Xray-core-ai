@@ -294,7 +294,7 @@ func TestParseRouteAdvertisementCapsule(t *testing.T) {
 }
 
 func TestParseRouteAdvertisementCapsuleLimit(t *testing.T) {
-	entry := func(i int) []byte { return []byte{4, 10, 0, byte(i >> 8), byte(i), 10, 0, byte(i >> 8), byte(i), 0} }
+	entry := func(i int) []byte { return []byte{4, 10, 0, byte(i >> 8), byte(i), 10, 0, byte(i >> 8), byte(i), 0} } //nolint:gosec // G115: explicit low-byte extraction from a value bounded by the wire format
 	testCapsuleEntryLimit(t, capsuleTypeRouteAdvertisement, maxRoutesPerCapsule, entry, parseRouteAdvertisementCapsule)
 }
 
@@ -421,7 +421,7 @@ func TestAdvertiseRouteValidation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			conn := newProxiedConn(&mockStream{})
-			t.Cleanup(func() { conn.Close() })
+			t.Cleanup(func() { _ = conn.Close() })
 			err := conn.AdvertiseRoute(tc.routes)
 			if tc.err != "" {
 				require.ErrorContains(t, err, tc.err)
@@ -439,7 +439,7 @@ func TestAdvertiseRouteValidation(t *testing.T) {
 func TestReceiveMisorderedRouteAdvertisement(t *testing.T) {
 	toRead := make(chan []byte, 1)
 	conn := newProxiedConn(&mockStream{toRead: toRead})
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 
 	toRead <- (&routeAdvertisementCapsule{IPAddressRanges: []IPRoute{route6, route4a}}).append(nil)
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)

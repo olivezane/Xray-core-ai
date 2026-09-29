@@ -31,6 +31,7 @@ func TestRegexRequiredLiterals(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		//nolint:forcetypeassert // the test builds the matcher itself
 		if got := m.(*RegexMatcher).literals; !slices.Equal(got, test.literals) {
 			t.Errorf("%s: got %q, want %q", test.pattern, got, test.literals)
 		}

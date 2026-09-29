@@ -384,7 +384,7 @@ func TestVlessXtlsVisionReality(t *testing.T) {
 	publicKey, _ := base64.RawURLEncoding.DecodeString("E59WjnvZcQMu7tR7_BgyhycuEdBS-CtKxfImRCdAvFM")
 	shortIds := make([][]byte, 1)
 	shortIds[0] = make([]byte, 8)
-	hex.Decode(shortIds[0], []byte("0123456789abcdef"))
+	_, _ = hex.Decode(shortIds[0], []byte("0123456789abcdef"))
 	serverConfig := &core.Config{
 		App: []*serial.TypedMessage{
 			serial.ToTypedMessage(&log.Config{
@@ -525,7 +525,9 @@ func TestVlessRealityFingerprints(t *testing.T) {
 		publicKey, _ := base64.RawURLEncoding.DecodeString("E59WjnvZcQMu7tR7_BgyhycuEdBS-CtKxfImRCdAvFM")
 		shortIds := make([][]byte, 1)
 		shortIds[0] = make([]byte, 8)
-		hex.Decode(shortIds[0], []byte("0123456789abcdef"))
+		if _, err := hex.Decode(shortIds[0], []byte("0123456789abcdef")); err != nil {
+			return err
+		}
 		serverConfig := &core.Config{
 			App: []*serial.TypedMessage{
 				serial.ToTypedMessage(&log.Config{

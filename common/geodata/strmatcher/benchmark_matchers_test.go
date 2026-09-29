@@ -109,7 +109,7 @@ func BenchmarkRegexMatcher(b *testing.B) {
 			matchers = append(matchers, ctor(p))
 		}
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			for _, d := range domains {
 				for _, match := range matchers {
 					_ = match(d)
@@ -155,7 +155,7 @@ func benchmarkMatcherType(b *testing.B, t Type, ctor func() MatcherGroup) {
 func benchmarkMatch(b *testing.B, g MatcherGroup, enabledTypes map[Type]bool) {
 	prepareMatchers(g, enabledTypes)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = g.Match("0.example.com")
 	}
 }
@@ -163,7 +163,7 @@ func benchmarkMatch(b *testing.B, g MatcherGroup, enabledTypes map[Type]bool) {
 func benchmarkMatchAny(b *testing.B, g MatcherGroup, enabledTypes map[Type]bool) {
 	prepareMatchers(g, enabledTypes)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = g.MatchAny("0.example.com")
 	}
 }
@@ -173,29 +173,29 @@ func prepareMatchers(g MatcherGroup, enabledTypes map[Type]bool) {
 		switch matcherType {
 		case Domain:
 			if hasMatch {
-				AddMatcherToGroup(g, DomainMatcher("example.com"), 0)
+				_ = AddMatcherToGroup(g, DomainMatcher("example.com"), 0)
 			}
 			for i := 1; i < 1024; i++ {
-				AddMatcherToGroup(g, DomainMatcher(strconv.Itoa(i)+".example.com"), uint32(i))
+				_ = AddMatcherToGroup(g, DomainMatcher(strconv.Itoa(i)+".example.com"), uint32(i))
 			}
 		case Full:
 			if hasMatch {
-				AddMatcherToGroup(g, FullMatcher("0.example.com"), 0)
+				_ = AddMatcherToGroup(g, FullMatcher("0.example.com"), 0)
 			}
 			for i := 1; i < 64; i++ {
-				AddMatcherToGroup(g, FullMatcher(strconv.Itoa(i)+".example.com"), uint32(i))
+				_ = AddMatcherToGroup(g, FullMatcher(strconv.Itoa(i)+".example.com"), uint32(i))
 			}
 		case Substr:
 			if hasMatch {
-				AddMatcherToGroup(g, SubstrMatcher("example.com"), 0)
+				_ = AddMatcherToGroup(g, SubstrMatcher("example.com"), 0)
 			}
 			for i := 1; i < 4; i++ {
-				AddMatcherToGroup(g, SubstrMatcher(strconv.Itoa(i)+".example.com"), uint32(i))
+				_ = AddMatcherToGroup(g, SubstrMatcher(strconv.Itoa(i)+".example.com"), uint32(i))
 			}
 		case Regex:
 			matcher, err := Regex.New("^[^.]*$") // Dotless domain matcher automatically inserted in DNS app when "localhost" DNS is used.
 			common.Must(err)
-			AddMatcherToGroup(g, matcher, 0)
+			_ = AddMatcherToGroup(g, matcher, 0)
 		}
 	}
 	if g, ok := g.(buildable); ok {

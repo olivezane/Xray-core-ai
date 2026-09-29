@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/main/commands/base"
 	_ "github.com/xtls/xray-core/main/distro/all"
 )
@@ -36,7 +37,7 @@ func getArgsV4Compatible() []string {
 	fs.Usage = func() {}
 	fs.SetOutput(&null{})
 	err := fs.Parse(os.Args[1:])
-	if err == flag.ErrHelp {
+	if errors.Is(err, flag.ErrHelp) {
 		// fmt.Println("DEPRECATED: -h, WILL BE REMOVED IN V5.")
 		// fmt.Println("PLEASE USE: xray help")
 		// fmt.Println()

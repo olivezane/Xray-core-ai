@@ -50,7 +50,7 @@ func (c *connection) Read(b []byte) (int, error) {
 		}
 
 		nBytes, err := reader.Read(b)
-		if errors.Cause(err) == io.EOF {
+		if errors.Is(err, io.EOF) {
 			c.reader = nil
 			continue
 		}

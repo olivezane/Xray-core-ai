@@ -37,9 +37,13 @@ func NewClient(ctx context.Context, config *ClientConfig) (*Client, error) {
 	}
 
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
 	c := &Client{
 		server:        server,
-		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager: pm,
 	}
 
 	return c, nil
@@ -175,7 +179,7 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewClient(ctx, config.(*ClientConfig))
+	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config *ClientConfig) (any, error) {
+		return NewClient(ctx, config)
 	}))
 }

@@ -93,6 +93,7 @@ func newRegexMatcher(pattern string) (Matcher, error) {
 
 // requiredLiterals appends to dst the case-sensitive strings that every match of re contains.
 func requiredLiterals(re *syntax.Regexp, dst []string) []string {
+	//nolint:exhaustive // only these regexp ops can carry a literal that every match must contain
 	switch re.Op {
 	case syntax.OpLiteral:
 		// regexp matches U+FFFD against invalid UTF-8 bytes, strings.Contains does not
@@ -188,7 +189,7 @@ func (t Type) NewDomainPattern(pattern string) (Matcher, error) {
 func ToDomain(pattern string) (string, error) {
 	for {
 		isASCII, hasUpper := true, false
-		for i := 0; i < len(pattern); i++ {
+		for i := range len(pattern) {
 			c := pattern[i]
 			if c >= utf8.RuneSelf {
 				isASCII = false

@@ -28,7 +28,7 @@ func (c *ConnRF) Read(b []byte) (int, error) {
 		// create reader capped to size of `b`, so it can be fully drained into
 		// `b` later with a single Read call
 		reader := bufio.NewReaderSize(c.Conn, len(b))
-		resp, err := http.ReadResponse(reader, c.Req) //nolint:bodyclose
+		resp, err := http.ReadResponse(reader, c.Req) //nolint:bodyclose // the body is drained by the caller through the same reader
 		if err != nil {
 			return 0, err
 		}
@@ -44,6 +44,7 @@ func (c *ConnRF) Read(b []byte) (int, error) {
 }
 
 func dialhttpUpgrade(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig) (net.Conn, error) {
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	transportConfiguration := streamSettings.ProtocolSettings.(*Config)
 
 	var pconn net.Conn
@@ -65,6 +66,7 @@ func dialhttpUpgrade(ctx context.Context, dest net.Destination, streamSettings *
 		tlsConfig := tConfig.GetTLSConfig(tls.WithDestination(dest), tls.WithNextProto("http/1.1"))
 		if fingerprint := tls.GetFingerprint(tConfig.Fingerprint); fingerprint != nil {
 			conn = tls.UClient(pconn, tlsConfig, fingerprint)
+			//nolint:forcetypeassert // utls.UClient always returns *utls.UConn
 			if err := conn.(*tls.UConn).WebsocketHandshakeContext(ctx); err != nil {
 				return nil, err
 			}

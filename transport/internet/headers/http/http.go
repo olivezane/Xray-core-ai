@@ -76,8 +76,8 @@ func (h *HeaderReader) Read(reader io.Reader) (*buf.Buffer, error) {
 			return nil, err
 		}
 		if n := bytes.Index(buffer.Bytes(), []byte(ENDING)); n != -1 {
-			headerBuf.Write(buffer.BytesRange(0, int32(n+len(ENDING))))
-			buffer.Advance(int32(n + len(ENDING)))
+			headerBuf.Write(buffer.BytesRange(0, int32(n+len(ENDING)))) //nolint:gosec // bounded by the buffer size / buf.Size
+			buffer.Advance(int32(n + len(ENDING)))                      //nolint:gosec // bounded by the buffer size / buf.Size
 			endingDetected = true
 			break
 		}
@@ -89,7 +89,7 @@ func (h *HeaderReader) Read(reader io.Reader) (*buf.Buffer, error) {
 			buffer.Clear()
 			copy(buffer.Extend(lenEnding), leftover)
 
-			if _, err := readRequest(bufio.NewReader(bytes.NewReader(headerBuf.Bytes()))); err != io.ErrUnexpectedEOF {
+			if _, err := readRequest(bufio.NewReader(bytes.NewReader(headerBuf.Bytes()))); !errors.Is(err, io.ErrUnexpectedEOF) {
 				return nil, err
 			}
 		}
@@ -222,13 +222,19 @@ func (c *Conn) Close() error {
 		// is probably not valid. Sending back a server error header in this case.
 
 		// Write response based on error reason
-		switch c.errReason {
-		case ErrHeaderMisMatch:
-			c.errorMismatchWriter.Write(c.Conn)
-		case ErrHeaderToLong:
-			c.errorTooLongWriter.Write(c.Conn)
+		switch {
+		case errors.Is(c.errReason, ErrHeaderMisMatch):
+			if err := c.errorMismatchWriter.Write(c.Conn); err != nil {
+				return err
+			}
+		case errors.Is(c.errReason, ErrHeaderToLong):
+			if err := c.errorTooLongWriter.Write(c.Conn); err != nil {
+				return err
+			}
 		default:
-			c.errorWriter.Write(c.Conn)
+			if err := c.errorWriter.Write(c.Conn); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -314,7 +320,7 @@ func NewAuthenticator(ctx context.Context, config *Config) (Authenticator, error
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewAuthenticator(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return NewAuthenticator(ctx, config)
 	}))
 }

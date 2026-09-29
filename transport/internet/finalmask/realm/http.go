@@ -84,6 +84,7 @@ func (e *StatusError) Error() string {
 func NewClient(scheme, host, port, token string, tlsConfig *tls.Config) *Client {
 	client := http.DefaultClient
 	if tlsConfig != nil {
+		//nolint:forcetypeassert // http.DefaultTransport is documented to be *http.Transport
 		tr := http.DefaultTransport.(*http.Transport).Clone()
 		tr.TLSClientConfig = tlsConfig.GetTLSConfig()
 		client = &http.Client{Transport: tr}

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"io"
+	"math"
 	"time"
 
 	"github.com/xtls/xray-core/common"
@@ -21,7 +22,10 @@ func SealVMessAEADHeader(key [16]byte, data []byte) []byte {
 
 	aeadPayloadLengthSerializeBuffer := bytes.NewBuffer(nil)
 
-	headerPayloadDataLen := uint16(len(data))
+	if len(data) > math.MaxUint16 {
+		panic("VMess AEAD header payload is too large")
+	}
+	headerPayloadDataLen := uint16(len(data)) //nolint:gosec // bounded by the check above
 
 	common.Must(binary.Write(aeadPayloadLengthSerializeBuffer, binary.BigEndian, headerPayloadDataLen))
 

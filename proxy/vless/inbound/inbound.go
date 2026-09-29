@@ -46,7 +46,7 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
 		var dc dns.Client
 		if err := core.RequireFeatures(ctx, func(d dns.Client) error {
 			dc = d
@@ -55,7 +55,7 @@ func init() {
 			return nil, err
 		}
 
-		c := config.(*Config)
+		c := config
 
 		validator := new(vless.MemoryValidator)
 		for _, user := range c.Users {
@@ -90,14 +90,34 @@ type Handler struct {
 // New creates a new VLess inbound handler.
 func New(ctx context.Context, config *Config, dc dns.Client, validator vless.Validator) (*Handler, error) {
 	v := core.MustFromContext(ctx)
+	im, ok := v.GetFeature(feature_inbound.ManagerType()).(feature_inbound.Manager)
+	if !ok {
+		return nil, errors.New("feature_inbound.Manager is not registered in Xray core")
+	}
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
+	sm, ok := v.GetFeature(stats.ManagerType()).(stats.Manager)
+	if !ok {
+		return nil, errors.New("stats.Manager is not registered in Xray core")
+	}
+	om, ok := v.GetFeature(outbound.ManagerType()).(outbound.Manager)
+	if !ok {
+		return nil, errors.New("outbound.Manager is not registered in Xray core")
+	}
+	rd, ok := v.GetFeature(routing.DispatcherType()).(routing.Dispatcher)
+	if !ok {
+		return nil, errors.New("routing.Dispatcher is not registered in Xray core")
+	}
 	handler := &Handler{
-		inboundHandlerManager:  v.GetFeature(feature_inbound.ManagerType()).(feature_inbound.Manager),
-		policyManager:          v.GetFeature(policy.ManagerType()).(policy.Manager),
-		stats:                  v.GetFeature(stats.ManagerType()).(stats.Manager),
+		inboundHandlerManager:  im,
+		policyManager:          pm,
+		stats:                  sm,
 		validator:              validator,
-		outboundHandlerManager: v.GetFeature(outbound.ManagerType()).(outbound.Manager),
+		outboundHandlerManager: om,
 		observer:               v.GetFeature(extension.ObservatoryType()),
-		defaultDispatcher:      v.GetFeature(routing.DispatcherType()).(routing.Dispatcher),
+		defaultDispatcher:      rd,
 		ctx:                    ctx,
 	}
 
@@ -195,6 +215,7 @@ func (h *Handler) GetReverse(a *vless.MemoryAccount) (*Reverse, error) {
 	if u == nil {
 		return nil, errors.New("reverse: user " + a.ID.String() + " doesn't exist anymore")
 	}
+	//nolint:forcetypeassert // the account is created by proxy/vless's own NewAccount
 	a = u.Account.(*vless.MemoryAccount)
 	if a.Reverse == nil || a.Reverse.Tag == "" {
 		return nil, errors.New("reverse: user " + a.ID.String() + " is not allowed to create reverse proxy")
@@ -218,9 +239,10 @@ func (h *Handler) GetReverse(a *vless.MemoryAccount) (*Reverse, error) {
 
 func (h *Handler) RemoveReverse(u *protocol.MemoryUser) {
 	if u != nil {
+		//nolint:forcetypeassert // the account is created by proxy/vless's own NewAccount
 		a := u.Account.(*vless.MemoryAccount)
 		if a.Reverse != nil && a.Reverse.Tag != "" {
-			h.outboundHandlerManager.RemoveHandler(h.ctx, a.Reverse.Tag)
+			_ = h.outboundHandlerManager.RemoveHandler(h.ctx, a.Reverse.Tag)
 		}
 	}
 }
@@ -444,7 +466,7 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 						ipType = 0
 					}
 					if ipType == 4 {
-						for i := 0; i < len(remoteAddr); i++ {
+						for i := range len(remoteAddr) {
 							if remoteAddr[i] == ':' {
 								ipType = 6
 								break
@@ -456,32 +478,48 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 					switch fb.Xver {
 					case 1:
 						if ipType == 0 {
-							pro.Write([]byte("PROXY UNKNOWN\r\n"))
+							if _, err := pro.WriteString("PROXY UNKNOWN\r\n"); err != nil {
+								return err
+							}
 							break
 						}
 						if ipType == 4 {
-							pro.Write([]byte("PROXY TCP4 " + remoteAddr + " " + localAddr + " " + remotePort + " " + localPort + "\r\n"))
+							if _, err := pro.WriteString("PROXY TCP4 " + remoteAddr + " " + localAddr + " " + remotePort + " " + localPort + "\r\n"); err != nil {
+								return err
+							}
 						} else {
-							pro.Write([]byte("PROXY TCP6 " + remoteAddr + " " + localAddr + " " + remotePort + " " + localPort + "\r\n"))
+							if _, err := pro.WriteString("PROXY TCP6 " + remoteAddr + " " + localAddr + " " + remotePort + " " + localPort + "\r\n"); err != nil {
+								return err
+							}
 						}
 					case 2:
-						pro.Write([]byte("\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A")) // signature
+						_, _ = pro.WriteString("\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A") // signature
 						if ipType == 0 {
-							pro.Write([]byte("\x20\x00\x00\x00")) // v2 + LOCAL + UNSPEC + UNSPEC + 0 bytes
+							_, _ = pro.WriteString("\x20\x00\x00\x00") // v2 + LOCAL + UNSPEC + UNSPEC + 0 bytes
 							break
 						}
 						if ipType == 4 {
-							pro.Write([]byte("\x21\x11\x00\x0C")) // v2 + PROXY + AF_INET + STREAM + 12 bytes
-							pro.Write(net.ParseIP(remoteAddr).To4())
-							pro.Write(net.ParseIP(localAddr).To4())
+							_, _ = pro.WriteString("\x21\x11\x00\x0C") // v2 + PROXY + AF_INET + STREAM + 12 bytes
+							if _, err := pro.Write(net.ParseIP(remoteAddr).To4()); err != nil {
+								return err
+							}
+							if _, err := pro.Write(net.ParseIP(localAddr).To4()); err != nil {
+								return err
+							}
 						} else {
-							pro.Write([]byte("\x21\x21\x00\x24")) // v2 + PROXY + AF_INET6 + STREAM + 36 bytes
-							pro.Write(net.ParseIP(remoteAddr).To16())
-							pro.Write(net.ParseIP(localAddr).To16())
+							_, _ = pro.WriteString("\x21\x21\x00\x24") // v2 + PROXY + AF_INET6 + STREAM + 36 bytes
+							if _, err := pro.Write(net.ParseIP(remoteAddr).To16()); err != nil {
+								return err
+							}
+							if _, err := pro.Write(net.ParseIP(localAddr).To16()); err != nil {
+								return err
+							}
 						}
 						p1, _ := strconv.ParseUint(remotePort, 10, 16)
 						p2, _ := strconv.ParseUint(localPort, 10, 16)
-						pro.Write([]byte{byte(p1 >> 8), byte(p1), byte(p2 >> 8), byte(p2)})
+						if _, err := pro.Write([]byte{byte(p1 >> 8), byte(p1), byte(p2 >> 8), byte(p2)}); err != nil { //nolint:gosec // G115: explicit low-byte extraction from a value bounded by the wire format
+							return err
+						}
 					}
 					if err := serverWriter.WriteMultiBuffer(buf.MultiBuffer{pro}); err != nil {
 						return errors.New("failed to set PROXY protocol v", fb.Xver).Base(err)
@@ -511,7 +549,7 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 			return nil
 		}
 
-		if errors.Cause(err) != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			log.Record(&log.AccessMessage{
 				From:   connection.RemoteAddr(),
 				To:     "",
@@ -536,6 +574,7 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 	inbound.User = request.User
 	inbound.VlessRoute = net.PortFromBytes(userSentID[6:8])
 
+	//nolint:forcetypeassert // the account is created by proxy/vless's own NewAccount
 	account := request.User.Account.(*vless.MemoryAccount)
 
 	if account.Reverse != nil && request.Command != protocol.RequestCommandRvs {
@@ -678,7 +717,7 @@ func (r *Reverse) Dispatch(ctx context.Context, link *transport.Link) {
 			link.Reader = &buf.EndpointOverrideReader{Reader: link.Reader, Dest: ob.Target.Address, OriginalDest: ob.OriginalTarget.Address}
 			link.Writer = &buf.EndpointOverrideWriter{Writer: link.Writer, Dest: ob.Target.Address, OriginalDest: ob.OriginalTarget.Address}
 		}
-		r.client.Dispatch(session.ContextWithIsReverseMux(ctx, true), link)
+		_ = r.client.Dispatch(session.ContextWithIsReverseMux(ctx, true), link)
 	}
 }
 

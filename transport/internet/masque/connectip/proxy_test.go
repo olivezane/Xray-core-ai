@@ -38,7 +38,7 @@ func dialHTTP3(t *testing.T, addr string) *http3.ClientConn {
 		&quic.Config{EnableDatagrams: true, InitialPacketSize: 1350, DisablePathMTUDiscovery: true},
 	)
 	require.NoError(t, err)
-	t.Cleanup(func() { qconn.CloseWithError(0, "") })
+	t.Cleanup(func() { _ = qconn.CloseWithError(0, "") })
 	return (&http3.Transport{EnableDatagrams: true}).NewClientConn(qconn)
 }
 
@@ -48,7 +48,7 @@ func setupConns(t *testing.T) (client, server *Conn) {
 	p := &Proxy{}
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	require.NoError(t, err)
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 
 	proxyURL := fmt.Sprintf("https://%s/connect-ip", conn.LocalAddr())
 	connChan := make(chan *Conn, 1)
@@ -72,8 +72,8 @@ func setupConns(t *testing.T) (client, server *Conn) {
 		EnableDatagrams: true,
 		TLSConfig:       tlsConf,
 	}
-	go func() { s.Serve(conn) }()
-	t.Cleanup(func() { s.Close() })
+	go func() { _ = s.Serve(conn) }()
+	t.Cleanup(func() { _ = s.Close() })
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
@@ -82,7 +82,7 @@ func setupConns(t *testing.T) (client, server *Conn) {
 	req.Header().Set("Authorization", "Bearer token")
 	client, rsp, err := NewClientConn(dialHTTP3(t, conn.LocalAddr().String())).Dial(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.NoError(t, err)
-	t.Cleanup(func() { client.Close() })
+	t.Cleanup(func() { _ = client.Close() })
 	require.Equal(t, http.StatusOK, rsp.StatusCode)
 
 	select {
@@ -90,7 +90,7 @@ func setupConns(t *testing.T) (client, server *Conn) {
 		t.Fatal("timed out")
 	case server = <-connChan:
 	}
-	t.Cleanup(func() { server.Close() })
+	t.Cleanup(func() { _ = server.Close() })
 	return client, server
 }
 
@@ -268,7 +268,7 @@ func TestTTLs(t *testing.T) {
 
 		receivedHdr, err := ipv4.ParseHeader(receivedPacket)
 		require.NoError(t, err)
-		require.Equal(t, uint16(receivedHdr.Checksum), calculateIPv4Checksum(receivedPacket[:ipv4.HeaderLen]))
+		require.Equal(t, uint16(receivedHdr.Checksum), calculateIPv4Checksum(receivedPacket[:ipv4.HeaderLen])) //nolint:gosec // G115: the value is bounded by the fixture built above
 		require.Equal(t, 41, receivedHdr.TTL)
 	})
 
@@ -345,7 +345,7 @@ func TestMaxPacketSizeOverQUIC(t *testing.T) {
 	icmp, err = client.WritePacket(ipv4Packet(64, 17, testSrc4, testDst4, nil, make([]byte, size+1-ipv4.HeaderLen)))
 	require.NoError(t, err)
 	require.NotNil(t, icmp)
-	require.Equal(t, uint16(size), binary.BigEndian.Uint16(icmp[ipv4.HeaderLen+6:]))
+	require.Equal(t, uint16(size), binary.BigEndian.Uint16(icmp[ipv4.HeaderLen+6:])) //nolint:gosec // G115: the value is bounded by the fixture built above
 }
 
 func TestClosing(t *testing.T) {

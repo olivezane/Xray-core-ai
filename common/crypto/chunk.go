@@ -45,11 +45,11 @@ type AEADChunkSizeParser struct {
 }
 
 func (p *AEADChunkSizeParser) SizeBytes() int32 {
-	return 2 + int32(p.Auth.Overhead())
+	return 2 + int32(p.Auth.Overhead()) //nolint:gosec // cipher overhead is a small constant
 }
 
 func (p *AEADChunkSizeParser) Encode(size uint16, b []byte) []byte {
-	binary.BigEndian.PutUint16(b, size-uint16(p.Auth.Overhead()))
+	binary.BigEndian.PutUint16(b, size-uint16(p.Auth.Overhead())) //nolint:gosec // cipher overhead is a small constant
 	b, err := p.Auth.Seal(b[:0], b[:2])
 	common.Must(err)
 	return b
@@ -60,7 +60,7 @@ func (p *AEADChunkSizeParser) Decode(b []byte) (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	return binary.BigEndian.Uint16(b) + uint16(p.Auth.Overhead()), nil
+	return binary.BigEndian.Uint16(b) + uint16(p.Auth.Overhead()), nil //nolint:gosec // cipher overhead is a small constant
 }
 
 type ChunkStreamReader struct {
@@ -147,7 +147,7 @@ func (w *ChunkStreamWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 		mb = mb2
 
 		b := buf.New()
-		w.sizeEncoder.Encode(uint16(slice.Len()), b.Extend(w.sizeEncoder.SizeBytes()))
+		w.sizeEncoder.Encode(uint16(slice.Len()), b.Extend(w.sizeEncoder.SizeBytes())) //nolint:gosec // slice length is bounded by buf.Size
 		mb2Write = append(mb2Write, b)
 		mb2Write = append(mb2Write, slice...)
 

@@ -47,14 +47,14 @@ func executeBalancerOverride(cmd *base.Command, args []string) {
 	cmd.Flag.BoolVar(&remove, "r", false, "")
 	cmd.Flag.BoolVar(&remove, "remove", false, "")
 	setSharedFlags(cmd)
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 
 	if balancer == "" {
 		base.Fatalf("balancer tag not specified")
 	}
 
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := routerService.NewRoutingServiceClient(conn)
 	target := ""

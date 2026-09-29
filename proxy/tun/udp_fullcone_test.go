@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/xtls/xray-core/common/buf"
+	"github.com/xtls/xray-core/common/errors"
 	xnet "github.com/xtls/xray-core/common/net"
 )
 
@@ -18,6 +19,7 @@ func newUDPTestHandler(t *testing.T) (*udpConnectionHandler, chan *udpConn, *int
 	handler := newUdpConnectionHandler(
 		func(conn net.Conn, _ xnet.Destination) {
 			atomic.AddInt32(&dials, 1)
+			//nolint:forcetypeassert // the test listener only produces *udpConn
 			connCh <- conn.(*udpConn)
 		},
 		func(data []byte, src, dst xnet.Destination) error {
@@ -112,7 +114,7 @@ func TestUDPFullConeCloseFreesBinding(t *testing.T) {
 		t.Fatalf("expected 'first', got %q (err=%v)", p[:n], err)
 	}
 	_ = conn.Close()
-	if _, err := conn.Read(make([]byte, 4)); err != io.EOF {
+	if _, err := conn.Read(make([]byte, 4)); !errors.Is(err, io.EOF) {
 		t.Fatalf("expected io.EOF after Close, got %v", err)
 	}
 

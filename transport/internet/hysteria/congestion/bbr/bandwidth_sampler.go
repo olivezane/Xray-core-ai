@@ -484,7 +484,7 @@ type bandwidthSampler struct {
 	a0Candidates    RingBuffer[ackPoint]
 
 	// Maximum number of tracked packets.
-	maxTrackedPackets congestion.ByteCount
+	maxTrackedPackets congestion.ByteCount //nolint:unused // upstream BBR port: kept verbatim for parity with the reference implementation
 
 	maxAckHeightTracker              *maxAckHeightTracker
 	totalBytesAckedAfterLastAckEvent congestion.ByteCount
@@ -726,7 +726,7 @@ func (b *bandwidthSampler) EndOfAppLimitedPhase() congestion.PacketNumber {
 	return b.endOfAppLimitedPhase
 }
 
-func (b *bandwidthSampler) max_ack_height() congestion.ByteCount {
+func (b *bandwidthSampler) max_ack_height() congestion.ByteCount { //nolint:unused // upstream BBR port: kept verbatim for parity with the reference implementation
 	return b.maxAckHeightTracker.Get()
 }
 
@@ -744,7 +744,7 @@ func (b *bandwidthSampler) chooseA0Point(totalBytesAcked congestion.ByteCount, a
 		if b.a0Candidates.Offset(i).totalBytesAcked > totalBytesAcked {
 			*a0 = *b.a0Candidates.Offset(i - 1)
 			if i > 1 {
-				for j := 0; j < i-1; j++ {
+				for range i - 1 {
 					b.a0Candidates.PopFront()
 				}
 			}
@@ -753,7 +753,7 @@ func (b *bandwidthSampler) chooseA0Point(totalBytesAcked congestion.ByteCount, a
 	}
 
 	*a0 = *b.a0Candidates.Back()
-	for k := 0; k < b.a0Candidates.Len()-1; k++ {
+	for range b.a0Candidates.Len() - 1 {
 		b.a0Candidates.PopFront()
 	}
 	return true
@@ -868,10 +868,10 @@ func sentPacketToSendTimeState(sentPacket *connectionStateOnSentPacket, sendTime
 // BytesFromBandwidthAndTimeDelta calculates the bytes
 // from a bandwidth(bits per second) and a time delta
 func bytesFromBandwidthAndTimeDelta(bandwidth Bandwidth, delta time.Duration) congestion.ByteCount {
-	return (congestion.ByteCount(bandwidth) * congestion.ByteCount(delta)) /
+	return (congestion.ByteCount(bandwidth) * congestion.ByteCount(delta)) / //nolint:gosec // bandwidth arithmetic saturates well below the type limits
 		(congestion.ByteCount(time.Second) * 8)
 }
 
-func timeDeltaFromBytesAndBandwidth(bytes congestion.ByteCount, bandwidth Bandwidth) time.Duration {
-	return time.Duration(bytes*8) * time.Second / time.Duration(bandwidth)
+func timeDeltaFromBytesAndBandwidth(bytes congestion.ByteCount, bandwidth Bandwidth) time.Duration { //nolint:unused // upstream BBR port: kept verbatim for parity with the reference implementation
+	return time.Duration(bytes*8) * time.Second / time.Duration(bandwidth) //nolint:gosec // bandwidth arithmetic saturates well below the type limits
 }

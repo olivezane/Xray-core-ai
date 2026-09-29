@@ -58,6 +58,7 @@ func Listen(ctx context.Context, address net.Address, port net.Port, streamSetti
 	if tlsConfig == nil {
 		return nil, errors.New("tls config is nil")
 	}
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	config := streamSettings.ProtocolSettings.(*Config)
 	path, err := newPathMatcher(config.Path)
 	if err != nil {
@@ -197,6 +198,7 @@ func (l *Listener) acceptHTTP2(config *gotls.Config) {
 }
 
 func (l *Listener) serveHTTP2Conn(conn net.Conn, config *gotls.Config) {
+	//nolint:forcetypeassert // tls.Server/tls.Client always return *tls.Conn
 	tlsConn := tls.Server(conn, config).(*tls.Conn)
 	if !l.track(tlsConn, true) {
 		tlsConn.Close()

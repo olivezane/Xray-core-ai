@@ -62,7 +62,7 @@ func (m *Instance) Close() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return New(ctx, config)
 	}))
 }

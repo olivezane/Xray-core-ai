@@ -589,7 +589,7 @@ func slicesEqual[T comparable](left, right []T) bool {
 func encodePaddingLength(t *testing.T, length int) []byte {
 	t.Helper()
 	var encoded bytes.Buffer
-	value := Varint(length)
+	value := Varint(length) //nolint:gosec // G115: the value is bounded by the fixture built above
 	if err := value.writeTo(&encoded); err != nil {
 		t.Fatal(err)
 	}

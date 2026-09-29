@@ -8,6 +8,7 @@ import (
 	"crypto/subtle"
 	"crypto/x509"
 	"fmt"
+	"github.com/xtls/xray-core/common/errors"
 	"io"
 	"net"
 	"sync"
@@ -71,7 +72,7 @@ func (c *serverConn) handshake() error {
 	}
 
 	if pkt.packetID != 0 {
-		return fmt.Errorf("bad handshake packet id")
+		return errors.New("bad handshake packet id")
 	}
 
 	err = pkt.readFields(&protocolVersion, &serverAddress, &serverPort, &nextState)
@@ -116,7 +117,7 @@ func (c *serverConn) handshake() error {
 
 		}
 
-		return fmt.Errorf("ping")
+		return errors.New("ping")
 
 	case 2:
 
@@ -130,7 +131,7 @@ func (c *serverConn) handshake() error {
 		}
 
 		if pkt.packetID != 0 {
-			return fmt.Errorf("bad login start packet id")
+			return errors.New("bad login start packet id")
 		}
 
 		var (
@@ -178,7 +179,7 @@ func (c *serverConn) handshake() error {
 		}
 
 		if pkt.packetID != 0x01 {
-			return fmt.Errorf("bad encrypt response packet id")
+			return errors.New("bad encrypt response packet id")
 		}
 
 		err = pkt.readFields(&encryptedSharedSecret, &encryptedVerifyToken)
@@ -200,7 +201,7 @@ func (c *serverConn) handshake() error {
 		}
 
 		if len(decryptedVerifyToken) < 4 || !bytes.Equal(verifyToken, decryptedVerifyToken[:4]) {
-			return fmt.Errorf("verify token mismatch")
+			return errors.New("verify token mismatch")
 		}
 
 		c.reader, err = newCryptoReader(c.reader, sharedSecret)
@@ -217,14 +218,14 @@ func (c *serverConn) handshake() error {
 		receivedPassword := decryptedVerifyToken[4:]
 
 		if subtle.ConstantTimeCompare(receivedPassword, []byte(c.password)) != 1 {
-			writeDisconnectPacket(c.writer, `{"type":"translatable","translate":"multiplayer.disconnect.authservers_down"}`)
-			return fmt.Errorf("bad password")
+			_ = writeDisconnectPacket(c.writer, `{"type":"translatable","translate":"multiplayer.disconnect.authservers_down"}`)
+			return errors.New("bad password")
 		}
 		if !found {
 			if err = writeDisconnectPacket(c.writer, `{"text":"You are not white-listed on this server!"}`); err != nil {
 				return fmt.Errorf("write unknown login profile disconnect: %w", err)
 			}
-			return fmt.Errorf("unknown login profile")
+			return errors.New("unknown login profile")
 		}
 
 		loginName := String(profile.Username)
@@ -242,7 +243,7 @@ func (c *serverConn) handshake() error {
 		if err != nil {
 			return fmt.Errorf("read login acknowledged: %w", err)
 		}
-		if err = validateLoginAcknowledgedPacket(pkt); err != nil {
+		if err := validateLoginAcknowledgedPacket(pkt); err != nil {
 			return err
 		}
 		if err = runPaddingSchedule(c.reader, c.writer, false, loginAcknowledgedLength, c.paddingSchedule); err != nil {
@@ -330,13 +331,13 @@ func (c *serverConn) SetWriteDeadline(t time.Time) error {
 
 func wrapConnServer(c net.Conn, profiles []loginProfile, password string, rsaPrivateKeyDER []byte, rsaPublicKey []byte) (*serverConn, error) {
 	if len(profiles) == 0 {
-		return nil, fmt.Errorf("empty profiles")
+		return nil, errors.New("empty profiles")
 	}
 	if len(rsaPrivateKeyDER) == 0 {
-		return nil, fmt.Errorf("empty rsa private key")
+		return nil, errors.New("empty rsa private key")
 	}
 	if len(rsaPublicKey) == 0 {
-		return nil, fmt.Errorf("empty rsa public key")
+		return nil, errors.New("empty rsa public key")
 	}
 	rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(rsaPrivateKeyDER)
 	if err != nil {

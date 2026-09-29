@@ -79,6 +79,7 @@ func (v *validator) get(email, password string) *protocol.MemoryUser {
 	v.mu.RLock()
 	user := v.users[strings.ToLower(email)]
 	v.mu.RUnlock()
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	if user == nil || subtle.ConstantTimeCompare([]byte(user.Account.(*MemoryAccount).Password), []byte(password)) != 1 {
 		return nil
 	}

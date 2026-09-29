@@ -36,7 +36,7 @@ func Test_ListenXHAndDial(t *testing.T) {
 			defer c.Close()
 
 			var b [1024]byte
-			c.SetReadDeadline(time.Now().Add(2 * time.Second))
+			_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
 			_, err := c.Read(b[:])
 			if err != nil {
 				return
@@ -153,7 +153,7 @@ func Test_ListenXHAndDial_TLS(t *testing.T) {
 			defer conn.Close()
 
 			var b [1024]byte
-			conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 			_, err := conn.Read(b[:])
 			if err != nil {
 				return
@@ -212,11 +212,13 @@ func Test_ListenXHAndDial_H2C(t *testing.T) {
 		},
 	}
 
-	resp, err := client.Get("http://" + net.LocalHostIP.String() + ":" + listenPort.String())
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+net.LocalHostIP.String()+":"+listenPort.String(), nil)
+	common.Must(err)
+	resp, err := client.Do(req)
 	common.Must(err)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 404 {
+	if resp.StatusCode != http.StatusNotFound {
 		t.Error("Expected 404 but got:", resp.StatusCode)
 	}
 
@@ -323,7 +325,7 @@ func Test_ListenXHAndDial_Unix(t *testing.T) {
 			defer c.Close()
 
 			var b [1024]byte
-			c.SetReadDeadline(time.Now().Add(2 * time.Second))
+			_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
 			_, err := c.Read(b[:])
 			if err != nil {
 				return
@@ -384,7 +386,7 @@ func Test_queryString(t *testing.T) {
 			defer c.Close()
 
 			var b [1024]byte
-			c.SetReadDeadline(time.Now().Add(2 * time.Second))
+			_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
 			_, err := c.Read(b[:])
 			if err != nil {
 				return
@@ -434,8 +436,8 @@ func Test_maxUpload(t *testing.T) {
 	listen, err := ListenXH(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
-			c.SetReadDeadline(time.Now().Add(2 * time.Second))
-			io.ReadFull(c, uploadReceived)
+			_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+			_, _ = io.ReadFull(c, uploadReceived)
 
 			common.Must2(c.Write([]byte("Response")))
 		}(conn)

@@ -302,8 +302,8 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 			}
 
 			if c.FinalMask.QuicParams.Debug {
-				os.Setenv("HYSTERIA_BBR_DEBUG", "true")
-				os.Setenv("HYSTERIA_BRUTAL_DEBUG", "true")
+				_ = os.Setenv("HYSTERIA_BBR_DEBUG", "true")
+				_ = os.Setenv("HYSTERIA_BRUTAL_DEBUG", "true")
 			}
 
 			config.QuicParams = &internet.QuicParams{

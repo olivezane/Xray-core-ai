@@ -320,7 +320,7 @@ func (v *Int32Range) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &str); err == nil {
 		left, right, err := ParseRangeString(str)
 		if err == nil {
-			v.Left, v.Right = int32(left), int32(right)
+			v.Left, v.Right = int32(left), int32(right) //nolint:gosec // config values are bounded by their declared field widths
 			return nil
 		}
 	} else if err := json.Unmarshal(data, &rawint); err == nil {
@@ -352,6 +352,16 @@ func splitFromSecondDash(s string) []string {
 
 // Parse rang in string. Support negative number.
 // eg: "114-514" "-114-514" "-1919--810" "114514" ""(return 0)
+// ToUint64Pair converts a pair of config integers to uint64, rejecting the
+// negative sentinel values that Int32Range permits. A negative value would
+// otherwise wrap around to a huge uint64.
+func ToUint64Pair[T int | int32](from, to T, name string) (uint64, uint64, error) {
+	if from < 0 || to < 0 {
+		return 0, 0, errors.New(name, " must not be negative")
+	}
+	return uint64(from), uint64(to), nil
+}
+
 func ParseRangeString(str string) (int, int, error) {
 	// for number in string format like "114" or "-1"
 	if value, err := strconv.Atoi(str); err == nil {

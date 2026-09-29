@@ -1,6 +1,10 @@
 package xmc
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/xtls/xray-core/common/errors"
+)
 
 type loginProfile struct {
 	Username          string
@@ -11,19 +15,19 @@ type loginProfile struct {
 
 func profilesFromConfig(configured []*Profile) ([]loginProfile, error) {
 	if len(configured) == 0 {
-		return nil, fmt.Errorf("empty profiles")
+		return nil, errors.New("empty profiles")
 	}
 
 	profiles := make([]loginProfile, 0, len(configured))
 	for _, configuredProfile := range configured {
 		if configuredProfile == nil || configuredProfile.Username == "" {
-			return nil, fmt.Errorf("invalid profile")
+			return nil, errors.New("invalid profile")
 		}
 		if len(configuredProfile.Uuid) != len(UUID{}) {
 			return nil, fmt.Errorf("bad profile UUID length: %d", len(configuredProfile.Uuid))
 		}
 		if configuredProfile.TexturesValue == "" || configuredProfile.TexturesSignature == "" {
-			return nil, fmt.Errorf("incomplete profile textures")
+			return nil, errors.New("incomplete profile textures")
 		}
 
 		profile := loginProfile{
@@ -60,7 +64,7 @@ func readLoginSuccess(packet *mcPacket) (loginProfile, error) {
 		return loginProfile{}, err
 	}
 	if propertyCount != 1 || propertyName != "textures" || !signed {
-		return loginProfile{}, fmt.Errorf("invalid login profile properties")
+		return loginProfile{}, errors.New("invalid login profile properties")
 	}
 	profile.Username = string(username)
 	profile.TexturesValue = string(value)

@@ -51,7 +51,9 @@ func NewValidator() *Validator {
 
 func (v *Validator) Add(user *protocol.MemoryUser) (err error) {
 	v.mu.Lock()
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	v.users.Store(user.Account.(*MemoryAccount).Auth, user)
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	if id, err := uuid.Parse(user.Account.(*MemoryAccount).Auth); err == nil {
 		id[6] = 0
 		id[7] = 0
@@ -64,6 +66,7 @@ func (v *Validator) Add(user *protocol.MemoryUser) (err error) {
 func (v *Validator) DelByEmail(email string) (err error) {
 	v.mu.Lock()
 	if user := v.GetByEmail(email); user != nil {
+		//nolint:forcetypeassert // the account is created by this package's own NewAccount
 		auth := user.Account.(*MemoryAccount).Auth
 		v.users.Delete(auth)
 		if id, err := uuid.Parse(auth); err == nil {
@@ -80,6 +83,7 @@ func (v *Validator) Get(auth string) (user *protocol.MemoryUser) {
 	if id, err := uuid.Parse(auth); err == nil {
 		if user = v.GetByID(id); user != nil {
 			VR := net.PortFromBytes(id[6:8])
+			//nolint:forcetypeassert // the account is created by this package's own NewAccount
 			if user.Account.(*MemoryAccount).VR != VR {
 				user = &protocol.MemoryUser{
 					Email: user.Email,
@@ -94,6 +98,7 @@ func (v *Validator) Get(auth string) (user *protocol.MemoryUser) {
 		return
 	}
 	if value, ok := v.users.Load(auth); ok {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		user = value.(*protocol.MemoryUser)
 	}
 	return
@@ -103,6 +108,7 @@ func (v *Validator) GetByID(id uuid.UUID) (user *protocol.MemoryUser) {
 	id[6] = 0
 	id[7] = 0
 	if value, ok := v.ids.Load(id); ok {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		user = value.(*protocol.MemoryUser)
 	}
 	return
@@ -110,7 +116,9 @@ func (v *Validator) GetByID(id uuid.UUID) (user *protocol.MemoryUser) {
 
 func (v *Validator) GetByEmail(email string) (user *protocol.MemoryUser) {
 	v.users.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		if value.(*protocol.MemoryUser).Email == email {
+			//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 			user = value.(*protocol.MemoryUser)
 			return false
 		}
@@ -121,6 +129,7 @@ func (v *Validator) GetByEmail(email string) (user *protocol.MemoryUser) {
 
 func (v *Validator) GetAll() (users []*protocol.MemoryUser) {
 	v.users.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		users = append(users, value.(*protocol.MemoryUser))
 		return true
 	})

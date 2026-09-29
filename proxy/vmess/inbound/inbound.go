@@ -112,9 +112,17 @@ type Handler struct {
 // New creates a new VMess inbound handler.
 func New(ctx context.Context, config *Config) (*Handler, error) {
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
+	im, ok := v.GetFeature(feature_inbound.ManagerType()).(feature_inbound.Manager)
+	if !ok {
+		return nil, errors.New("feature_inbound.Manager is not registered in Xray core")
+	}
 	handler := &Handler{
-		policyManager:         v.GetFeature(policy.ManagerType()).(policy.Manager),
-		inboundHandlerManager: v.GetFeature(feature_inbound.ManagerType()).(feature_inbound.Manager),
+		policyManager:         pm,
+		inboundHandlerManager: im,
 		clients:               vmess.NewTimedUserValidator(),
 		usersByEmail:          newUserByEmail(config.GetDefaultValue()),
 		sessionHistory:        encoding.NewSessionHistory(),
@@ -150,7 +158,7 @@ func (*Handler) Network() []net.Network {
 func (h *Handler) GetOrGenerateUser(email string) *protocol.MemoryUser {
 	user, existing := h.usersByEmail.GetOrGenerate(email)
 	if !existing {
-		h.clients.Add(user)
+		_ = h.clients.Add(user)
 	}
 	return user
 }
@@ -212,6 +220,7 @@ func transferResponse(timer signal.ActivityUpdater, session *encoding.ServerSess
 		return err
 	}
 
+	//nolint:forcetypeassert // the account is created by proxy/vmess's own NewAccount
 	account := request.User.Account.(*vmess.MemoryAccount)
 
 	if request.Option.Has(protocol.RequestOptionChunkStream) && !account.NoTerminationSignal {
@@ -240,7 +249,7 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 	svrSession := encoding.NewServerSession(h.clients, h.sessionHistory)
 	request, err := svrSession.DecodeRequestHeader(reader, isDrain)
 	if err != nil {
-		if errors.Cause(err) != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			log.Record(&log.AccessMessage{
 				From:   connection.RemoteAddr(),
 				To:     "",
@@ -301,7 +310,7 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 		defer timer.SetTimeout(sessionPolicy.Timeouts.UplinkOnly)
 
 		writer := buf.NewBufferedWriter(buf.NewWriter(connection))
-		defer writer.Flush()
+		defer func() { _ = writer.Flush() }()
 
 		response := &protocol.ResponseHeader{
 			Command: h.generateCommand(ctx, request),
@@ -325,7 +334,7 @@ func (h *Handler) generateCommand(ctx context.Context, request *protocol.Request
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return New(ctx, config)
 	}))
 }

@@ -2,6 +2,7 @@ package xmc
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/x509"
 	"errors"
@@ -44,7 +45,7 @@ func testLoginProfile(username string) loginProfile {
 }
 
 func TestHandshakeSuccess(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
@@ -86,7 +87,7 @@ func TestHandshakeSuccess(t *testing.T) {
 		}
 	}()
 
-	clientRaw, err := net.Dial("tcp", ln.Addr().String())
+	clientRaw, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatalf("failed to dial: %v", err)
 	}
@@ -114,7 +115,7 @@ func TestHandshakeSuccess(t *testing.T) {
 }
 
 func TestHandshakePasswordMismatch(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
@@ -150,7 +151,7 @@ func TestHandshakePasswordMismatch(t *testing.T) {
 		}
 	})
 
-	clientRaw, err := net.Dial("tcp", ln.Addr().String())
+	clientRaw, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatalf("failed to dial: %v", err)
 	}

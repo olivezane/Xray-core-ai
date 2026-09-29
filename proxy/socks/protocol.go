@@ -52,7 +52,7 @@ type ServerSession struct {
 
 func (s *ServerSession) handshake4(cmd byte, reader io.Reader, writer io.Writer) (*protocol.RequestHeader, error) {
 	if s.config.AuthType == AuthType_PASSWORD {
-		writeSocks4Response(writer, socks4RequestRejected, net.AnyIP, net.Port(0))
+		_ = writeSocks4Response(writer, socks4RequestRejected, net.AnyIP, net.Port(0))
 		return nil, errors.New("socks 4 is not allowed when auth is required.")
 	}
 
@@ -94,7 +94,7 @@ func (s *ServerSession) handshake4(cmd byte, reader io.Reader, writer io.Writer)
 		}
 		return request, nil
 	default:
-		writeSocks4Response(writer, socks4RequestRejected, net.AnyIP, net.Port(0))
+		_ = writeSocks4Response(writer, socks4RequestRejected, net.AnyIP, net.Port(0))
 		return nil, errors.New("unsupported command: ", cmd)
 	}
 }
@@ -113,7 +113,7 @@ func (s *ServerSession) auth5(nMethod byte, reader io.Reader, writer io.Writer) 
 	}
 
 	if !hasAuthMethod(expectedAuth, buffer.BytesRange(0, int32(nMethod))) {
-		writeSocks5AuthenticationResponse(writer, socks5Version, authNoMatchingMethod)
+		_ = writeSocks5AuthenticationResponse(writer, socks5Version, authNoMatchingMethod)
 		return "", errors.New("no matching auth method")
 	}
 
@@ -128,7 +128,7 @@ func (s *ServerSession) auth5(nMethod byte, reader io.Reader, writer io.Writer) 
 		}
 
 		if !s.config.HasAccount(username, password) {
-			writeSocks5AuthenticationResponse(writer, 0x01, 0xFF)
+			_ = writeSocks5AuthenticationResponse(writer, 0x01, 0xFF)
 			return "", errors.New("invalid username or password")
 		}
 
@@ -171,15 +171,15 @@ func (s *ServerSession) handshake5(nMethod byte, reader io.Reader, writer net.Co
 		request.Command = protocol.RequestCommandTCP
 	case cmdUDPAssociate:
 		if !s.config.UdpEnabled {
-			writeSocks5Response(writer, statusCmdNotSupport, net.AnyIP, net.Port(0))
+			_ = writeSocks5Response(writer, statusCmdNotSupport, net.AnyIP, net.Port(0))
 			return nil, nil, errors.New("UDP is not enabled.")
 		}
 		request.Command = protocol.RequestCommandUDP
 	case cmdTCPBind:
-		writeSocks5Response(writer, statusCmdNotSupport, net.AnyIP, net.Port(0))
+		_ = writeSocks5Response(writer, statusCmdNotSupport, net.AnyIP, net.Port(0))
 		return nil, nil, errors.New("TCP bind is not supported.")
 	default:
-		writeSocks5Response(writer, statusCmdNotSupport, net.AnyIP, net.Port(0))
+		_ = writeSocks5Response(writer, statusCmdNotSupport, net.AnyIP, net.Port(0))
 		return nil, nil, errors.New("unknown command ", cmd)
 	}
 
@@ -207,10 +207,11 @@ func (s *ServerSession) handshake5(nMethod byte, reader io.Reader, writer net.Co
 		if err != nil {
 			return nil, nil, errors.New("failed to create UDP listener").Base(err)
 		}
-		responsePort = net.Port(udpHub.LocalAddr().(*net.UDPAddr).Port)
+		responsePort = net.Port(udpHub.LocalAddr().(*net.UDPAddr).Port) //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 		expectedRemote := &gonet.UDPAddr{}
 		// UDP Associate should not specify a domain as source IP
 		if request.Address.Family().IsDomain() || request.Address.IP().IsUnspecified() {
+			//nolint:forcetypeassert // the socket was created by this package as a TCP socket
 			expectedRemote.IP = writer.RemoteAddr().(*net.TCPAddr).IP // unix?
 		} else {
 			expectedRemote.IP = request.Address.IP()
@@ -369,7 +370,7 @@ func EncodeUDPPacket(request *protocol.RequestHeader, data []byte) (*buf.Buffer,
 		return nil, err
 	}
 	// if data is too large, return an empty buffer (drop too big data)
-	if b.Available() < int32(len(data)) {
+	if b.Available() < int32(len(data)) { //nolint:gosec // bounded by the buffer size / buf.Size
 		b.Clear()
 		return b, nil
 	}
@@ -461,11 +462,12 @@ func ClientHandshake(request *protocol.RequestHeader, reader io.Reader, writer i
 
 	if authByte == authPassword {
 		b.Clear()
+		//nolint:forcetypeassert // the account is created by this package's own NewAccount
 		account := request.User.Account.(*Account)
 		common.Must(b.WriteByte(0x01))
-		common.Must(b.WriteByte(byte(len(account.Username))))
+		common.Must(b.WriteByte(byte(len(account.Username)))) //nolint:gosec // SOCKS5 credentials are length-prefixed by one byte by protocol definition
 		common.Must2(b.WriteString(account.Username))
-		common.Must(b.WriteByte(byte(len(account.Password))))
+		common.Must(b.WriteByte(byte(len(account.Password)))) //nolint:gosec // SOCKS5 credentials are length-prefixed by one byte by protocol definition
 		common.Must2(b.WriteString(account.Password))
 		if err := buf.WriteAllBytes(writer, b.Bytes(), nil); err != nil {
 			return nil, err

@@ -21,7 +21,7 @@ func EncodeHeaderAddons(buffer *buf.Buffer, addons *Addons) error {
 		if err != nil {
 			return errors.New("failed to marshal addons protobuf value").Base(err)
 		}
-		if err := buffer.WriteByte(byte(len(bytes))); err != nil {
+		if err := buffer.WriteByte(byte(len(bytes))); err != nil { //nolint:gosec // VLESS addon lengths are bounded by the request header size
 			return errors.New("failed to write addons protobuf length").Base(err)
 		}
 		if _, err := buffer.Write(bytes); err != nil {
@@ -68,6 +68,7 @@ func EncodeBodyAddons(writer buf.Writer, request *protocol.RequestHeader, reques
 		return NewMultiLengthPacketWriter(writer)
 	}
 	if requestAddons.Flow == vless.XRV {
+		//nolint:forcetypeassert // the account is created by proxy/vless's own NewAccount
 		return proxy.NewVisionWriter(writer, state, isUplink, context, conn, ob, request.User.Account.(*vless.MemoryAccount).Testseed)
 	}
 	return writer
@@ -103,11 +104,11 @@ func (w *MultiLengthPacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 			continue
 		}
 		eb := buf.New()
-		if err := eb.WriteByte(byte(length >> 8)); err != nil {
+		if err := eb.WriteByte(byte(length >> 8)); err != nil { //nolint:gosec // explicit byte extraction from a shift
 			eb.Release()
 			continue
 		}
-		if err := eb.WriteByte(byte(length)); err != nil {
+		if err := eb.WriteByte(byte(length)); err != nil { //nolint:gosec // VLESS addon lengths are bounded by the request header size
 			eb.Release()
 			continue
 		}
@@ -144,7 +145,7 @@ func (w *LengthPacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 	defer func() {
 		w.cache = w.cache[:0]
 	}()
-	w.cache = append(w.cache, byte(length>>8), byte(length))
+	w.cache = append(w.cache, byte(length>>8), byte(length)) //nolint:gosec // explicit byte extraction from a shift
 	for i, b := range mb {
 		w.cache = append(w.cache, b.Bytes()...)
 		b.Release()

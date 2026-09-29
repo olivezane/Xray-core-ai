@@ -35,7 +35,7 @@ func getControlFunc(ctx context.Context, sockopt *SocketConfig, controllers []fu
 				}
 			}
 
-			setReusePort(fd)
+			_ = setReusePort(fd)
 		})
 	}
 }
@@ -53,6 +53,7 @@ func (l *UnixListenerWrapper) Accept() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	//nolint:forcetypeassert // the listener was created as a Unix socket
 	return &UnixConnWrapper{UnixConn: conn.(*net.UnixConn)}, nil
 }
 
@@ -151,6 +152,7 @@ func (dl *DefaultListener) Listen(ctx context.Context, addr net.Addr, sockopt *S
 					locker.Release()
 					return nil, err
 				}
+				//nolint:forcetypeassert // the listener was created as a Unix listener
 				l = &UnixListenerWrapper{UnixListener: l.(*net.UnixListener), locker: locker}
 				if filePerm == nil {
 					return l, nil

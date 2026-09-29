@@ -37,10 +37,10 @@ func (c *noiseConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 		for _, item := range c.config.Items {
 			if item.RandMax > 0 {
 				buf := make([]byte, crypto.RandBetween(item.RandMin, item.RandMax))
-				crypto.RandBytesBetween(buf, byte(item.RandRangeMin), byte(item.RandRangeMax))
-				c.PacketConn.WriteTo(buf, addr)
+				crypto.RandBytesBetween(buf, byte(item.RandRangeMin), byte(item.RandRangeMax)) //nolint:gosec // the random range is a config value within 0..255
+				_, _ = c.PacketConn.WriteTo(buf, addr)
 			} else {
-				c.PacketConn.WriteTo(item.Packet, addr)
+				_, _ = c.PacketConn.WriteTo(item.Packet, addr)
 			}
 			time.Sleep(time.Duration(crypto.RandBetween(item.DelayMin, item.DelayMax)) * time.Millisecond)
 		}

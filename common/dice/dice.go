@@ -1,6 +1,6 @@
 // Package dice contains common functions to generate random number.
 // It also initialize math/rand with the time in seconds at launch time.
-package dice // import "github.com/xtls/xray-core/common/dice"
+package dice
 
 import (
 	"math/rand"
@@ -32,7 +32,7 @@ func RollDeterministic(n int, seed int64) int {
 
 // RollUint16 returns a random uint16 value.
 func RollUint16() uint16 {
-	return uint16(rand.Int63() >> 47)
+	return uint16(rand.Int63() >> 47) //nolint:gosec // rand.Int63() >> 47 leaves exactly 16 bits
 }
 
 func RollUint64() uint64 {

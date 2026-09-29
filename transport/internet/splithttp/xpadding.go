@@ -43,7 +43,7 @@ func randStringFromCharset(n int, charset string) (string, bool) {
 	}
 
 	m := len(charset)
-	limit := byte(256 - (256 % m))
+	limit := byte(256 - (256 % m)) //nolint:gosec // padding lengths are bounded by the HTTP header size limit
 
 	result := make([]byte, n)
 	i := 0
@@ -88,7 +88,7 @@ func GenerateTokenishPaddingBase62(targetHuffmanBytes int) string {
 
 	// Adjust until close enough
 	for range maxIter {
-		currentLength := int(hpack.HuffmanEncodeLength(randBase62Str))
+		currentLength := int(hpack.HuffmanEncodeLength(randBase62Str)) //nolint:gosec // padding lengths are bounded by the HTTP header size limit
 		diff := currentLength - targetHuffmanBytes
 
 		if absInt(diff) <= validationTolerance {
@@ -146,7 +146,7 @@ func ApplyPaddingToCookie(req *http.Request, name, value string) {
 	if req == nil || name == "" || value == "" {
 		return
 	}
-	req.AddCookie(&http.Cookie{
+	req.AddCookie(&http.Cookie{ //nolint:gosec // G124: protocol cookie sent in the request, browser cookie attributes do not apply
 		Name:  name,
 		Value: value,
 		Path:  "/",
@@ -157,7 +157,7 @@ func ApplyPaddingToResponseCookie(writer http.ResponseWriter, name, value string
 	if name == "" || value == "" {
 		return
 	}
-	http.SetCookie(writer, &http.Cookie{
+	http.SetCookie(writer, &http.Cookie{ //nolint:gosec // G124: protocol cookie, the peer is an Xray client, not a browser
 		Name:  name,
 		Value: value,
 		Path:  "/",
@@ -312,12 +312,12 @@ func (c *Config) IsPaddingValid(paddingValue string, from, to int32, method Padd
 
 	switch method {
 	case PaddingMethodRepeatX:
-		n := int32(len(paddingValue))
+		n := int32(len(paddingValue)) //nolint:gosec // HTTP header padding length, bounded by the header size limit
 		return n >= from && n <= to
 	case PaddingMethodTokenish:
 		const tolerance = int32(validationTolerance)
 
-		n := int32(hpack.HuffmanEncodeLength(paddingValue))
+		n := int32(hpack.HuffmanEncodeLength(paddingValue)) //nolint:gosec // padding lengths are bounded by the HTTP header size limit
 		f := from - tolerance
 		t := to + tolerance
 		if f < 0 {
@@ -325,7 +325,7 @@ func (c *Config) IsPaddingValid(paddingValue string, from, to int32, method Padd
 		}
 		return n >= f && n <= t
 	default:
-		n := int32(len(paddingValue))
+		n := int32(len(paddingValue)) //nolint:gosec // HTTP header padding length, bounded by the header size limit
 		return n >= from && n <= to
 	}
 }

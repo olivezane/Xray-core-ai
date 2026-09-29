@@ -101,6 +101,7 @@ func publicKey(priv any) any {
 	case *ecdsa.PrivateKey:
 		return &k.PublicKey
 	case ed25519.PrivateKey:
+		//nolint:forcetypeassert // the certificate was generated with an ed25519 key
 		return k.Public().(ed25519.PublicKey)
 	default:
 		return nil

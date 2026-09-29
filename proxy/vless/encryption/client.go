@@ -96,7 +96,7 @@ func (i *ClientInstance) Handshake(conn net.Conn) (*CommonConn, error) {
 			index = 1088
 		}
 		if i.XorMode > 0 { // this xor can (others can't) be recovered by client's config, revealing an X25519 public key / ML-KEM-768 ciphertext, that's why "native" values
-			NewCTR(i.NfsPKeysBytes[j], iv).XORKeyStream(relays, relays[:index]) // make X25519 public key / ML-KEM-768 ciphertext distinguishable from random bytes
+			NewCTR(i.NfsPKeysBytes[j], iv).XORKeyStream(relays, relays[:index]) //nolint:gosec // G407: nonce is derived from the handshake ticket, not hardcoded // make X25519 public key / ML-KEM-768 ciphertext distinguishable from random bytes
 		}
 		if lastCTR != nil {
 			lastCTR.XORKeyStream(relays, relays[:32]) // make this relay irreplaceable
@@ -114,7 +114,7 @@ func (i *ClientInstance) Handshake(conn net.Conn) (*CommonConn, error) {
 		i.RWLock.RLock()
 		if time.Now().Before(i.Expire) {
 			c.Client = i
-			c.UnitedKey = append(i.PfsKey, nfsKey...) // different unitedKey for each connection
+			c.UnitedKey = append(i.PfsKey, nfsKey...) //nolint:gocritic // appendAssign: i.PfsKey has no spare capacity (see the make above), so append allocates a fresh slice and i.PfsKey is not mutated
 			nfsAEAD.Seal(clientHello[:ivAndRealysLength], nil, EncodeLength(32), nil)
 			nfsAEAD.Seal(clientHello[:ivAndRealysLength+18], nil, i.Ticket, nil)
 			i.RWLock.RUnlock()
@@ -156,7 +156,7 @@ func (i *ClientInstance) Handshake(conn net.Conn) (*CommonConn, error) {
 	if _, err := io.ReadFull(conn, encryptedPfsPublicKey); err != nil {
 		return nil, err
 	}
-	nfsAEAD.Open(encryptedPfsPublicKey[:0], MaxNonce, encryptedPfsPublicKey, nil)
+	_, _ = nfsAEAD.Open(encryptedPfsPublicKey[:0], MaxNonce, encryptedPfsPublicKey, nil)
 	mlkem768Key, err := mlkem768DKey.Decapsulate(encryptedPfsPublicKey[:1088])
 	if err != nil {
 		return nil, err
@@ -172,7 +172,7 @@ func (i *ClientInstance) Handshake(conn net.Conn) (*CommonConn, error) {
 	pfsKey := make([]byte, 32+32) // no more capacity
 	copy(pfsKey, mlkem768Key)
 	copy(pfsKey[32:], x25519Key)
-	c.UnitedKey = append(pfsKey, nfsKey...)
+	c.UnitedKey = append(pfsKey, nfsKey...) //nolint:gocritic // appendAssign: pfsKey has no spare capacity, so append allocates a fresh slice
 	c.AEAD = NewAEAD(pfsPublicKey, c.UnitedKey, c.UseAES)
 	c.PeerAEAD = NewAEAD(encryptedPfsPublicKey[:1088+32], c.UnitedKey, c.UseAES)
 

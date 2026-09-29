@@ -76,7 +76,7 @@ func writeMetaWithFrame(writer buf.Writer, meta FrameMetadata, data buf.MultiBuf
 	if err := meta.WriteTo(frame); err != nil {
 		return err
 	}
-	if _, err := serial.WriteUint16(frame, uint16(data.Len())); err != nil {
+	if _, err := serial.WriteUint16(frame, uint16(data.Len())); err != nil { //nolint:gosec // mux frames and session counts are bounded well below the field width
 		return err
 	}
 
@@ -131,6 +131,8 @@ func (w *Writer) Close() error {
 	frame := buf.New()
 	common.Must(meta.WriteTo(frame))
 
-	w.writer.WriteMultiBuffer(buf.MultiBuffer{frame})
+	if err := w.writer.WriteMultiBuffer(buf.MultiBuffer{frame}); err != nil {
+		return err
+	}
 	return nil
 }

@@ -74,7 +74,7 @@ func FetchHTTPContent(target string) ([]byte, error) {
 	}
 
 	resp, err := client.Do(&http.Request{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    parsedTarget,
 		Close:  true,
 	})
@@ -83,7 +83,7 @@ func FetchHTTPContent(target string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, errors.New("unexpected HTTP status code: ", resp.StatusCode)
 	}
 

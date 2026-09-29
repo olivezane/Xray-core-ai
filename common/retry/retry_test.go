@@ -69,7 +69,7 @@ func TestRetryExhausted(t *testing.T) {
 	})
 	duration := time.Since(startTime)
 
-	if errors.Cause(err) != ErrRetryFailed {
+	if !errors.Is(err, ErrRetryFailed) {
 		t.Error("cause: ", err)
 	}
 
@@ -87,7 +87,7 @@ func TestExponentialBackoff(t *testing.T) {
 	})
 	duration := time.Since(startTime)
 
-	if errors.Cause(err) != ErrRetryFailed {
+	if !errors.Is(err, ErrRetryFailed) {
 		t.Error("cause: ", err)
 	}
 	if v := int64(duration / time.Millisecond); v < 4000 {

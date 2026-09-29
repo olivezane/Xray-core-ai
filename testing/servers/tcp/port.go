@@ -11,6 +11,7 @@ func PickPort() net.Port {
 	common.Must(err)
 	defer listener.Close()
 
+	//nolint:forcetypeassert // the socket was created by this package as a TCP socket
 	addr := listener.Addr().(*net.TCPAddr)
-	return net.Port(addr.Port)
+	return net.Port(addr.Port) //nolint:gosec // Port of a net.Addr is always 0..65535
 }

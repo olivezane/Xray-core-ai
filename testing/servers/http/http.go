@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/xtls/xray-core/common/net"
 )
@@ -16,7 +17,7 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/" {
 		resp.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		resp.WriteHeader(http.StatusOK)
-		resp.Write([]byte("Home"))
+		_, _ = resp.Write([]byte("Home"))
 		return
 	}
 
@@ -28,10 +29,11 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 func (s *Server) Start() (net.Destination, error) {
 	s.server = &http.Server{
-		Addr:    "127.0.0.1:" + s.Port.String(),
-		Handler: s,
+		Addr:              "127.0.0.1:" + s.Port.String(),
+		Handler:           s,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
-	go s.server.ListenAndServe()
+	go func() { _ = s.server.ListenAndServe() }()
 	return net.TCPDestination(net.LocalHostIP, s.Port), nil
 }
 

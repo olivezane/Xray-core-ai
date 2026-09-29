@@ -108,8 +108,9 @@ func (c *FreedomConfig) Build() (proto.Message, error) {
 			if err != nil {
 				return nil, errors.New("Invalid PacketsFrom").Base(err)
 			}
-			config.Fragment.PacketsFrom = uint64(from)
-			config.Fragment.PacketsTo = uint64(to)
+			if config.Fragment.PacketsFrom, config.Fragment.PacketsTo, err = ToUint64Pair(from, to, "Packets"); err != nil {
+				return nil, err
+			}
 			if config.Fragment.PacketsFrom == 0 {
 				return nil, errors.New("PacketsFrom can't be 0")
 			}
@@ -119,8 +120,12 @@ func (c *FreedomConfig) Build() (proto.Message, error) {
 			if c.Fragment.Length == nil {
 				return nil, errors.New("Length can't be empty")
 			}
-			config.Fragment.LengthMin = uint64(c.Fragment.Length.From)
-			config.Fragment.LengthMax = uint64(c.Fragment.Length.To)
+			lengthMin, lengthMax, err := ToUint64Pair(c.Fragment.Length.From, c.Fragment.Length.To, "Length")
+			if err != nil {
+				return nil, err
+			}
+			config.Fragment.LengthMin = lengthMin
+			config.Fragment.LengthMax = lengthMax
 			if config.Fragment.LengthMin == 0 {
 				return nil, errors.New("LengthMin can't be 0")
 			}
@@ -130,14 +135,22 @@ func (c *FreedomConfig) Build() (proto.Message, error) {
 			if c.Fragment.Interval == nil {
 				return nil, errors.New("Interval can't be empty")
 			}
-			config.Fragment.IntervalMin = uint64(c.Fragment.Interval.From)
-			config.Fragment.IntervalMax = uint64(c.Fragment.Interval.To)
+			intervalMin, intervalMax, err := ToUint64Pair(c.Fragment.Interval.From, c.Fragment.Interval.To, "Interval")
+			if err != nil {
+				return nil, err
+			}
+			config.Fragment.IntervalMin = intervalMin
+			config.Fragment.IntervalMax = intervalMax
 		}
 
 		{
 			if c.Fragment.MaxSplit != nil {
-				config.Fragment.MaxSplitMin = uint64(c.Fragment.MaxSplit.From)
-				config.Fragment.MaxSplitMax = uint64(c.Fragment.MaxSplit.To)
+				maxSplitMin, maxSplitMax, err := ToUint64Pair(c.Fragment.MaxSplit.From, c.Fragment.MaxSplit.To, "MaxSplit")
+				if err != nil {
+					return nil, err
+				}
+				config.Fragment.MaxSplitMin = maxSplitMin
+				config.Fragment.MaxSplitMax = maxSplitMax
 			}
 		}
 	}
@@ -200,12 +213,13 @@ func ParseNoise(noise *Noise) (*freedom.Noise, error) {
 
 	switch noise.Type {
 	case "rand":
-		min, max, err := ParseRangeString(noise.Packet)
+		minVal, maxVal, err := ParseRangeString(noise.Packet)
 		if err != nil {
 			return nil, errors.New("invalid value for rand Length").Base(err)
 		}
-		NConfig.LengthMin = uint64(min)
-		NConfig.LengthMax = uint64(max)
+		if NConfig.LengthMin, NConfig.LengthMax, err = ToUint64Pair(minVal, maxVal, "rand length"); err != nil {
+			return nil, err
+		}
 		if NConfig.LengthMin == 0 {
 			return nil, errors.New("rand lengthMin or lengthMax cannot be 0")
 		}
@@ -233,8 +247,9 @@ func ParseNoise(noise *Noise) (*freedom.Noise, error) {
 	}
 
 	if noise.Delay != nil {
-		NConfig.DelayMin = uint64(noise.Delay.From)
-		NConfig.DelayMax = uint64(noise.Delay.To)
+		if NConfig.DelayMin, NConfig.DelayMax, err = ToUint64Pair(noise.Delay.From, noise.Delay.To, "Delay"); err != nil {
+			return nil, err
+		}
 	}
 	switch strings.ToLower(noise.ApplyTo) {
 	case "", "ip", "all":
@@ -278,9 +293,13 @@ func (c *FreedomFinalRuleConfig) Build() (*freedom.FinalRuleConfig, error) {
 	}
 
 	if c.BlockDelay != nil {
+		minVal, maxVal, err := ToUint64Pair(c.BlockDelay.From, c.BlockDelay.To, "BlockDelay")
+		if err != nil {
+			return nil, err
+		}
 		rule.BlockDelay = &freedom.Range{
-			Min: uint64(c.BlockDelay.From),
-			Max: uint64(c.BlockDelay.To),
+			Min: minVal,
+			Max: maxVal,
 		}
 	}
 

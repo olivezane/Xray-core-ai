@@ -56,12 +56,13 @@ func DecodeJSONConfig(reader io.Reader) (*conf.Config, error) {
 
 	if err := decoder.Decode(jsonConfig); err != nil {
 		var pos *offset
-		cause := errors.Cause(err)
-		switch tErr := cause.(type) {
-		case *json.SyntaxError:
-			pos = findOffset(jsonContent.Bytes(), int(tErr.Offset))
-		case *json.UnmarshalTypeError:
-			pos = findOffset(jsonContent.Bytes(), int(tErr.Offset))
+		var syntaxErr *json.SyntaxError
+		var typeErr *json.UnmarshalTypeError
+		switch {
+		case errors.As(err, &syntaxErr):
+			pos = findOffset(jsonContent.Bytes(), int(syntaxErr.Offset))
+		case errors.As(err, &typeErr):
+			pos = findOffset(jsonContent.Bytes(), int(typeErr.Offset))
 		}
 		if pos != nil {
 			return nil, errors.New("failed to read config file at line ", pos.line, " char ", pos.char).Base(err)

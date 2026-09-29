@@ -69,10 +69,12 @@ func TestHttpConformance(t *testing.T) {
 			Transport: transport,
 		}
 
-		resp, err := client.Get("http://127.0.0.1:" + httpServerPort.String())
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:"+httpServerPort.String(), nil)
+		common.Must(err)
+		resp, err := client.Do(req)
 		common.Must(err)
 		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			t.Fatal("status: ", resp.StatusCode)
 		}
 
@@ -133,11 +135,13 @@ func TestHttpError(t *testing.T) {
 			Transport: transport,
 		}
 
-		resp, err := client.Get("http://127.0.0.1:" + dest.Port.String())
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:"+dest.Port.String(), nil)
+		common.Must(err)
+		resp, err := client.Do(req)
 		if resp != nil {
 			defer resp.Body.Close()
 		}
-		if resp != nil && resp.StatusCode != 503 || err != nil && !strings.Contains(err.Error(), "malformed HTTP status code") {
+		if resp != nil && resp.StatusCode != http.StatusServiceUnavailable || err != nil && !strings.Contains(err.Error(), "malformed HTTP status code") {
 			t.Error("should not receive http response", err)
 		}
 	}
@@ -190,6 +194,7 @@ func TestHTTPConnectMethod(t *testing.T) {
 		common.Must2(rand.Read(payload))
 
 		ctx := context.Background()
+		//nolint:usestdlibvars // the non-canonical casing is what this test exercises
 		req, err := http.NewRequestWithContext(ctx, "Connect", "http://"+dest.NetAddr()+"/", bytes.NewReader(payload))
 		req.Header.Set("X-a", "b")
 		req.Header.Set("X-b", "d")
@@ -198,7 +203,7 @@ func TestHTTPConnectMethod(t *testing.T) {
 		resp, err := client.Do(req)
 		common.Must(err)
 		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			t.Fatal("status: ", resp.StatusCode)
 		}
 
@@ -220,12 +225,12 @@ func TestHttpPost(t *testing.T) {
 				r.Body.Close()
 
 				if err != nil {
-					w.WriteHeader(500)
-					w.Write([]byte("Unable to read all payload"))
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = w.Write([]byte("Unable to read all payload"))
 					return
 				}
 				payload = xor(payload)
-				w.Write(payload)
+				_, _ = w.Write(payload)
 			},
 		},
 	}
@@ -272,10 +277,13 @@ func TestHttpPost(t *testing.T) {
 		payload := make([]byte, 1024*64)
 		common.Must2(rand.Read(payload))
 
-		resp, err := client.Post("http://127.0.0.1:"+httpServerPort.String()+"/testpost", "application/x-www-form-urlencoded", bytes.NewReader(payload))
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "http://127.0.0.1:"+httpServerPort.String()+"/testpost", bytes.NewReader(payload))
+		common.Must(err)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		resp, err := client.Do(req)
 		common.Must(err)
 		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			t.Fatal("status: ", resp.StatusCode)
 		}
 
@@ -343,38 +351,40 @@ func TestHttpBasicAuth(t *testing.T) {
 		}
 
 		{
-			resp, err := client.Get("http://127.0.0.1:" + httpServerPort.String())
+			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:"+httpServerPort.String(), nil)
+			common.Must(err)
+			resp, err := client.Do(req)
 			common.Must(err)
 			defer resp.Body.Close()
-			if resp.StatusCode != 407 {
+			if resp.StatusCode != http.StatusProxyAuthRequired {
 				t.Fatal("status: ", resp.StatusCode)
 			}
 		}
 
 		{
 			ctx := context.Background()
-			req, err := http.NewRequestWithContext(ctx, "GET", "http://127.0.0.1:"+httpServerPort.String(), nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:"+httpServerPort.String(), nil)
 			common.Must(err)
 
 			setProxyBasicAuth(req, "a", "c")
 			resp, err := client.Do(req)
 			common.Must(err)
 			defer resp.Body.Close()
-			if resp.StatusCode != 407 {
+			if resp.StatusCode != http.StatusProxyAuthRequired {
 				t.Fatal("status: ", resp.StatusCode)
 			}
 		}
 
 		{
 			ctx := context.Background()
-			req, err := http.NewRequestWithContext(ctx, "GET", "http://127.0.0.1:"+httpServerPort.String(), nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:"+httpServerPort.String(), nil)
 			common.Must(err)
 
 			setProxyBasicAuth(req, "a", "b")
 			resp, err := client.Do(req)
 			common.Must(err)
 			defer resp.Body.Close()
-			if resp.StatusCode != 200 {
+			if resp.StatusCode != http.StatusOK {
 				t.Fatal("status: ", resp.StatusCode)
 			}
 

@@ -45,13 +45,13 @@ func TestRequestSerialization(t *testing.T) {
 	common.Must(client.EncodeRequestHeader(expectedRequest, buffer))
 
 	buffer2 := buf.New()
-	buffer2.Write(buffer.Bytes())
+	_, _ = buffer2.Write(buffer.Bytes())
 
 	sessionHistory := NewSessionHistory()
 	defer common.Close(sessionHistory)
 
 	userValidator := vmess.NewTimedUserValidator()
-	userValidator.Add(user)
+	_ = userValidator.Add(user)
 	defer common.Close(userValidator)
 
 	server := NewServerSession(userValidator, sessionHistory)
@@ -94,13 +94,13 @@ func TestInvalidRequest(t *testing.T) {
 	common.Must(client.EncodeRequestHeader(expectedRequest, buffer))
 
 	buffer2 := buf.New()
-	buffer2.Write(buffer.Bytes())
+	_, _ = buffer2.Write(buffer.Bytes())
 
 	sessionHistory := NewSessionHistory()
 	defer common.Close(sessionHistory)
 
 	userValidator := vmess.NewTimedUserValidator()
-	userValidator.Add(user)
+	_ = userValidator.Add(user)
 	defer common.Close(userValidator)
 
 	server := NewServerSession(userValidator, sessionHistory)
@@ -134,13 +134,13 @@ func TestMuxRequest(t *testing.T) {
 	common.Must(client.EncodeRequestHeader(expectedRequest, buffer))
 
 	buffer2 := buf.New()
-	buffer2.Write(buffer.Bytes())
+	_, _ = buffer2.Write(buffer.Bytes())
 
 	sessionHistory := NewSessionHistory()
 	defer common.Close(sessionHistory)
 
 	userValidator := vmess.NewTimedUserValidator()
-	userValidator.Add(user)
+	_ = userValidator.Add(user)
 	defer common.Close(userValidator)
 
 	server := NewServerSession(userValidator, sessionHistory)

@@ -128,7 +128,7 @@ func handleInput(ctx context.Context, conn *connEntry, dest net.Destination, cal
 	defer func() {
 		conn.Close()
 		if callClose != nil {
-			callClose()
+			_ = callClose()
 		}
 	}()
 
@@ -220,7 +220,7 @@ func (c *dispatcherConn) WriteTo(p []byte, addr net.Addr) (int, error) {
 	buffer := buf.New()
 	raw := buffer.Extend(buf.Size)
 	n := copy(raw, p)
-	buffer.Resize(0, int32(n))
+	buffer.Resize(0, int32(n)) //nolint:gosec // read length is bounded by the buffer size
 
 	destination := net.DestinationFromAddr(addr)
 	buffer.UDP = &destination

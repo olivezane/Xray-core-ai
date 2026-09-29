@@ -23,7 +23,7 @@ func (g *SubstrMatcherGroup) Match(input string) []uint32 {
 	var result []uint32
 	for i, pattern := range g.patterns {
 		for j := strings.LastIndex(input, pattern); j != -1; j = strings.LastIndex(input[:j], pattern) {
-			result = append(result, uint32(j)<<16|uint32(i)&0xffff) // uint32: position (higher 16 bit) | patternIdx (lower 16 bit)
+			result = append(result, uint32(j)<<16|uint32(i)&0xffff) //nolint:gosec // uint32: position (higher 16 bit) | patternIdx (lower 16 bit)
 		}
 	}
 	// sort.Slice will trigger allocation no matter what input is. See https://github.com/golang/go/issues/17332

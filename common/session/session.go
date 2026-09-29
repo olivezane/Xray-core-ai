@@ -1,5 +1,5 @@
 // Package session provides functions for sessions of incoming requests.
-package session // import "github.com/xtls/xray-core/common/session"
+package session
 
 import (
 	"context"

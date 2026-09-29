@@ -21,7 +21,7 @@ func (r reflectionService) Register(s *grpc.Server) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ReflectionConfig)(nil), func(ctx context.Context, cfg any) (any, error) {
+	common.Must(common.RegisterConfig((*ReflectionConfig)(nil), func(ctx context.Context, cfg *ReflectionConfig) (any, error) {
 		return reflectionService{}, nil
 	}))
 }

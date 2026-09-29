@@ -77,7 +77,7 @@ func executePing(cmd *base.Command, args []string) {
 			base.Fatalf("Failed to dial tcp: %s", err)
 		}
 		tlsConn := xtls.GeneraticUClient(tcpConn, &gotls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec // xray tls ping exists precisely to inspect a server whose certificate is not trusted yet
 			NextProtos:         []string{"h2", "http/1.1"},
 			MaxVersion:         gotls.VersionTLS13,
 			MinVersion:         gotls.VersionTLS12,
@@ -89,7 +89,7 @@ func executePing(cmd *base.Command, args []string) {
 			fmt.Println("Handshake succeeded")
 			printTLSConnDetail(tabWriter, tlsConn)
 			printCertificates(tabWriter, tlsConn.ConnectionState().PeerCertificates)
-			tabWriter.Flush()
+			_ = tabWriter.Flush()
 		}
 		tlsConn.Close()
 	}
@@ -114,7 +114,7 @@ func executePing(cmd *base.Command, args []string) {
 			fmt.Println("Handshake succeeded")
 			printTLSConnDetail(tabWriter, tlsConn)
 			printCertificates(tabWriter, tlsConn.ConnectionState().PeerCertificates)
-			tabWriter.Flush()
+			_ = tabWriter.Flush()
 		}
 		tlsConn.Close()
 	}
@@ -135,15 +135,15 @@ func printCertificates(tabWriter *tabwriter.Writer, certs []*x509.Certificate) {
 			CAs = append(CAs, cert)
 		}
 	}
-	fmt.Fprintf(tabWriter, "Certificate chain's total length:\t%d (certs count: %s)\n", length, strconv.Itoa(len(certs)))
+	_, _ = fmt.Fprintf(tabWriter, "Certificate chain's total length:\t%d (certs count: %s)\n", length, strconv.Itoa(len(certs)))
 	if leaf != nil {
-		fmt.Fprintf(tabWriter, "Cert's signature algorithm:\t%s\n", leaf.SignatureAlgorithm.String())
-		fmt.Fprintf(tabWriter, "Cert's publicKey algorithm:\t%s\n", leaf.PublicKeyAlgorithm.String())
-		fmt.Fprintf(tabWriter, "Cert's leaf SHA256:\t%s\n", hex.EncodeToString(xtls.GenerateCertHash(leaf)))
+		_, _ = fmt.Fprintf(tabWriter, "Cert's signature algorithm:\t%s\n", leaf.SignatureAlgorithm.String())
+		_, _ = fmt.Fprintf(tabWriter, "Cert's publicKey algorithm:\t%s\n", leaf.PublicKeyAlgorithm.String())
+		_, _ = fmt.Fprintf(tabWriter, "Cert's leaf SHA256:\t%s\n", hex.EncodeToString(xtls.GenerateCertHash(leaf)))
 		for _, ca := range CAs {
-			fmt.Fprintf(tabWriter, "Cert's CA <%s> SHA256:\t%s\n", ca.Subject.CommonName, hex.EncodeToString(xtls.GenerateCertHash(ca)))
+			_, _ = fmt.Fprintf(tabWriter, "Cert's CA <%s> SHA256:\t%s\n", ca.Subject.CommonName, hex.EncodeToString(xtls.GenerateCertHash(ca)))
 		}
-		fmt.Fprintf(tabWriter, "Cert's allowed domains:\t%v\n", leaf.DNSNames)
+		_, _ = fmt.Fprintf(tabWriter, "Cert's allowed domains:\t%v\n", leaf.DNSNames)
 	}
 }
 
@@ -156,12 +156,12 @@ func printTLSConnDetail(tabWriter *tabwriter.Writer, tlsConn *utls.UConn) {
 	case gotls.VersionTLS12:
 		tlsVersion = "TLS 1.2"
 	}
-	fmt.Fprintf(tabWriter, "TLS Version:\t%s\n", tlsVersion)
+	_, _ = fmt.Fprintf(tabWriter, "TLS Version:\t%s\n", tlsVersion)
 	curveID := utils.AccessField[utls.CurveID](tlsConn.Conn, "curveID")
 	if curveID != nil {
 		PostQuantum := (*curveID == utls.X25519MLKEM768)
-		fmt.Fprintf(tabWriter, "TLS Post-Quantum key exchange:\t%t (%s)\n", PostQuantum, curveID.String())
+		_, _ = fmt.Fprintf(tabWriter, "TLS Post-Quantum key exchange:\t%t (%s)\n", PostQuantum, curveID.String())
 	} else {
-		fmt.Fprintf(tabWriter, "TLS Post-Quantum key exchange:  false (RSA Exchange)\n")
+		_, _ = fmt.Fprintf(tabWriter, "TLS Post-Quantum key exchange:  false (RSA Exchange)\n")
 	}
 }

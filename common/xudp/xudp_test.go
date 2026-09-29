@@ -19,10 +19,12 @@ func TestXudpReadWrite(t *testing.T) {
 
 	source := make(buf.MultiBuffer, 0, 16)
 	b := buf.New()
-	b.WriteByte('a')
+	if err := b.WriteByte('a'); err != nil {
+		t.Fatal(err)
+	}
 	b.UDP = &addr
 	source = append(source, b)
-	writer.WriteMultiBuffer(source)
+	_ = writer.WriteMultiBuffer(source)
 
 	reader := NewPacketReader(&m)
 	dest, err := reader.ReadMultiBuffer()

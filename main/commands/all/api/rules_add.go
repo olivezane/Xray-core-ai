@@ -41,15 +41,15 @@ func executeAddRules(cmd *base.Command, args []string) {
 	var shouldAppend bool
 	setSharedFlags(cmd)
 	cmd.Flag.BoolVar(&shouldAppend, "append", false, "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 
 	unnamedArgs := cmd.Flag.Args()
 	if len(unnamedArgs) == 0 {
 		fmt.Println("reading from stdin:")
 		unnamedArgs = []string{"stdin:"}
 	}
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := routerService.NewRoutingServiceClient(conn)
 

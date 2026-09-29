@@ -103,7 +103,7 @@ func New(ctx context.Context, config *Config) (*DNS, error) {
 				effectiveRules = append(effectiveRules, localTLDsAndDotlessDomainsRules...)
 				for _, rule := range localTLDsAndDotlessDomainsRules {
 					matcherInfos = append(matcherInfos, &DomainMatcherInfo{
-						clientIdx:  uint16(clientIdx),
+						clientIdx:  uint16(clientIdx), //nolint:gosec // the number of configured DNS clients is far below 65535
 						domainRule: rule.String(),
 					})
 				}
@@ -112,7 +112,7 @@ func New(ctx context.Context, config *Config) (*DNS, error) {
 			effectiveRules = append(effectiveRules, ns.Domain...)
 			for _, rule := range ns.Domain {
 				matcherInfos = append(matcherInfos, &DomainMatcherInfo{
-					clientIdx:  uint16(clientIdx),
+					clientIdx:  uint16(clientIdx), //nolint:gosec // the number of configured DNS clients is far below 65535
 					domainRule: rule.String(),
 				})
 			}
@@ -553,7 +553,7 @@ func makeGroups( /*ctx context.Context,*/ clients []*Client) ([]group, []int) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return New(ctx, config)
 	}))
 }

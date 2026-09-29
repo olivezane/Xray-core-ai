@@ -149,7 +149,7 @@ func (name Name) TrimSuffix(suffix Name) (Name, bool) {
 	split := len(name) - len(suffix)
 	fore, aft := name[:split], name[split:]
 	for i := range aft {
-		if !bytes.Equal(bytes.ToLower(aft[i]), bytes.ToLower(suffix[i])) {
+		if !bytes.EqualFold(aft[i], suffix[i]) {
 			return nil, false
 		}
 	}
@@ -357,7 +357,7 @@ func readMessage(r io.ReadSeeker) (Message, error) {
 
 	// Question section
 	// https://tools.ietf.org/html/rfc1035#section-4.1.2
-	for i := 0; i < int(qdCount); i++ {
+	for range int(qdCount) {
 		question, err := readQuestion(r)
 		if err != nil {
 			return message, err
@@ -375,7 +375,7 @@ func readMessage(r io.ReadSeeker) (Message, error) {
 		{&message.Authority, nsCount},
 		{&message.Additional, arCount},
 	} {
-		for i := 0; i < int(rec.count); i++ {
+		for range int(rec.count) {
 			rr, err := readRR(r)
 			if err != nil {
 				return message, err
@@ -393,12 +393,12 @@ func readMessage(r io.ReadSeeker) (Message, error) {
 func MessageFromWireFormat(buf []byte) (Message, error) {
 	r := bytes.NewReader(buf)
 	message, err := readMessage(r)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		err = io.ErrUnexpectedEOF
 	} else if err == nil {
 		// Check for trailing bytes.
 		_, err = r.ReadByte()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			err = nil
 		} else if err == nil {
 			err = ErrTrailingBytes
@@ -435,7 +435,7 @@ func (builder *messageBuilder) WriteName(name Name) {
 		// Has this suffix already been encoded in the message?
 		if ptr, ok := builder.nameCache[name[i:].String()]; ok && ptr&0x3fff == ptr {
 			// If so, we can write a compression pointer.
-			binary.Write(&builder.w, binary.BigEndian, uint16(0xc000|ptr))
+			_ = binary.Write(&builder.w, binary.BigEndian, uint16(0xc000|ptr)) //nolint:gosec // G115: the value is bounded by the fixture built above
 			return
 		}
 		// Not cached; we must encode this label verbatim. Store a cache
@@ -456,8 +456,8 @@ func (builder *messageBuilder) WriteName(name Name) {
 func (builder *messageBuilder) WriteQuestion(question *Question) {
 	// https://tools.ietf.org/html/rfc1035#section-4.1.2
 	builder.WriteName(question.Name)
-	binary.Write(&builder.w, binary.BigEndian, question.Type)
-	binary.Write(&builder.w, binary.BigEndian, question.Class)
+	_ = binary.Write(&builder.w, binary.BigEndian, question.Type)
+	_ = binary.Write(&builder.w, binary.BigEndian, question.Class)
 }
 
 // WriteRR appends a resource record to the in-progress messageBuilder. It
@@ -465,14 +465,14 @@ func (builder *messageBuilder) WriteQuestion(question *Question) {
 func (builder *messageBuilder) WriteRR(rr *RR) error {
 	// https://tools.ietf.org/html/rfc1035#section-4.1.3
 	builder.WriteName(rr.Name)
-	binary.Write(&builder.w, binary.BigEndian, rr.Type)
-	binary.Write(&builder.w, binary.BigEndian, rr.Class)
-	binary.Write(&builder.w, binary.BigEndian, rr.TTL)
-	rdLength := uint16(len(rr.Data))
+	_ = binary.Write(&builder.w, binary.BigEndian, rr.Type)
+	_ = binary.Write(&builder.w, binary.BigEndian, rr.Class)
+	_ = binary.Write(&builder.w, binary.BigEndian, rr.TTL)
+	rdLength := uint16(len(rr.Data)) //nolint:gosec // record data is bounded by the packet size
 	if int(rdLength) != len(rr.Data) {
 		return ErrIntegerOverflow
 	}
-	binary.Write(&builder.w, binary.BigEndian, rdLength)
+	_ = binary.Write(&builder.w, binary.BigEndian, rdLength)
 	builder.w.Write(rr.Data)
 	return nil
 }
@@ -484,19 +484,19 @@ func (builder *messageBuilder) WriteRR(rr *RR) error {
 func (builder *messageBuilder) WriteMessage(message *Message) error {
 	// Header section
 	// https://tools.ietf.org/html/rfc1035#section-4.1.1
-	binary.Write(&builder.w, binary.BigEndian, message.ID)
-	binary.Write(&builder.w, binary.BigEndian, message.Flags)
+	_ = binary.Write(&builder.w, binary.BigEndian, message.ID)
+	_ = binary.Write(&builder.w, binary.BigEndian, message.Flags)
 	for _, count := range []int{
 		len(message.Question),
 		len(message.Answer),
 		len(message.Authority),
 		len(message.Additional),
 	} {
-		count16 := uint16(count)
+		count16 := uint16(count) //nolint:gosec // DNS lengths and counts are bounded by the packet size
 		if int(count16) != count {
 			return ErrIntegerOverflow
 		}
-		binary.Write(&builder.w, binary.BigEndian, count16)
+		_ = binary.Write(&builder.w, binary.BigEndian, count16)
 	}
 
 	// Question section
@@ -575,7 +575,7 @@ func EncodeRDataTXT(p []byte) []byte {
 	}
 	// Must write here, even if len(p) == 0, because it's "*one or more*
 	// <character-string>s".
-	buf.WriteByte(byte(len(p)))
+	buf.WriteByte(byte(len(p))) //nolint:gosec // DNS lengths and counts are bounded by the packet size
 	buf.Write(p)
 	return buf.Bytes()
 }

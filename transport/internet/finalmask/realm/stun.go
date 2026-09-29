@@ -170,7 +170,7 @@ func expandSymmetricNATCandidates(candidates []netip.AddrPort, seen map[netip.Ad
 		end := min(int(ports[len(ports)-1])+symmetricNATExtraPorts, 65535)
 		added := 0
 		for port := start; port <= end && added < symmetricNATMaxPortsPerHost; port++ {
-			addr := netip.AddrPortFrom(ip, uint16(port))
+			addr := netip.AddrPortFrom(ip, uint16(port)) //nolint:gosec // the port is a 16-bit field on the STUN wire
 			if _, ok := seen[addr]; ok {
 				continue
 			}

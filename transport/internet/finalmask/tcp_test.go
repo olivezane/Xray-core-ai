@@ -3,6 +3,7 @@ package finalmask_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	gonet "net"
 	"strings"
@@ -113,19 +114,19 @@ func TestConnReadWrite(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { listener.Close() })
+			t.Cleanup(func() { _ = listener.Close() })
 
-			client, err := finalMask.DialTCP(context.Background(), net.TCPDestination(net.IPAddress(listener.Addr().(*net.TCPAddr).IP), net.Port(listener.Addr().(*net.TCPAddr).Port)))
+			client, err := finalMask.DialTCP(context.Background(), net.TCPDestination(net.IPAddress(listener.Addr().(*net.TCPAddr).IP), net.Port(listener.Addr().(*net.TCPAddr).Port))) //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { client.Close() })
+			t.Cleanup(func() { _ = client.Close() })
 
 			server, err := listener.Accept()
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { server.Close() })
+			t.Cleanup(func() { _ = server.Close() })
 
 			_ = client.SetDeadline(time.Now().Add(time.Second))
 			_ = server.SetDeadline(time.Now().Add(time.Second))
@@ -173,7 +174,7 @@ func TestTCPcustomStaticHandshakeRoundTrip(t *testing.T) {
 	}
 	defer listener.Close()
 
-	client, err := finalMask.DialTCP(context.Background(), net.TCPDestination(net.IPAddress(listener.Addr().(*net.TCPAddr).IP), net.Port(listener.Addr().(*net.TCPAddr).Port)))
+	client, err := finalMask.DialTCP(context.Background(), net.TCPDestination(net.IPAddress(listener.Addr().(*net.TCPAddr).IP), net.Port(listener.Addr().(*net.TCPAddr).Port))) //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +258,8 @@ func TestTCPcustomClientRejectsMismatchedServerSequence(t *testing.T) {
 	if readErr == nil {
 		t.Fatal("expected server read to fail")
 	}
-	if ne, ok := readErr.(net.Error); !ok || !ne.Timeout() {
+	var ne gonet.Error
+	if !errors.As(readErr, &ne) || !ne.Timeout() {
 		t.Fatalf("expected server timeout after client auth failure, got %v", readErr)
 	}
 }
@@ -289,7 +291,7 @@ func TestTCPWrapListenerRejectsImmediateWrapErrors(t *testing.T) {
 		}{conn: conn, err: err}
 	}()
 
-	client, err := finalMask.DialTCP(context.Background(), net.TCPDestination(net.IPAddress(listener.Addr().(*net.TCPAddr).IP), net.Port(listener.Addr().(*net.TCPAddr).Port)))
+	client, err := finalMask.DialTCP(context.Background(), net.TCPDestination(net.IPAddress(listener.Addr().(*net.TCPAddr).IP), net.Port(listener.Addr().(*net.TCPAddr).Port))) //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,7 +25,7 @@ type http2Peer struct {
 
 func tcpPipe(t *testing.T) (net.Conn, net.Conn) {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer ln.Close()
 	accepted := make(chan net.Conn, 1)
@@ -33,7 +33,7 @@ func tcpPipe(t *testing.T) (net.Conn, net.Conn) {
 		conn, _ := ln.Accept()
 		accepted <- conn
 	}()
-	client, err := net.Dial("tcp", ln.Addr().String())
+	client, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", ln.Addr().String())
 	require.NoError(t, err)
 	server := <-accepted
 	require.NotNil(t, server)
@@ -46,7 +46,7 @@ func newHTTP2Peer(t *testing.T, settings ...http2.Setting) (*http2ClientConn, *h
 	p := &http2Peer{t: t, conn: server, fr: http2.NewFramer(server, server)}
 	p.henc = hpack.NewEncoder(&p.hbuf)
 	p.fr.ReadMetaHeaders = hpack.NewDecoder(4096, nil)
-	t.Cleanup(func() { server.Close() })
+	t.Cleanup(func() { _ = server.Close() })
 
 	ccErr := make(chan error, 1)
 	var cc *http2ClientConn
@@ -63,10 +63,12 @@ func newHTTP2Peer(t *testing.T, settings ...http2.Setting) (*http2ClientConn, *h
 	f := p.readFrame()
 	require.IsType(t, &http2.SettingsFrame{}, f)
 	var got []http2.Setting
-	f.(*http2.SettingsFrame).ForeachSetting(func(s http2.Setting) error {
+	if err := f.(*http2.SettingsFrame).ForeachSetting(func(s http2.Setting) error { //nolint:forcetypeassert // f was asserted to be a *http2.SettingsFrame just above
 		got = append(got, s)
 		return nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 	require.Equal(t, []http2.Setting{
 		{ID: http2.SettingHeaderTableSize, Val: http2HeaderTableSize},
 		{ID: http2.SettingEnablePush, Val: 0},
@@ -76,20 +78,22 @@ func newHTTP2Peer(t *testing.T, settings ...http2.Setting) (*http2ClientConn, *h
 	f = p.readFrame()
 	require.IsType(t, &http2.WindowUpdateFrame{}, f)
 	require.Equal(t, uint32(0), f.Header().StreamID)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, uint32(http2ConnectionWindow-http2DefaultWindow), f.(*http2.WindowUpdateFrame).Increment)
 	require.NoError(t, <-ccErr)
-	t.Cleanup(func() { cc.Close() })
+	t.Cleanup(func() { _ = cc.Close() })
 
 	require.NoError(t, p.fr.WriteSettings(settings...))
 	f = p.readFrame()
 	require.IsType(t, &http2.SettingsFrame{}, f)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.True(t, f.(*http2.SettingsFrame).IsAck())
 	return cc, p
 }
 
 func (p *http2Peer) readFrame() http2.Frame {
 	p.t.Helper()
-	p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_ = p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	f, err := p.fr.ReadFrame()
 	require.NoError(p.t, err)
 	return f
@@ -128,13 +132,15 @@ func TestHTTP2ClientRequest(t *testing.T) {
 		err error
 	}
 	results := make(chan result, 1)
+	req := connectRequest(t, context.Background(), pr)
 	go func() {
-		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), pr)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
+		rsp, err := cc.RoundTrip(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		results <- result{rsp, err}
 	}()
 
 	f := p.readFrame()
 	require.IsType(t, &http2.MetaHeadersFrame{}, f)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	headers := f.(*http2.MetaHeadersFrame)
 	require.False(t, headers.StreamEnded())
 	var fields []string
@@ -157,9 +163,10 @@ func TestHTTP2ClientRequest(t *testing.T) {
 	require.Equal(t, http.StatusOK, r.rsp.StatusCode)
 	require.Equal(t, "?1", r.rsp.Header.Get("Capsule-Protocol"))
 
-	go pw.Write([]byte("ping"))
+	go func() { _, _ = pw.Write([]byte("ping")) }()
 	f = p.readFrame()
 	require.IsType(t, &http2.DataFrame{}, f)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, "ping", string(f.(*http2.DataFrame).Data()))
 
 	require.NoError(t, p.fr.WriteData(http2StreamID, false, []byte("pong")))
@@ -171,6 +178,7 @@ func TestHTTP2ClientRequest(t *testing.T) {
 	require.NoError(t, pw.Close())
 	f = p.readFrame()
 	require.IsType(t, &http2.DataFrame{}, f)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.True(t, f.(*http2.DataFrame).StreamEnded())
 
 	require.NoError(t, p.fr.WriteData(http2StreamID, true, nil))
@@ -182,10 +190,11 @@ func TestHTTP2ClientDefaultUserAgent(t *testing.T) {
 	cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 	req := connectRequest(t, context.Background(), nil)
 	delete(req.Header, "User-Agent")
-	go cc.RoundTrip(req)
+	go func() { _, _ = cc.RoundTrip(req) }() //nolint:bodyclose // response body is owned by the returned conn
 	f := p.readFrame()
 	require.IsType(t, &http2.MetaHeadersFrame{}, f)
 	var userAgents []string
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	for _, hf := range f.(*http2.MetaHeadersFrame).Fields {
 		if hf.Name == "user-agent" {
 			userAgents = append(userAgents, hf.Value)
@@ -202,7 +211,8 @@ func TestHTTP2ClientNeedsExtendedConnect(t *testing.T) {
 
 func TestHTTP2ClientSingleStream(t *testing.T) {
 	cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
-	go cc.RoundTrip(connectRequest(t, context.Background(), nil))
+	req := connectRequest(t, context.Background(), nil)
+	go func() { _, _ = cc.RoundTrip(req) }() //nolint:bodyclose // response body is owned by the returned conn
 	p.readFrame()
 	_, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.ErrorIs(t, err, errHTTP2StreamUsed)
@@ -214,15 +224,18 @@ func TestHTTP2ClientFlowControl(t *testing.T) {
 		http2.Setting{ID: http2.SettingInitialWindowSize, Val: 10},
 	)
 	pr, pw := io.Pipe()
-	go cc.RoundTrip(connectRequest(t, context.Background(), pr))
+	req := connectRequest(t, context.Background(), pr)
+	go func() { _, _ = cc.RoundTrip(req) }() //nolint:bodyclose // response body is owned by the returned conn
 	require.IsType(t, &http2.MetaHeadersFrame{}, p.readFrame())
 
-	go pw.Write([]byte("0123456789abcdef"))
+	go func() { _, _ = pw.Write([]byte("0123456789abcdef")) }()
 	f := p.readFrame()
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, "0123456789", string(f.(*http2.DataFrame).Data()))
 
 	require.NoError(t, p.fr.WriteWindowUpdate(http2StreamID, 4))
 	f = p.readFrame()
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, "abcd", string(f.(*http2.DataFrame).Data()))
 
 	require.NoError(t, p.fr.WriteSettings(http2.Setting{ID: http2.SettingInitialWindowSize, Val: 12}))
@@ -243,13 +256,15 @@ func TestHTTP2ClientFlowControl(t *testing.T) {
 func TestHTTP2ClientReceiveWindow(t *testing.T) {
 	cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 	rsps := make(chan *http.Response, 1)
+	req := connectRequest(t, context.Background(), nil)
 	go func() {
-		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
+		rsp, err := cc.RoundTrip(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		if err == nil {
 			rsps <- rsp
 		}
 	}()
 	require.IsType(t, &http2.MetaHeadersFrame{}, p.readFrame())
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.True(t, p.readFrame().(*http2.DataFrame).StreamEnded())
 	p.writeHeaders(false, ":status", "200")
 	rsp := <-rsps
@@ -270,6 +285,7 @@ func TestHTTP2ClientReceiveWindow(t *testing.T) {
 		f := p.readFrame()
 		require.IsType(t, &http2.WindowUpdateFrame{}, f)
 		require.Equal(t, id, f.Header().StreamID)
+		//nolint:forcetypeassert // the test asserts the frame type before using it
 		require.Equal(t, uint32(http2WindowUpdateSize), f.(*http2.WindowUpdateFrame).Increment)
 	}
 }
@@ -277,8 +293,9 @@ func TestHTTP2ClientReceiveWindow(t *testing.T) {
 func TestHTTP2ClientRejectsOverflow(t *testing.T) {
 	cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 	rsps := make(chan *http.Response, 1)
+	req := connectRequest(t, context.Background(), nil)
 	go func() {
-		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
+		rsp, err := cc.RoundTrip(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		if err == nil {
 			rsps <- rsp
 		}
@@ -309,6 +326,7 @@ func TestHTTP2ClientRejectsOverflow(t *testing.T) {
 func TestHTTP2ClientRejectsOversizedFrames(t *testing.T) {
 	cc, p := newHTTP2Peer(t)
 	require.NoError(t, p.fr.WritePing(false, [8]byte{}))
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.True(t, p.readFrame().(*http2.PingFrame).IsAck())
 
 	p.fr.AllowIllegalWrites = true
@@ -324,8 +342,9 @@ func TestHTTP2ClientRejectsOversizedFrames(t *testing.T) {
 func TestHTTP2ClientStatus(t *testing.T) {
 	cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 	rsps := make(chan *http.Response, 1)
+	req := connectRequest(t, context.Background(), nil)
 	go func() {
-		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
+		rsp, err := cc.RoundTrip(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		if err == nil {
 			rsps <- rsp
 		}
@@ -345,8 +364,9 @@ func TestHTTP2ClientReset(t *testing.T) {
 	t.Run("by the server", func(t *testing.T) {
 		cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 		errs := make(chan error, 1)
+		req := connectRequest(t, context.Background(), nil)
 		go func() {
-			_, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
+			_, err := cc.RoundTrip(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 			errs <- err
 		}()
 		p.readFrame()
@@ -361,8 +381,9 @@ func TestHTTP2ClientReset(t *testing.T) {
 		pr, pw := io.Pipe()
 		defer pw.Close()
 		rsps := make(chan *http.Response, 1)
+		req := connectRequest(t, ctx, pr)
 		go func() {
-			rsp, err := cc.RoundTrip(connectRequest(t, ctx, pr)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
+			rsp, err := cc.RoundTrip(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 			if err == nil {
 				rsps <- rsp
 			}
@@ -373,6 +394,7 @@ func TestHTTP2ClientReset(t *testing.T) {
 		cancel()
 		f := p.readFrame()
 		require.IsType(t, &http2.RSTStreamFrame{}, f)
+		//nolint:forcetypeassert // the test asserts the frame type before using it
 		require.Equal(t, http2.ErrCodeCancel, f.(*http2.RSTStreamFrame).ErrCode)
 		_, err := rsp.Body.Read(make([]byte, 1))
 		require.ErrorIs(t, err, context.Canceled)
@@ -383,8 +405,9 @@ func TestHTTP2ClientReset(t *testing.T) {
 	t.Run("by GOAWAY", func(t *testing.T) {
 		cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 		errs := make(chan error, 1)
+		req := connectRequest(t, context.Background(), nil)
 		go func() {
-			_, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
+			_, err := cc.RoundTrip(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 			errs <- err
 		}()
 		p.readFrame()
@@ -400,6 +423,8 @@ func TestHTTP2ClientAnswersPings(t *testing.T) {
 	require.NoError(t, p.fr.WritePing(false, data))
 	f := p.readFrame()
 	require.IsType(t, &http2.PingFrame{}, f)
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.True(t, f.(*http2.PingFrame).IsAck())
+	//nolint:forcetypeassert // the test asserts the frame type before using it
 	require.Equal(t, data, f.(*http2.PingFrame).Data)
 }

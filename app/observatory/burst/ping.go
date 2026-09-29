@@ -15,12 +15,14 @@ import (
 type pingClient struct {
 	destination string
 	httpClient  *http.Client
+	ctx         context.Context
 }
 
 func newPingClient(ctx context.Context, dispatcher routing.Dispatcher, destination string, timeout time.Duration, handler string) *pingClient {
 	return &pingClient{
 		destination: destination,
 		httpClient:  newHTTPClient(ctx, dispatcher, handler, timeout),
+		ctx:         ctx,
 	}
 }
 
@@ -28,6 +30,7 @@ func newDirectPingClient(destination string, timeout time.Duration) *pingClient 
 	return &pingClient{
 		destination: destination,
 		httpClient:  &http.Client{Timeout: timeout},
+		ctx:         context.Background(),
 	}
 }
 
@@ -58,7 +61,7 @@ func (s *pingClient) MeasureDelay(httpMethod string) (time.Duration, error) {
 		panic("pingClient not initialized")
 	}
 
-	req, err := http.NewRequest(httpMethod, s.destination, nil)
+	req, err := http.NewRequestWithContext(s.ctx, httpMethod, s.destination, nil)
 	if err != nil {
 		return rttFailed, err
 	}

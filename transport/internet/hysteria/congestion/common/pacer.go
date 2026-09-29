@@ -63,8 +63,8 @@ func (p *Pacer) TimeUntilSend() monotime.Time {
 	if p.budgetAtLastSent >= p.maxDatagramSize {
 		return 0
 	}
-	diff := 1e9 * uint64(p.maxDatagramSize-p.budgetAtLastSent)
-	bw := uint64(p.getBandwidth())
+	diff := 1e9 * uint64(p.maxDatagramSize-p.budgetAtLastSent) //nolint:gosec // bandwidth arithmetic saturates well below the type limits
+	bw := uint64(p.getBandwidth())                             //nolint:gosec // bandwidth arithmetic saturates well below the type limits
 	// We might need to round up this value.
 	// Otherwise, we might have a budget (slightly) smaller than the datagram size when the timer expires.
 	d := diff / bw
@@ -72,7 +72,7 @@ func (p *Pacer) TimeUntilSend() monotime.Time {
 	if diff%bw > 0 {
 		d++
 	}
-	return p.lastSentTime.Add(max(congestion.MinPacingDelay, time.Duration(d)*time.Nanosecond))
+	return p.lastSentTime.Add(max(congestion.MinPacingDelay, time.Duration(d)*time.Nanosecond)) //nolint:gosec // bandwidth arithmetic saturates well below the type limits
 }
 
 func (p *Pacer) SetMaxDatagramSize(s congestion.ByteCount) {

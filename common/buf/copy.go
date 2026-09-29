@@ -66,8 +66,8 @@ func (e readError) Unwrap() error {
 
 // IsReadError returns true if the error in Copy() comes from reading.
 func IsReadError(err error) bool {
-	_, ok := err.(readError)
-	return ok
+	var re readError
+	return errors.As(err, &re)
 }
 
 type writeError struct {
@@ -84,8 +84,8 @@ func (e writeError) Unwrap() error {
 
 // IsWriteError returns true if the error in Copy() comes from writing.
 func IsWriteError(err error) bool {
-	_, ok := err.(writeError)
-	return ok
+	var we writeError
+	return errors.As(err, &we)
 }
 
 func copyInternal(reader Reader, writer Writer, handler *copyHandler) error {
@@ -114,7 +114,7 @@ func Copy(reader Reader, writer Writer, options ...CopyOption) error {
 		option(&handler)
 	}
 	err := copyInternal(reader, writer, &handler)
-	if err != nil && errors.Cause(err) != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil

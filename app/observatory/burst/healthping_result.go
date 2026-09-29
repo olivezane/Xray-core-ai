@@ -32,8 +32,8 @@ type pingRTT struct {
 }
 
 // NewHealthPingResult returns a *HealthPingResult with specified capacity
-func NewHealthPingResult(cap int, validity time.Duration) *HealthPingRTTS {
-	return &HealthPingRTTS{cap: cap, validity: validity}
+func NewHealthPingResult(capacity int, validity time.Duration) *HealthPingRTTS {
+	return &HealthPingRTTS{cap: capacity, validity: validity}
 }
 
 // Get gets statistics of the HealthPingRTTS
@@ -58,7 +58,7 @@ func (h *HealthPingRTTS) GetWithCache() *HealthPingStats {
 func (h *HealthPingRTTS) Put(d time.Duration) {
 	if h.rtts == nil {
 		h.rtts = make([]*pingRTT, h.cap)
-		for i := 0; i < h.cap; i++ {
+		for i := range h.cap {
 			h.rtts[i] = &pingRTT{value: rttUntested}
 		}
 		h.idx = -1

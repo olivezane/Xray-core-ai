@@ -50,7 +50,7 @@ func compareVersions(v1, v2 string) (int, error) {
 	}
 
 	// Compare each part
-	for i := 0; i < len(v1Parts); i++ {
+	for i := range v1Parts {
 		// Convert parts to integers
 		n1, err := strconv.Atoi(v1Parts[i])
 		if err != nil {
@@ -72,7 +72,7 @@ func compareVersions(v1, v2 string) (int, error) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return New(ctx, config)
 	}))
 }

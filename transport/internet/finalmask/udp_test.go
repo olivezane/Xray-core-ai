@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/proxy"
 	"github.com/xtls/xray-core/transport/internet/finalmask"
@@ -70,67 +71,6 @@ func (c *countingConn) Write(p []byte) (int, error) {
 
 func (c *countingConn) Written() int64 {
 	return c.written.Load()
-}
-
-type recordedPacketWrite struct {
-	payload []byte
-	addr    net.Addr
-}
-
-type scriptedPacketConn struct {
-	local    *net.UDPAddr
-	writes   chan recordedPacketWrite
-	reads    chan recordedPacketWrite
-	closed   atomic.Bool
-	deadline atomic.Int64
-}
-
-func newScriptedPacketConn() *scriptedPacketConn {
-	return &scriptedPacketConn{
-		local:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 40000},
-		writes: make(chan recordedPacketWrite, 8),
-		reads:  make(chan recordedPacketWrite, 8),
-	}
-}
-
-func (c *scriptedPacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	item, ok := <-c.reads
-	if !ok {
-		return 0, nil, io.EOF
-	}
-	copy(p, item.payload)
-	return len(item.payload), item.addr, nil
-}
-
-func (c *scriptedPacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	c.writes <- recordedPacketWrite{
-		payload: append([]byte(nil), p...),
-		addr:    addr,
-	}
-	return len(p), nil
-}
-
-func (c *scriptedPacketConn) Close() error {
-	if c.closed.CompareAndSwap(false, true) {
-		close(c.reads)
-	}
-	return nil
-}
-
-func (c *scriptedPacketConn) LocalAddr() net.Addr { return c.local }
-func (c *scriptedPacketConn) SetDeadline(t time.Time) error {
-	c.deadline.Store(t.UnixNano())
-	return nil
-}
-
-func (c *scriptedPacketConn) SetReadDeadline(t time.Time) error {
-	c.deadline.Store(t.UnixNano())
-	return nil
-}
-
-func (c *scriptedPacketConn) SetWriteDeadline(t time.Time) error {
-	c.deadline.Store(t.UnixNano())
-	return nil
 }
 
 func newStandaloneEchoUDPConfig() *custom.UDPStandaloneConfig {
@@ -215,13 +155,13 @@ func newStandaloneStunLikeUDPServerConfig() *custom.UDPStandaloneConfig {
 func newUDPClientServerPair(t *testing.T, cfg *custom.UDPStandaloneConfig) (net.PacketConn, net.PacketConn, net.PacketConn, net.PacketConn) {
 	t.Helper()
 
-	clientRaw, err := gonet.ListenPacket("udp", "127.0.0.1:0")
+	clientRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = clientRaw.Close() })
 
-	serverRaw, err := gonet.ListenPacket("udp", "127.0.0.1:0")
+	serverRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -349,7 +289,7 @@ func TestPacketConnReadWrite(t *testing.T) {
 				layers = 1
 			}
 			masks := make([]finalmask.UDPMask, 0, layers)
-			for i := 0; i < layers; i++ {
+			for range layers {
 				masks = append(masks, mask)
 			}
 
@@ -358,14 +298,14 @@ func TestPacketConnReadWrite(t *testing.T) {
 				if err != nil {
 					return nil, nil, err
 				}
-				conn, err := gonet.ListenPacket("udp", "127.0.0.1:0")
+				conn, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 				if err != nil {
 					return nil, nil, err
 				}
 				return conn, udpAddr, nil
 			}
 			listenPacket := func(ctx context.Context, addr net.Addr) (net.PacketConn, error) {
-				return gonet.ListenPacket(addr.Network(), addr.String())
+				return (&net.ListenConfig{}).ListenPacket(context.Background(), addr.Network(), addr.String())
 			}
 			finalMask := finalmask.NewFinalMask(nil, masks, nil, nil, dialUDP, listenPacket)
 
@@ -373,13 +313,14 @@ func TestPacketConnReadWrite(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { server.Close() })
+			t.Cleanup(func() { _ = server.Close() })
 
-			clientConn, err := finalMask.DialUDP(context.Background(), net.UDPDestination(net.IPAddress(server.LocalAddr().(*net.UDPAddr).IP), net.Port(server.LocalAddr().(*net.UDPAddr).Port)))
+			clientConn, err := finalMask.DialUDP(context.Background(), net.UDPDestination(net.IPAddress(server.LocalAddr().(*net.UDPAddr).IP), net.Port(server.LocalAddr().(*net.UDPAddr).Port))) //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { clientConn.Close() })
+			t.Cleanup(func() { _ = clientConn.Close() })
+			//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
 			client := clientConn.(*finalmask.PacketConnWrapper).PacketConn
 
 			_ = client.SetDeadline(time.Now().Add(time.Second))
@@ -406,13 +347,13 @@ func TestUDPcustomStaticHeaderWireShape(t *testing.T) {
 		},
 	}
 
-	clientRaw, err := gonet.ListenPacket("udp", "127.0.0.1:0")
+	clientRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer clientRaw.Close()
 
-	serverRaw, err := gonet.ListenPacket("udp", "127.0.0.1:0")
+	serverRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -576,11 +517,14 @@ func TestUDPcustomStandaloneStunLikeExchangeUsesSavedTxidAndSrcMetadata(t *testi
 	want = append(want, txid...)
 	want = append(want, []byte{0x00, 0x20, 0x00, 0x08, 0x00, 0x01}...)
 
+	//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 	clientAddr := clientRaw.LocalAddr().(*net.UDPAddr)
-	xPort := uint16(clientAddr.Port) ^ 0x2112
+	xPort := uint16(clientAddr.Port) ^ 0x2112 //nolint:gosec // G115: the value is bounded by the fixture built above
 	xIP := binary.BigEndian.Uint32(clientAddr.IP.To4()) ^ 0x2112A442
-	want = append(want, byte(xPort>>8), byte(xPort))
-	want = append(want, byte(xIP>>24), byte(xIP>>16), byte(xIP>>8), byte(xIP))
+	want = append(want,
+		byte(xPort>>8), byte(xPort), //nolint:gosec // G115: explicit low-byte extraction from a value bounded by the wire format
+		byte(xIP>>24), byte(xIP>>16), byte(xIP>>8), byte(xIP), //nolint:gosec // G115: explicit low-byte extraction from a value bounded by the wire format
+	)
 
 	if !bytes.Equal(buf[:n], want) {
 		t.Fatalf("unexpected stun-like response: got=%x want=%x", buf[:n], want)
@@ -884,13 +828,13 @@ func TestSudokuBDD(t *testing.T) {
 			PaddingMax:   0,
 		}
 
-		clientRaw, err := gonet.ListenPacket("udp", "127.0.0.1:0")
+		clientRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer clientRaw.Close()
 
-		serverRaw, err := gonet.ListenPacket("udp", "127.0.0.1:0")
+		serverRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -990,7 +934,7 @@ func TestSudokuBDD(t *testing.T) {
 
 		one := make([]byte, 1)
 		n, err := serverConn.Read(one)
-		if n != 0 || err != io.EOF {
+		if n != 0 || !errors.Is(err, io.EOF) {
 			t.Fatalf("expected EOF after CloseWrite, got n=%d err=%v", n, err)
 		}
 	})

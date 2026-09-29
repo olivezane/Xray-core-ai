@@ -45,8 +45,8 @@ var (
 func ipv4Packet(ttl, proto uint8, src, dst netip.Addr, options, payload []byte) []byte {
 	hdrLen := ipv4.HeaderLen + len(options)
 	b := make([]byte, hdrLen, hdrLen+len(payload))
-	b[0] = 4<<4 | byte(hdrLen>>2)
-	binary.BigEndian.PutUint16(b[2:4], uint16(hdrLen+len(payload)))
+	b[0] = 4<<4 | byte(hdrLen>>2)                                   //nolint:gosec // G115: explicit low-byte extraction from a value bounded by the wire format
+	binary.BigEndian.PutUint16(b[2:4], uint16(hdrLen+len(payload))) //nolint:gosec // G115: length of a buffer allocated in the same statement, far below 64KiB
 	b[8] = ttl
 	b[9] = proto
 	copy(b[12:16], src.AsSlice())
@@ -58,7 +58,7 @@ func ipv4Packet(ttl, proto uint8, src, dst netip.Addr, options, payload []byte) 
 func ipv6Packet(hopLimit, nextHeader uint8, src, dst netip.Addr, payload []byte) []byte {
 	b := make([]byte, ipv6.HeaderLen, ipv6.HeaderLen+len(payload))
 	b[0] = 6 << 4
-	binary.BigEndian.PutUint16(b[4:6], uint16(len(payload)))
+	binary.BigEndian.PutUint16(b[4:6], uint16(len(payload))) //nolint:gosec // G115: length of a buffer allocated in the same statement, far below 64KiB
 	b[6] = nextHeader
 	b[7] = hopLimit
 	copy(b[8:24], src.AsSlice())
@@ -138,7 +138,7 @@ func (m *mockStream) SendDatagram(data []byte) error {
 	if m.sendDatagramErr != nil {
 		return m.sendDatagramErr
 	}
-	if size := quicvarint.Len(uint64(m.streamID/4)) + len(data); m.maxDatagramPayloadSize > 0 && size > m.maxDatagramPayloadSize {
+	if size := quicvarint.Len(uint64(m.streamID/4)) + len(data); m.maxDatagramPayloadSize > 0 && size > m.maxDatagramPayloadSize { //nolint:gosec // G115: the value is bounded by the fixture built above
 		return &quic.DatagramTooLargeError{MaxDatagramPayloadSize: int64(m.maxDatagramPayloadSize)}
 	}
 	m.sent = append(m.sent, bytes.Clone(data))
@@ -164,7 +164,7 @@ func TestCapsuleWriteQueueLimit(t *testing.T) {
 		writeStarted: writeStarted,
 		written:      writes,
 	})
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 
 	require.NoError(t, conn.AssignAddresses(nil))
 	select {
@@ -177,7 +177,7 @@ func TestCapsuleWriteQueueLimit(t *testing.T) {
 		require.NoError(t, conn.AssignAddresses(nil))
 	}
 	go func() {
-		conn.Routes(context.Background())
+		_, _ = conn.Routes(context.Background())
 		for range maxQueuedCapsules + 1 {
 			<-writes
 		}
@@ -201,7 +201,7 @@ func TestCapsuleReceiveQueueLimit(t *testing.T) {
 				}
 			}
 			conn := newProxiedConn(&mockStream{reading: data})
-			t.Cleanup(func() { conn.Close() })
+			t.Cleanup(func() { _ = conn.Close() })
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			_, err := conn.Routes(ctx)
@@ -230,7 +230,7 @@ func TestAbortErrorCode(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			conn := newProxiedConn(c.str)
-			t.Cleanup(func() { conn.Close() })
+			t.Cleanup(func() { _ = conn.Close() })
 			require.Eventually(t, func() bool {
 				_, ok := c.str.cancelWriteCode()
 				return ok
@@ -427,7 +427,7 @@ func FuzzIncomingDatagram(f *testing.F) {
 	f.Add(ipv6Header)
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		conn.handleIncomingProxiedPacket(data)
+		_ = conn.handleIncomingProxiedPacket(data)
 	})
 }
 
@@ -484,7 +484,7 @@ func TestWritePacketDropsWithoutSending(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			str := &mockStream{}
 			conn := newProxiedConn(str)
-			t.Cleanup(func() { conn.Close() })
+			t.Cleanup(func() { _ = conn.Close() })
 
 			orig := bytes.Clone(tc.packet)
 			icmpPacket, err := conn.WritePacket(tc.packet)
@@ -508,7 +508,7 @@ func TestWritePacketIPv4Checksum(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			str := &mockStream{}
 			conn := newProxiedConn(str)
-			t.Cleanup(func() { conn.Close() })
+			t.Cleanup(func() { _ = conn.Close() })
 
 			packet := ipv4Packet(64, 17, testSrc4, testDst4, tc.options, []byte("foobar"))
 			icmpPacket, err := conn.WritePacket(packet)
@@ -545,7 +545,7 @@ func TestWritePacketTooLarge(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			str := &mockStream{streamID: tc.streamID, maxDatagramPayloadSize: tc.maxPayloadSize}
 			conn := newProxiedConn(str)
-			t.Cleanup(func() { conn.Close() })
+			t.Cleanup(func() { _ = conn.Close() })
 
 			packetOfSize := func(size int) []byte {
 				if tc.ipv6 {
@@ -571,11 +571,12 @@ func TestWritePacketTooLarge(t *testing.T) {
 				msg, err := icmp.ParseMessage(ipProtoICMPv6, icmpPacket[ipv6.HeaderLen:])
 				require.NoError(t, err)
 				require.Equal(t, ipv6.ICMPTypePacketTooBig, msg.Type)
+				//nolint:forcetypeassert // the test builds the ICMP message itself
 				require.Equal(t, tc.wantMTU, msg.Body.(*icmp.PacketTooBig).MTU)
 			} else {
 				msg := icmpPacket[ipv4.HeaderLen:]
 				require.Equal(t, []byte{3, 4}, msg[:2])
-				require.Equal(t, uint16(tc.wantMTU), binary.BigEndian.Uint16(msg[6:8]))
+				require.Equal(t, uint16(tc.wantMTU), binary.BigEndian.Uint16(msg[6:8])) //nolint:gosec // G115: the value is bounded by the fixture built above
 			}
 		})
 	}
@@ -585,14 +586,14 @@ func TestMaxPacketSize(t *testing.T) {
 	t.Run("sends nothing", func(t *testing.T) {
 		str := &mockStream{streamID: 8, maxDatagramPayloadSize: 1350}
 		conn := newProxiedConn(str)
-		t.Cleanup(func() { conn.Close() })
+		t.Cleanup(func() { _ = conn.Close() })
 		require.Equal(t, 1348, conn.MaxPacketSize())
 		require.Empty(t, str.sent)
 	})
 
 	t.Run("datagrams unsupported", func(t *testing.T) {
 		conn := newProxiedConn(&mockStream{sendDatagramErr: errors.New("datagram support disabled")})
-		t.Cleanup(func() { conn.Close() })
+		t.Cleanup(func() { _ = conn.Close() })
 		require.Zero(t, conn.MaxPacketSize())
 	})
 
@@ -618,7 +619,7 @@ func TestReadPacketDropsMalformedDatagrams(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			datagrams := make(chan []byte, 2)
 			conn := newProxiedConn(&mockStream{datagrams: datagrams})
-			t.Cleanup(func() { conn.Close() })
+			t.Cleanup(func() { _ = conn.Close() })
 			require.NoError(t, conn.AdvertiseRoute([]IPRoute{
 				{StartIP: netip.IPv4Unspecified(), EndIP: netip.MustParseAddr("255.255.255.255")},
 			}))
@@ -636,7 +637,7 @@ func TestReadPacketDropsMalformedDatagrams(t *testing.T) {
 func TestReadPacketShortBuffer(t *testing.T) {
 	datagrams := make(chan []byte, 3)
 	conn := newProxiedConn(&mockStream{datagrams: datagrams})
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 	require.NoError(t, conn.AdvertiseRoute([]IPRoute{
 		{StartIP: netip.IPv4Unspecified(), EndIP: netip.MustParseAddr("255.255.255.255")},
 	}))

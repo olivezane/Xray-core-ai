@@ -73,7 +73,8 @@ func Reload() {
 		webpage := bytes.ReplaceAll(webpage, []byte("csrfToken"), []byte(csrfToken))
 		conns = make(chan *websocket.Conn, 256)
 		server = &http.Server{
-			Addr: addr,
+			Addr:              addr,
+			ReadHeaderTimeout: 10 * time.Second,
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/websocket" {
 					if r.URL.Query().Get("token") == csrfToken {
@@ -85,11 +86,11 @@ func Reload() {
 					}
 				} else {
 					w.Header().Set("Access-Control-Allow-Origin", "*")
-					w.Write(webpage)
+					_, _ = w.Write(webpage)
 				}
 			}),
 		}
-		go server.ListenAndServe()
+		go func() { _ = server.ListenAndServe() }()
 	}
 }
 

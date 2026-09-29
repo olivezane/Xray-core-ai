@@ -211,7 +211,7 @@ L:
 	for {
 		ah, err := parser.AnswerHeader()
 		if err != nil {
-			if err != dnsmessage.ErrSectionDone {
+			if !errors.Is(err, dnsmessage.ErrSectionDone) {
 				errors.LogInfoInner(context.Background(), err, "failed to parse answer section for domain: ", ah.Name.String())
 			}
 			break

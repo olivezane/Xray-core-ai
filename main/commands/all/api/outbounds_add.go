@@ -33,7 +33,7 @@ Example:
 
 func executeAddOutbounds(cmd *base.Command, args []string) {
 	setSharedFlags(cmd)
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 	unnamedArgs := cmd.Flag.Args()
 	if len(unnamedArgs) == 0 {
 		fmt.Println("Reading from STDIN")
@@ -56,8 +56,8 @@ func executeAddOutbounds(cmd *base.Command, args []string) {
 		base.Fatalf("no valid outbound found")
 	}
 
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := handlerService.NewHandlerServiceClient(conn)
 	for _, out := range outs {

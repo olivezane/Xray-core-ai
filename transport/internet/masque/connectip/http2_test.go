@@ -94,7 +94,7 @@ func setupHTTP2Conns(t *testing.T) (client, server *Conn) {
 	req.Header().Set("Authorization", "Bearer token")
 	client, rsp, err := NewHTTP2ClientConn(rt).Dial(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.NoError(t, err)
-	t.Cleanup(func() { client.Close() })
+	t.Cleanup(func() { _ = client.Close() })
 	require.Equal(t, http.StatusOK, rsp.StatusCode)
 	require.Equal(t, "?1", rsp.Header.Get("Capsule-Protocol"))
 
@@ -103,7 +103,7 @@ func setupHTTP2Conns(t *testing.T) (client, server *Conn) {
 		t.Fatal("timed out")
 	case server = <-serverConns:
 	}
-	t.Cleanup(func() { server.Close() })
+	t.Cleanup(func() { _ = server.Close() })
 	return client, server
 }
 
@@ -263,6 +263,7 @@ func TestHTTP2Packets(t *testing.T) {
 				b := make([]byte, 1500)
 				for i := range count {
 					n, err := dir.to.ReadPacket(b)
+					//nolint:testifylint // non-test goroutine: require (t.FailNow) is illegal here
 					if !assert.NoError(t, err) || !assert.Equal(t, ipv4.HeaderLen+1200, n) {
 						return
 					}
@@ -361,7 +362,7 @@ func TestHTTP2DatagramCapsules(t *testing.T) {
 	str, pw := newTestHTTP2Stream()
 	defer pw.Close()
 	conn := newProxiedConn(str)
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 	require.NoError(t, conn.AdvertiseRoute([]IPRoute{
 		{StartIP: netip.IPv4Unspecified(), EndIP: netip.MustParseAddr("255.255.255.255")},
 	}))
@@ -395,7 +396,7 @@ func TestHTTP2WritesDatagramCapsules(t *testing.T) {
 	str, pw := newTestHTTP2Stream()
 	defer pw.Close()
 	conn := newProxiedConn(str)
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 
 	packet := ipv4Packet(64, 17, testSrc4, testDst4, nil, []byte("foobar"))
 	_, err := conn.WritePacket(slices.Clone(packet))
@@ -433,7 +434,7 @@ func TestRequestBody(t *testing.T) {
 		require.NoError(t, err)
 		written := make(chan struct{})
 		go func() {
-			b.Write([]byte("x"))
+			_, _ = b.Write([]byte("x"))
 			close(written)
 		}()
 		select {

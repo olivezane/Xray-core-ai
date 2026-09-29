@@ -2,6 +2,7 @@ package sudoku
 
 import (
 	"fmt"
+	"github.com/xtls/xray-core/common/errors"
 	"io"
 	"net"
 )
@@ -38,7 +39,7 @@ func (e *packedEncoder) encode(p []byte) ([]byte, error) {
 		for bitCount >= 6 {
 			bitCount -= 6
 			layout := e.layouts[e.groupIndex%len(e.layouts)]
-			group := byte(bitBuf >> bitCount)
+			group := byte(bitBuf >> bitCount) //nolint:gosec // explicit byte extraction from a shift
 			out = e.maybePad(out, layout)
 			out = append(out, layout.encodeGroup(group&0x3f))
 			e.groupIndex++
@@ -52,7 +53,7 @@ func (e *packedEncoder) encode(p []byte) ([]byte, error) {
 
 	if bitCount > 0 {
 		layout := e.layouts[e.groupIndex%len(e.layouts)]
-		group := byte(bitBuf << (6 - bitCount))
+		group := byte(bitBuf << (6 - bitCount)) //nolint:gosec // explicit byte extraction from a shift
 		out = e.maybePad(out, layout)
 		out = append(out, layout.encodeGroup(group&0x3f))
 		e.groupIndex++
@@ -146,7 +147,7 @@ func decodePackedBytes(
 	out []byte,
 ) (uint64, int, int, []byte, error) {
 	if len(layouts) == 0 {
-		return bitBuf, bitCount, groupIndex, out, fmt.Errorf("sudoku layout set missing")
+		return bitBuf, bitCount, groupIndex, out, errors.New("sudoku layout set missing")
 	}
 	for _, b := range in {
 		layout := layouts[groupIndex%len(layouts)]
@@ -169,7 +170,7 @@ func decodePackedBytes(
 
 		for bitCount >= 8 {
 			bitCount -= 8
-			out = append(out, byte(bitBuf>>bitCount))
+			out = append(out, byte(bitBuf>>bitCount)) //nolint:gosec // explicit byte extraction from a shift
 			if bitCount > 0 {
 				bitBuf &= (uint64(1) << bitCount) - 1
 			} else {

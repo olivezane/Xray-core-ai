@@ -3,6 +3,7 @@ package xdns
 import (
 	"bytes"
 	"fmt"
+	"github.com/xtls/xray-core/common/errors"
 	"io"
 	"strconv"
 	"strings"
@@ -330,7 +331,7 @@ func TestName(t *testing.T) {
 		// Test that NewName returns proper error codes, and otherwise
 		// returns an equal slice of labels.
 		name, err := NewName(test.labels)
-		if err != test.err || (err == nil && !namesEqual(name, test.labels)) {
+		if !errors.Is(err, test.err) || (err == nil && !namesEqual(name, test.labels)) {
 			t.Errorf("%+q returned (%+q, %v), expected (%+q, %v)",
 				test.labels, name, err, test.labels, test.err)
 			continue
@@ -358,7 +359,7 @@ func TestName(t *testing.T) {
 		// A trailing dot should be ignored.
 		if !strings.HasSuffix(s, ".") {
 			dotName, dotErr := ParseName(s + ".")
-			if dotErr != err || !namesEqual(dotName, name) {
+			if !errors.Is(dotErr, err) || !namesEqual(dotName, name) {
 				t.Errorf("%+q parsing %+q returned (%+q, %v), expected (%+q, %v)",
 					test.labels, s+".", dotName, dotErr, name, err)
 				continue
@@ -378,7 +379,7 @@ func TestParseName(t *testing.T) {
 		{"", [][]byte{}, nil},
 	} {
 		name, err := ParseName(test.s)
-		if err != test.err || (err == nil && !namesEqual(name, test.name)) {
+		if !errors.Is(err, test.err) || (err == nil && !namesEqual(name, test.name)) {
 			t.Errorf("%+q returned (%+q, %v), expected (%+q, %v)",
 				test.s, name, err, test.name, test.err)
 			continue
@@ -404,7 +405,7 @@ func unescapeString(s string) ([][]byte, error) {
 				if label[i+1] != 'x' {
 					return nil, fmt.Errorf("malformed escape sequence at index %v", i)
 				}
-				b, err := strconv.ParseUint(string(label[i+2:i+4]), 16, 8)
+				b, err := strconv.ParseUint(label[i+2:i+4], 16, 8)
 				if err != nil {
 					return nil, fmt.Errorf("malformed hex sequence at index %v", i+2)
 				}
@@ -569,10 +570,10 @@ func TestReadName(t *testing.T) {
 			panic(err)
 		}
 		name, err := readName(r)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			err = io.ErrUnexpectedEOF
 		}
-		if err != test.err {
+		if !errors.Is(err, test.err) {
 			t.Errorf("%+q returned (%+q, %v), expected %v", test.input, name, err, test.err)
 			continue
 		}
@@ -617,7 +618,7 @@ func messagesEqual(a, b *Message) bool {
 	if len(a.Question) != len(b.Question) {
 		return false
 	}
-	for i := 0; i < len(a.Question); i++ {
+	for i := range len(a.Question) {
 		if !questionsEqual(&a.Question[i], &b.Question[i]) {
 			return false
 		}
@@ -630,7 +631,7 @@ func messagesEqual(a, b *Message) bool {
 		if len(rec.rrA) != len(rec.rrB) {
 			return false
 		}
-		for i := 0; i < len(rec.rrA); i++ {
+		for i := range len(rec.rrA) {
 			if !rrsEqual(&rec.rrA[i], &rec.rrB[i]) {
 				return false
 			}
@@ -701,7 +702,7 @@ func TestMessageFromWireFormat(t *testing.T) {
 		},
 	} {
 		message, err := MessageFromWireFormat([]byte(test.buf))
-		if err != test.err || (err == nil && !messagesEqual(&message, &test.expected)) {
+		if !errors.Is(err, test.err) || (err == nil && !messagesEqual(&message, &test.expected)) {
 			t.Errorf("%+q\nreturned (%+v, %v)\nexpected (%+v, %v)",
 				test.buf, message, err, test.expected, test.err)
 			continue
@@ -782,7 +783,7 @@ func TestDecodeRDataTXT(t *testing.T) {
 		{[]byte("\x01"), nil, io.ErrUnexpectedEOF},
 	} {
 		decoded, err := DecodeRDataTXT(test.p)
-		if err != test.err || (err == nil && !bytes.Equal(decoded, test.decoded)) {
+		if !errors.Is(err, test.err) || (err == nil && !bytes.Equal(decoded, test.decoded)) {
 			t.Errorf("%+q\nreturned (%+q, %v)\nexpected (%+q, %v)",
 				test.p, decoded, err, test.decoded, test.err)
 			continue

@@ -47,7 +47,7 @@ func marshalTypedMessage(v *cserial.TypedMessage, ignoreNullValue bool, insertTy
 
 func marshalSlice(v reflect.Value, ignoreNullValue bool, insertTypeInfo bool) any {
 	r := make([]any, 0)
-	for i := 0; i < v.Len(); i++ {
+	for i := range v.Len() {
 		rv := v.Index(i)
 		if rv.CanInterface() {
 			value := rv.Interface()
@@ -93,7 +93,7 @@ func toJsonName(f reflect.StructField) string {
 func marshalStruct(v reflect.Value, ignoreNullValue bool, insertTypeInfo bool) any {
 	r := make(map[string]any)
 	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
+	for i := range v.NumField() {
 		rv := v.Field(i)
 		if rv.CanInterface() {
 			ft := t.Field(i)
@@ -176,23 +176,28 @@ func marshalKnownType(v any, ignoreNullValue bool, insertTypeInfo bool) (any, bo
 	case *json.RawMessage, json.RawMessage:
 		return ty, true
 	case *cnet.IPOrDomain:
+		//nolint:forcetypeassert // the marshaller switches on the concrete type first
 		if domain := v.(*cnet.IPOrDomain); domain != nil {
 			return domain.AsAddress().String(), true
 		}
 		return nil, false
 	case *cnet.PortList:
+		//nolint:forcetypeassert // the marshaller switches on the concrete type first
 		npl := v.(*cnet.PortList)
 		return serializePortList(npl)
 	case *conf.PortList:
+		//nolint:forcetypeassert // the marshaller switches on the concrete type first
 		cpl := v.(*conf.PortList)
 		return serializePortList(cpl.Build())
 	case conf.Int32Range:
+		//nolint:forcetypeassert // the marshaller switches on the concrete type first
 		i32rng := v.(conf.Int32Range)
 		if i32rng.Left == i32rng.Right {
 			return i32rng.Left, true
 		}
 		return i32rng.String(), true
 	case cnet.Address:
+		//nolint:forcetypeassert // the marshaller switches on the concrete type first
 		if addr := v.(cnet.Address); addr != nil {
 			return addr.String(), true
 		}

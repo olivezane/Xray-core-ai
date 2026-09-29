@@ -67,7 +67,7 @@ const (
 func startMasqueServer(t *testing.T, h2 bool) (net.Port, [32]byte) {
 	dev, _, gstack, err := wireguard.CreateNetTUN([]netip.Addr{masqueServerV4, masqueServerV6}, nil, transmasque.MinPacketSize, false)
 	common.Must(err)
-	t.Cleanup(func() { dev.Close() })
+	t.Cleanup(func() { _ = dev.Close() })
 
 	for _, addr := range []netip.Addr{masqueServerV4, masqueServerV6} {
 		proto := ipv4.ProtocolNumber
@@ -107,7 +107,7 @@ func startMasqueServer(t *testing.T, h2 bool) (net.Port, [32]byte) {
 				if err != nil {
 					return
 				}
-				u.WriteTo(xor(b[:n]), addr)
+				_, _ = u.WriteTo(xor(b[:n]), addr)
 			}
 		}()
 	}
@@ -122,7 +122,7 @@ func startMasqueServer(t *testing.T, h2 bool) (net.Port, [32]byte) {
 			}
 			if conn := current.Load(); conn != nil {
 				if icmp, _ := conn.WritePacket(bufs[0][:sizes[0]]); len(icmp) > 0 {
-					go dev.Write([][]byte{icmp}, 0)
+					go func() { _, _ = dev.Write([][]byte{icmp}, 0) }()
 				}
 			}
 		}
@@ -139,8 +139,7 @@ func startMasqueServer(t *testing.T, h2 bool) (net.Port, [32]byte) {
 		}
 		req, err := connectip.ParseProxyRequest(r)
 		if err != nil {
-			var perr *connectip.ProxyRequestParseError
-			if go_errors.As(err, &perr) {
+			if perr, ok := go_errors.AsType[*connectip.ProxyRequestParseError](err); ok {
 				w.WriteHeader(perr.HTTPStatus)
 			}
 			return
@@ -169,7 +168,7 @@ func startMasqueServer(t *testing.T, h2 bool) (net.Port, [32]byte) {
 						assigned[i] = masqueClientV6
 					}
 				}
-				ar.Respond(assigned, nil)
+				_ = ar.Respond(assigned, nil)
 			}
 		}()
 		current.Store(conn)
@@ -182,7 +181,7 @@ func startMasqueServer(t *testing.T, h2 bool) (net.Port, [32]byte) {
 				}
 				return
 			}
-			dev.Write([][]byte{b[:n]}, 0)
+			_, _ = dev.Write([][]byte{b[:n]}, 0)
 		}
 	}
 
@@ -195,15 +194,15 @@ func startMasqueServer(t *testing.T, h2 bool) (net.Port, [32]byte) {
 	if h2 {
 		tlsConfig.NextProtos = []string{http2.NextProtoTLS}
 		ln := common.Must2(gotls.Listen("tcp", "127.0.0.1:0", tlsConfig))
-		t.Cleanup(func() { ln.Close() })
+		t.Cleanup(func() { _ = ln.Close() })
 		go serveHTTP2(ln, http.HandlerFunc(handler))
-		return net.Port(ln.Addr().(*net.TCPAddr).Port), certHash
+		return net.Port(ln.Addr().(*net.TCPAddr).Port), certHash //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 	}
 	pktConn := common.Must2(net.ListenUDP("udp", &net.UDPAddr{IP: net.LocalHostIP.IP()}))
 	tr := &quic.Transport{Conn: pktConn}
 	ln := common.Must2(tr.ListenEarly(tlsConfig, &quic.Config{EnableDatagrams: true, InitialPacketSize: 1350}))
 	server := &http3.Server{Handler: http.HandlerFunc(handler), EnableDatagrams: true}
-	go server.ServeListener(ln)
+	go func() { _ = server.ServeListener(ln) }()
 	t.Cleanup(func() {
 		server.Close()
 		ln.Close()
@@ -211,7 +210,7 @@ func startMasqueServer(t *testing.T, h2 bool) (net.Port, [32]byte) {
 		pktConn.Close()
 	})
 
-	return net.Port(pktConn.LocalAddr().(*net.UDPAddr).Port), certHash
+	return net.Port(pktConn.LocalAddr().(*net.UDPAddr).Port), certHash //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 }
 
 func serveHTTP2(ln net.Listener, handler http.Handler) {
@@ -241,10 +240,10 @@ func (c *http2ServerConn) writeHeaders(streamID uint32, status int, header http.
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.hbuf.Reset()
-	c.henc.WriteField(hpack.HeaderField{Name: ":status", Value: strconv.Itoa(status)})
+	_ = c.henc.WriteField(hpack.HeaderField{Name: ":status", Value: strconv.Itoa(status)})
 	for k, vv := range header {
 		for _, v := range vv {
-			c.henc.WriteField(hpack.HeaderField{Name: strings.ToLower(k), Value: v})
+			_ = c.henc.WriteField(hpack.HeaderField{Name: strings.ToLower(k), Value: v})
 		}
 	}
 	return c.fr.WriteHeaders(http2.HeadersFrameParam{StreamID: streamID, BlockFragment: c.hbuf.Bytes(), EndHeaders: true})
@@ -333,7 +332,7 @@ func serveHTTP2Conn(conn net.Conn, handler http.Handler) {
 			go func() {
 				handler.ServeHTTP(w, req)
 				w.WriteHeader(http.StatusOK)
-				sc.writeData(streamID, true, nil)
+				_ = sc.writeData(streamID, true, nil)
 			}()
 		case *http2.DataFrame:
 			if body := bodies[f.StreamID]; body != nil {
@@ -366,7 +365,7 @@ func (w *http2ResponseWriter) Header() http.Header { return w.header }
 func (w *http2ResponseWriter) WriteHeader(code int) {
 	if !w.wroteHeader {
 		w.wroteHeader = true
-		w.conn.writeHeaders(w.streamID, code, w.header)
+		_ = w.conn.writeHeaders(w.streamID, code, w.header)
 	}
 }
 
@@ -586,11 +585,11 @@ func testMasqueServer(t *testing.T, h2 bool, authorization string) error {
 }
 
 func TestMasqueServer(t *testing.T) {
-	testMasqueServer(t, false, masqueAuthorization)
+	_ = testMasqueServer(t, false, masqueAuthorization)
 }
 
 func TestMasqueServerHTTP2(t *testing.T) {
-	testMasqueServer(t, true, masqueAuthorization)
+	_ = testMasqueServer(t, true, masqueAuthorization)
 }
 
 func TestMasqueServerRejectsWrongPassword(t *testing.T) {
@@ -605,7 +604,7 @@ func masqueIPPacket(src, dst netip.Addr, payload []byte) []byte {
 	if src.Is4() {
 		p := make([]byte, 20, 20+len(payload))
 		p[0] = 0x45
-		binary.BigEndian.PutUint16(p[2:], uint16(20+len(payload)))
+		binary.BigEndian.PutUint16(p[2:], uint16(20+len(payload))) //nolint:gosec // G115: length of a buffer allocated in the same statement, far below 64KiB
 		p[8] = 64
 		p[9] = 253
 		copy(p[12:], src.AsSlice())
@@ -614,7 +613,7 @@ func masqueIPPacket(src, dst netip.Addr, payload []byte) []byte {
 	}
 	p := make([]byte, 40, 40+len(payload))
 	p[0] = 0x60
-	binary.BigEndian.PutUint16(p[4:], uint16(len(payload)))
+	binary.BigEndian.PutUint16(p[4:], uint16(len(payload))) //nolint:gosec // G115: length of a buffer allocated in the same statement, far below 64KiB
 	p[6] = 253
 	p[7] = 64
 	copy(p[8:], src.AsSlice())
@@ -655,7 +654,8 @@ func TestMasqueServerClientToClient(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { conn.Close() })
+		t.Cleanup(func() { _ = conn.Close() })
+		//nolint:forcetypeassert // the masque client returns a *transmasque.Conn
 		return conn.(*transmasque.Conn)
 	}
 	h3 := dial()

@@ -21,12 +21,14 @@ func BenchmarkUserValidator(b *testing.B) {
 
 		for range 1500 {
 			id := uuid.New()
-			v.Add(&protocol.MemoryUser{
+			if err := v.Add(&protocol.MemoryUser{
 				Email: "test",
 				Account: toAccount(&Account{
 					Id: id.String(),
 				}),
-			})
+			}); err != nil {
+				b.Fatal(err)
+			}
 		}
 
 		common.Close(v)

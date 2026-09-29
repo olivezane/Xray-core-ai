@@ -90,7 +90,7 @@ func (d *fdPacketDevice) Wait() {
 // readable reports whether the device has a packet to read, waiting at most
 // for the given timeout
 func (d *fdPacketDevice) readable(timeout time.Duration) bool {
-	fds := []unix.PollFd{{Fd: int32(d.fd), Events: unix.POLLIN}}
+	fds := []unix.PollFd{{Fd: int32(d.fd), Events: unix.POLLIN}} //nolint:gosec // a file descriptor always fits in int32
 	for {
 		n, err := unix.Poll(fds, int(timeout.Milliseconds()))
 		if errors.Is(err, unix.EINTR) {

@@ -48,8 +48,10 @@ func NewConnClient(config *Config, raw net.PacketConn) (net.PacketConn, error) {
 	if config.PortMapping != nil && config.PortMapping.Enabled {
 		var err error
 		start := time.Now()
+		//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 		mapper, err = NewPortMapper(context.Background(), raw.LocalAddr().(*net.UDPAddr).Port, PortMapConfig{Timeout: time.Duration(config.PortMapping.Timeout) * time.Second, Lifetime: time.Duration(config.PortMapping.Lifetime) * time.Second})
 		if err != nil {
+			//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 			errors.LogErrorInner(context.Background(), err, "[realm] [port mapping] [", raw.LocalAddr().(*net.UDPAddr).Port, "] init failed after ", time.Since(start))
 		} else {
 			errors.LogDebug(context.Background(), "[realm] [port mapping] [", mapper.InternalPort(), "] gateway ", mapper.GatewayType(), ", external ", mapper.ExternalAddr())
@@ -76,6 +78,7 @@ func NewConnClient(config *Config, raw net.PacketConn) (net.PacketConn, error) {
 
 func (c *realmConnClient) getpeer() (net.PacketConn, error) {
 	start := time.Now()
+	//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 	servers := resolveSTUNServers(c.PacketConn.LocalAddr().(*net.UDPAddr).IP, c.stunServers, c.family)
 	errors.LogDebug(context.Background(), "[realm] update stun servers ", servers, " with ", time.Since(start))
 	if len(servers) == 0 {
@@ -138,7 +141,7 @@ func (c *realmConnClient) discover(servers []*net.UDPAddr) []netip.AddrPort {
 
 	buf := make([]byte, 1500)
 	results := make([]netip.AddrPort, 0, len(servers))
-	c.PacketConn.SetReadDeadline(time.Now().Add(defaultSTUNTimeout))
+	_ = c.PacketConn.SetReadDeadline(time.Now().Add(defaultSTUNTimeout))
 	for len(transactionIDs) > 0 {
 		n, _, err := c.PacketConn.ReadFrom(buf)
 		if err != nil {
@@ -153,7 +156,7 @@ func (c *realmConnClient) discover(servers []*net.UDPAddr) []netip.AddrPort {
 			results = append(results, addrPort)
 		}
 	}
-	c.PacketConn.SetReadDeadline(time.Time{})
+	_ = c.PacketConn.SetReadDeadline(time.Time{})
 	if c.mapper != nil {
 		results = insertAddr(results, c.mapper.ExternalAddr())
 	}
@@ -164,7 +167,7 @@ func (c *realmConnClient) discover(servers []*net.UDPAddr) []netip.AddrPort {
 }
 
 func (c *realmConnClient) punch(meta PunchMetadata, peers []netip.AddrPort) (*net.UDPAddr, error) {
-	defer c.PacketConn.SetReadDeadline(time.Time{})
+	defer func() { _ = c.PacketConn.SetReadDeadline(time.Time{}) }()
 	nextSend := time.Now()
 	deadline := nextSend.Add(c.punchTimeout)
 	buf := make([]byte, punchMaxWireLen)
@@ -182,9 +185,9 @@ func (c *realmConnClient) punch(meta PunchMetadata, peers []netip.AddrPort) (*ne
 		}
 
 		if nextSend.After(deadline) {
-			c.PacketConn.SetReadDeadline(deadline)
+			_ = c.PacketConn.SetReadDeadline(deadline)
 		} else {
-			c.PacketConn.SetReadDeadline(nextSend)
+			_ = c.PacketConn.SetReadDeadline(nextSend)
 		}
 		n, addr, err := c.PacketConn.ReadFrom(buf)
 		if err != nil {
@@ -202,6 +205,7 @@ func (c *realmConnClient) punch(meta PunchMetadata, peers []netip.AddrPort) (*ne
 			packet := common.Must2(EncodePunchPacket(PunchPacketAck, meta))
 			_, _ = c.PacketConn.WriteTo(packet, addr)
 		}
+		//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 		return addr.(*net.UDPAddr), nil
 	}
 }

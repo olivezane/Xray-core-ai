@@ -39,6 +39,7 @@ func (v *TypedMessage) GetInstance() (proto.Message, error) {
 	if err != nil {
 		return nil, err
 	}
+	//nolint:forcetypeassert // the typed message only ever holds a proto.Message
 	protoMessage := instance.(proto.Message)
 	if err := proto.Unmarshal(v.Value, protoMessage); err != nil {
 		return nil, err

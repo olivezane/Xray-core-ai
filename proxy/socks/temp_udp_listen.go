@@ -34,6 +34,7 @@ func (c *TempUDPConn) Read(b []byte) (n int, err error) {
 		if err != nil {
 			return
 		}
+		//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 		remote := remote.(*net.UDPAddr)
 		expected := c.ExpectedRemote.Load()
 		if remote.IP.Equal(expected.IP) {

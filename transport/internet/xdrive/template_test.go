@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/xtls/xray-core/common"
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/transport/internet"
 )
 
@@ -40,7 +41,7 @@ func (s *fakeStore) handle(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		s.tokens++
 		s.mu.Unlock()
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": "tok-fake", "expires_in": 3600,
 		})
 		return
@@ -66,7 +67,7 @@ func (s *fakeStore) handle(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(&b, "<d:href>/folder/%s</d:href>\n", name)
 		}
 		s.mu.Unlock()
-		w.Write([]byte(b.String()))
+		_, _ = w.Write([]byte(b.String()))
 	case http.MethodPut:
 		body, _ := io.ReadAll(r.Body)
 		s.mu.Lock()
@@ -81,7 +82,7 @@ func (s *fakeStore) handle(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		w.Write(data)
+		_, _ = w.Write(data)
 	case http.MethodDelete:
 		s.mu.Lock()
 		delete(s.objects, key)
@@ -138,6 +139,7 @@ func templateSettings(store *fakeStore, auth map[string]any, secrets []string) *
 func newTemplateBackend(t *testing.T, store *fakeStore, auth map[string]any, secrets []string) *templateStorage {
 	t.Helper()
 	settings := templateSettings(store, auth, secrets)
+	//nolint:forcetypeassert // the test builds the stream settings itself
 	storage, err := newTemplateStorage(settings, settings.ProtocolSettings.(*Config))
 	if err != nil {
 		t.Fatalf("newTemplateStorage: %v", err)
@@ -169,7 +171,7 @@ func TestTemplateRoundTrip(t *testing.T) {
 		t.Fatalf("List returned %v, want one segment", entries)
 	}
 
-	if _, err := storage.Get(ctx, "streams/abc/c2s/000000009.seg"); err != errNotFound {
+	if _, err := storage.Get(ctx, "streams/abc/c2s/000000009.seg"); !errors.Is(err, errNotFound) {
 		t.Fatalf("Get of a missing object returned %v, want errNotFound", err)
 	}
 
@@ -262,7 +264,7 @@ func TestTemplateTransport(t *testing.T) {
 	for i := range payload {
 		payload[i] = byte(i % 251)
 	}
-	go func() { client.Write(payload) }()
+	go func() { _, _ = client.Write(payload) }()
 
 	if err := server.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 		t.Fatalf("SetReadDeadline: %v", err)
@@ -283,6 +285,7 @@ func TestTemplateConcurrency(t *testing.T) {
 	settings := templateSettings(store, map[string]any{"type": "none"}, nil)
 
 	var tmpl map[string]any
+	//nolint:forcetypeassert // the test builds the stream settings itself
 	cfg := settings.ProtocolSettings.(*Config)
 	if err := json.Unmarshal([]byte(cfg.Template), &tmpl); err != nil {
 		t.Fatalf("unmarshal: %v", err)

@@ -53,11 +53,11 @@ func (s *ChaCha20Stream) XORKeyStream(dst, src []byte) {
 	// previously used. This will produce best results when processing blocks
 	// of a size evenly divisible by 64.
 	i := 0
-	max := len(src)
-	for i < max {
+	srcLen := len(src)
+	for i < srcLen {
 		gap := blockSize - s.offset
 
-		limit := min(i+gap, max)
+		limit := min(i+gap, srcLen)
 
 		o := s.offset
 		for j := i; j < limit; j++ {

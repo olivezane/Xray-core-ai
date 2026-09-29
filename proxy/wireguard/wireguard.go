@@ -7,8 +7,8 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*DeviceConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		deviceConfig := config.(*DeviceConfig)
+	common.Must(common.RegisterConfig((*DeviceConfig)(nil), func(ctx context.Context, config *DeviceConfig) (any, error) {
+		deviceConfig := config
 		if deviceConfig.IsClient {
 			return NewClient(ctx, deviceConfig)
 		} else {

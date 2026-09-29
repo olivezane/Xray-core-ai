@@ -39,6 +39,7 @@ func (v *MemoryValidator) Add(u *protocol.MemoryUser) error {
 			return errors.New("User ", u.Email, " already exists.")
 		}
 	}
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	v.users.Store(ProcessUUID(u.Account.(*MemoryAccount).ID.UUID()), u)
 	return nil
 }
@@ -54,6 +55,7 @@ func (v *MemoryValidator) Del(e string) error {
 		return errors.New("User ", e, " not found.")
 	}
 	v.email.Delete(le)
+	//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 	v.users.Delete(ProcessUUID(u.(*protocol.MemoryUser).Account.(*MemoryAccount).ID.UUID()))
 	return nil
 }
@@ -62,6 +64,7 @@ func (v *MemoryValidator) Del(e string) error {
 func (v *MemoryValidator) Get(id uuid.UUID) *protocol.MemoryUser {
 	u, _ := v.users.Load(ProcessUUID(id))
 	if u != nil {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		return u.(*protocol.MemoryUser)
 	}
 	return nil
@@ -72,6 +75,7 @@ func (v *MemoryValidator) GetByEmail(email string) *protocol.MemoryUser {
 	email = strings.ToLower(email)
 	u, _ := v.email.Load(email)
 	if u != nil {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		return u.(*protocol.MemoryUser)
 	}
 	return nil
@@ -81,6 +85,7 @@ func (v *MemoryValidator) GetByEmail(email string) *protocol.MemoryUser {
 func (v *MemoryValidator) GetAll() []*protocol.MemoryUser {
 	u := make([]*protocol.MemoryUser, 0, 100)
 	v.email.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		u = append(u, value.(*protocol.MemoryUser))
 		return true
 	})

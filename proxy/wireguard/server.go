@@ -54,16 +54,20 @@ type Server struct {
 
 func NewServer(ctx context.Context, conf *DeviceConfig) (*Server, error) {
 	v := core.MustFromContext(ctx)
+	//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 	p := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	//nolint:forcetypeassert // feature registered under routing.DispatcherType()
 	d := v.GetFeature(routing.DispatcherType()).(routing.Dispatcher)
 
 	inbound := session.InboundFromContext(ctx)
 	content := session.ContentFromContext(ctx)
+	//nolint:forcetypeassert // session.StreamSettingsFromContext only ever stores *internet.MemoryStreamConfig
 	streamSettings := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig)
 	tag := inbound.Tag
 	var uplinkCounter stats.Counter
 	var downlinkCounter stats.Counter
 	if len(tag) > 0 && p.ForSystem().Stats.InboundUplink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := v.GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "inbound>>>" + tag + ">>>traffic>>>uplink"
 		c, _ := statsManager.GetOrRegisterCounter(name)
@@ -72,6 +76,7 @@ func NewServer(ctx context.Context, conf *DeviceConfig) (*Server, error) {
 		}
 	}
 	if len(tag) > 0 && p.ForSystem().Stats.InboundDownlink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := v.GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "inbound>>>" + tag + ">>>traffic>>>downlink"
 		c, _ := statsManager.GetOrRegisterCounter(name)
@@ -110,6 +115,7 @@ func NewServer(ctx context.Context, conf *DeviceConfig) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
+		//nolint:forcetypeassert // the account is created by this package's own NewAccount
 		users.Store(user.Account.(*MemoryAccount).Pub, user)
 	}
 
@@ -140,6 +146,7 @@ func (s *Server) AddUser(ctx context.Context, user *protocol.MemoryUser) error {
 	if s.dev == nil {
 		return errors.New("too early")
 	}
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	peer := user.Account.(*MemoryAccount)
 	if peer.Pub == s.pub {
 		return errors.New("invalid public key")
@@ -179,6 +186,7 @@ func (s *Server) RemoveUser(ctx context.Context, email string) error {
 		return errors.New("too early")
 	}
 	if user := s.GetUser(ctx, email); user != nil {
+		//nolint:forcetypeassert // the account is created by this package's own NewAccount
 		peer := user.Account.(*MemoryAccount)
 		err := s.dev.IpcSet("public_key=" + hex.EncodeToString(peer.Pub[:]) + "\nremove=true\n")
 		if err != nil {
@@ -191,7 +199,9 @@ func (s *Server) RemoveUser(ctx context.Context, email string) error {
 
 func (s *Server) GetUser(ctx context.Context, email string) (user *protocol.MemoryUser) {
 	s.users.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		if value.(*protocol.MemoryUser).Email == email {
+			//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 			user = value.(*protocol.MemoryUser)
 			return false
 		}
@@ -202,9 +212,11 @@ func (s *Server) GetUser(ctx context.Context, email string) (user *protocol.Memo
 
 func (s *Server) GetUserByAddr(ctx context.Context, addr netip.Addr) (user *protocol.MemoryUser) {
 	s.users.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		peer := value.(*protocol.MemoryUser).Account.(*MemoryAccount)
 		for i := range peer.AllowedIPs {
 			if peer.AllowedIPs[i].Contains(addr) {
+				//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 				user = value.(*protocol.MemoryUser)
 				return false
 			}
@@ -216,6 +228,7 @@ func (s *Server) GetUserByAddr(ctx context.Context, addr netip.Addr) (user *prot
 
 func (s *Server) GetUsers(ctx context.Context) (users []*protocol.MemoryUser) {
 	s.users.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		users = append(users, value.(*protocol.MemoryUser))
 		return true
 	})
@@ -308,6 +321,7 @@ func (s *Server) Start() error {
 	cfg.WriteString(s.conf.SecretKey)
 	cfg.WriteString("\n")
 	s.users.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 		peer := value.(*protocol.MemoryUser).Account.(*MemoryAccount)
 		cfg.WriteString("public_key=")
 		cfg.WriteString(hex.EncodeToString(peer.Pub[:]))

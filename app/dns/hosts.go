@@ -31,7 +31,7 @@ func NewStaticHosts(hosts []*Config_HostMapping) (*StaticHosts, error) {
 				if err != nil {
 					return nil, err
 				}
-				rep = append(rep, dns.RCodeError(rcode))
+				rep = append(rep, dns.RCodeError(rcode)) //nolint:gosec // DNS response codes are small constants
 			} else {
 				rep = append(rep, net.DomainAddress(mapping.ProxiedDomain))
 			}

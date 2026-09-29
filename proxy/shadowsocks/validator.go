@@ -29,6 +29,7 @@ func (v *Validator) Add(u *protocol.MemoryUser) error {
 	v.Lock()
 	defer v.Unlock()
 
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	account := u.Account.(*MemoryAccount)
 	if !account.Cipher.IsAEAD() && len(v.users) > 0 {
 		return errors.New("The cipher is not support Single-port Multi-user")
@@ -114,12 +115,14 @@ func (v *Validator) Get(bs []byte, command protocol.RequestCommand) (u *protocol
 	defer v.RUnlock()
 
 	for _, user := range v.users {
+		//nolint:forcetypeassert // the account is created by this package's own NewAccount
 		if account := user.Account.(*MemoryAccount); account.Cipher.IsAEAD() {
 			// AEAD payload decoding requires the payload to be over 32 bytes
 			if len(bs) < 32 {
 				continue
 			}
 
+			//nolint:forcetypeassert // the account was validated as AEAD by the caller
 			aeadCipher := account.Cipher.(*AEADCipher)
 			ivLen = aeadCipher.IVSize()
 			iv := bs[:ivLen]
@@ -129,6 +132,7 @@ func (v *Validator) Get(bs []byte, command protocol.RequestCommand) (u *protocol
 			aead = aeadCipher.AEADAuthCreator(subkey)
 
 			var matchErr error
+			//nolint:exhaustive // only TCP and UDP are valid first commands; anything else leaves matchErr set
 			switch command {
 			case protocol.RequestCommandTCP:
 				data := make([]byte, 4+aead.NonceSize())
@@ -144,6 +148,7 @@ func (v *Validator) Get(bs []byte, command protocol.RequestCommand) (u *protocol
 			}
 		} else {
 			u = user
+			//nolint:forcetypeassert // the account is created by this package's own NewAccount
 			ivLen = user.Account.(*MemoryAccount).Cipher.IVSize()
 			return
 		}

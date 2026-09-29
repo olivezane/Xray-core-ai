@@ -48,6 +48,7 @@ func reloadEnvSettings() error {
 
 func ensureBaseKey() []byte {
 	if key := baseKey.Load(); key != nil {
+		//nolint:forcetypeassert // the pool only ever stores []byte
 		return key.([]byte)
 	}
 	key := make([]byte, 32)
@@ -63,13 +64,14 @@ func init() {
 }
 
 func GetGlobalID(ctx context.Context) (globalID [8]byte) {
+	//nolint:forcetypeassert // session.ConeKey is only ever set to a bool
 	if cone := ctx.Value(session.ConeKey); cone == nil || !cone.(bool) { // cone is nil only in some unit tests
 		return
 	}
 	if inbound := session.InboundFromContext(ctx); inbound != nil && inbound.Source.Network == net.Network_UDP &&
 		(inbound.Name == "dokodemo-door" || inbound.Name == "socks" || inbound.Name == "shadowsocks" || inbound.Name == "tun") {
 		h := blake3.New(8, ensureBaseKey())
-		h.Write([]byte(inbound.Source.String()))
+		_, _ = h.Write([]byte(inbound.Source.String()))
 		copy(globalID[:], h.Sum(nil))
 		if Show.Load() {
 			errors.LogInfo(ctx, fmt.Sprintf("XUDP inbound.Source.String(): %v\tglobalID: %v\n", inbound.Source.String(), globalID))
@@ -102,30 +104,34 @@ func (w *PacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 		}
 
 		eb := buf.New()
-		eb.Write([]byte{0, 0, 0, 0}) // Meta data length; Mux Session ID
+		_, _ = eb.Write([]byte{0, 0, 0, 0}) // Meta data length; Mux Session ID
 		if w.Dest.Network == net.Network_UDP {
-			eb.WriteByte(1) // New
-			eb.WriteByte(1) // Opt
-			eb.WriteByte(2) // UDP
-			AddrParser.WriteAddressPort(eb, w.Dest.Address, w.Dest.Port)
+			_ = eb.WriteByte(1) // New
+			_ = eb.WriteByte(1) // Opt
+			_ = eb.WriteByte(2) // UDP
+			if err := AddrParser.WriteAddressPort(eb, w.Dest.Address, w.Dest.Port); err != nil {
+				return err
+			}
 			if b.UDP != nil { // make sure it's user's proxy request
-				eb.Write(w.GlobalID[:]) // no need to check whether it's empty
+				_, _ = eb.Write(w.GlobalID[:]) // no need to check whether it's empty
 			}
 			w.Dest.Network = net.Network_Unknown
 		} else {
-			eb.WriteByte(2) // Keep
-			eb.WriteByte(1) // Opt
+			_ = eb.WriteByte(2) // Keep
+			_ = eb.WriteByte(1) // Opt
 			if b.UDP != nil {
-				eb.WriteByte(2) // UDP
-				AddrParser.WriteAddressPort(eb, b.UDP.Address, b.UDP.Port)
+				_ = eb.WriteByte(2) // UDP
+				if err := AddrParser.WriteAddressPort(eb, b.UDP.Address, b.UDP.Port); err != nil {
+					return err
+				}
 			}
 		}
 		l := eb.Len() - 2
-		eb.SetByte(0, byte(l>>8))
-		eb.SetByte(1, byte(l))
-		eb.WriteByte(byte(length >> 8))
-		eb.WriteByte(byte(length))
-		eb.Write(b.Bytes())
+		eb.SetByte(0, byte(l>>8))           //nolint:gosec // explicit byte extraction from a shift
+		eb.SetByte(1, byte(l))              //nolint:gosec // explicit byte extraction for the XUDP header
+		_ = eb.WriteByte(byte(length >> 8)) //nolint:gosec // G115: explicit low-byte extraction from a value bounded by the wire format
+		_ = eb.WriteByte(byte(length))      //nolint:gosec // G115: explicit byte extraction from a value bounded by the wire format
+		_, _ = eb.Write(b.Bytes())
 
 		mb2Write = append(mb2Write, eb)
 	}

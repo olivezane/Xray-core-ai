@@ -25,13 +25,17 @@ func TestXrayDependency(t *testing.T) {
 	instance := new(Instance)
 
 	wait := make(chan bool, 1)
-	instance.RequireFeatures(func(d dns.Client) {
+	if err := instance.RequireFeatures(func(d dns.Client) {
 		if d == nil {
 			t.Error("expected dns client fulfilled, but actually nil")
 		}
 		wait <- true
-	}, false)
-	instance.AddFeature(localdns.New())
+	}, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := instance.AddFeature(localdns.New()); err != nil {
+		t.Fatal(err)
+	}
 	<-wait
 }
 

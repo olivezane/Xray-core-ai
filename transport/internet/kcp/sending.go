@@ -28,6 +28,7 @@ func (sw *SendingWindow) Release() {
 		return
 	}
 	for sw.cache.Len() > 0 {
+		//nolint:forcetypeassert // the KCP retransmission queues only ever store *DataSegment
 		seg := sw.cache.Front().Value.(*DataSegment)
 		seg.Release()
 		sw.cache.Remove(sw.cache.Front())
@@ -35,7 +36,7 @@ func (sw *SendingWindow) Release() {
 }
 
 func (sw *SendingWindow) Len() uint32 {
-	return uint32(sw.cache.Len())
+	return uint32(sw.cache.Len()) //nolint:gosec // session IDs and segment sizes are bounded by the protocol
 }
 
 func (sw *SendingWindow) IsEmpty() bool {
@@ -51,11 +52,13 @@ func (sw *SendingWindow) Push(number uint32, b *buf.Buffer) {
 }
 
 func (sw *SendingWindow) FirstNumber() uint32 {
+	//nolint:forcetypeassert // the KCP retransmission queues only ever store *DataSegment
 	return sw.cache.Front().Value.(*DataSegment).Number
 }
 
 func (sw *SendingWindow) Clear(una uint32) {
 	for !sw.IsEmpty() {
+		//nolint:forcetypeassert // the KCP retransmission queues only ever store *DataSegment
 		seg := sw.cache.Front().Value.(*DataSegment)
 		if seg.Number >= una {
 			break
@@ -88,6 +91,7 @@ func (sw *SendingWindow) Visit(visitor func(seg *DataSegment) bool) {
 	}
 
 	for e := sw.cache.Front(); e != nil; e = e.Next() {
+		//nolint:forcetypeassert // the KCP retransmission queues only ever store *DataSegment
 		seg := e.Value.(*DataSegment)
 		if !visitor(seg) {
 			break
@@ -117,7 +121,7 @@ func (sw *SendingWindow) Flush(current uint32, rto uint32, maxInFlightSize uint3
 
 		segment.Timestamp = current
 		segment.transmit++
-		sw.writer.Write(segment)
+		_ = sw.writer.Write(segment)
 		inFlightSize++
 		return inFlightSize < maxInFlightSize
 	})
@@ -134,6 +138,7 @@ func (sw *SendingWindow) Remove(number uint32) bool {
 	}
 
 	for e := sw.cache.Front(); e != nil; e = e.Next() {
+		//nolint:forcetypeassert // the KCP retransmission queues only ever store *DataSegment
 		seg := e.Value.(*DataSegment)
 		if seg.Number > number {
 			return false
@@ -275,6 +280,7 @@ func (w *SendingWorker) Push(b *buf.Buffer) bool {
 }
 
 func (w *SendingWorker) Write(seg Segment) error {
+	//nolint:forcetypeassert // the KCP retransmission queues only ever store *DataSegment
 	dataSeg := seg.(*DataSegment)
 
 	dataSeg.Conv = w.conn.meta.Conversation

@@ -151,14 +151,14 @@ func BenchmarkAddressReadingIPv4(b *testing.B) {
 	defer payload.Release()
 
 	raw := []byte{1, 0, 0, 0, 0, 0, 53}
-	payload.Write(raw)
+	_, _ = payload.Write(raw)
 
 	for b.Loop() {
 		_, _, err := parser.ReadAddressPort(cache, payload)
 		common.Must(err)
 		cache.Clear()
 		payload.Clear()
-		payload.Extend(int32(len(raw)))
+		payload.Extend(int32(len(raw))) //nolint:gosec // G115: length of a buffer allocated in the same statement
 	}
 }
 
@@ -171,14 +171,14 @@ func BenchmarkAddressReadingIPv6(b *testing.B) {
 	defer payload.Release()
 
 	raw := []byte{4, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 0, 80}
-	payload.Write(raw)
+	_, _ = payload.Write(raw)
 
 	for b.Loop() {
 		_, _, err := parser.ReadAddressPort(cache, payload)
 		common.Must(err)
 		cache.Clear()
 		payload.Clear()
-		payload.Extend(int32(len(raw)))
+		payload.Extend(int32(len(raw))) //nolint:gosec // G115: length of a buffer allocated in the same statement
 	}
 }
 
@@ -191,14 +191,14 @@ func BenchmarkAddressReadingDomain(b *testing.B) {
 	defer payload.Release()
 
 	raw := []byte{3, 9, 118, 50, 114, 97, 121, 46, 99, 111, 109, 0, 80}
-	payload.Write(raw)
+	_, _ = payload.Write(raw)
 
 	for b.Loop() {
 		_, _, err := parser.ReadAddressPort(cache, payload)
 		common.Must(err)
 		cache.Clear()
 		payload.Clear()
-		payload.Extend(int32(len(raw)))
+		payload.Extend(int32(len(raw))) //nolint:gosec // G115: length of a buffer allocated in the same statement
 	}
 }
 

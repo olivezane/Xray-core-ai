@@ -276,11 +276,14 @@ type bbrSender struct {
 	// A window used to limit the number of bytes in flight during loss recovery.
 	recoveryWindow congestion.ByteCount
 	// If true, consider all samples in recovery app-limited.
+	//nolint:unused // upstream BBR port: kept verbatim for parity with the reference implementation
 	isAppLimitedRecovery bool // not used
 
 	// When true, pace at 1.5x and disable packet conservation in STARTUP.
+	//nolint:unused // upstream BBR port: kept verbatim for parity with the reference implementation
 	slowerStartup bool // not used
 	// When true, disables packet conservation in STARTUP.
+	//nolint:unused // upstream BBR port: kept verbatim for parity with the reference implementation
 	rateBasedStartup bool // not used
 
 	// When true, add the most recent ack aggregation measurement during STARTUP.
@@ -409,7 +412,7 @@ func scaleByteWindowForDatagramSize(window, oldMaxDatagramSize, newMaxDatagramSi
 	if oldMaxDatagramSize == newMaxDatagramSize {
 		return window
 	}
-	return congestion.ByteCount(uint64(window) * uint64(newMaxDatagramSize) / uint64(oldMaxDatagramSize))
+	return congestion.ByteCount(uint64(window) * uint64(newMaxDatagramSize) / uint64(oldMaxDatagramSize)) //nolint:gosec // bandwidth arithmetic saturates well below the type limits
 }
 
 func (b *bbrSender) rescalePacketSizedWindows(maxDatagramSize congestion.ByteCount) {
@@ -648,7 +651,7 @@ func (b *bbrSender) PacingRate() Bandwidth {
 }
 
 // Sets the CWND gain used in STARTUP.  Must be greater than 1.
-func (b *bbrSender) setHighCwndGain(highCwndGain float64) {
+func (b *bbrSender) setHighCwndGain(highCwndGain float64) { //nolint:unused // upstream BBR port: kept verbatim for parity with the reference implementation
 	b.highCwndGain = highCwndGain
 	if b.mode == bbrModeStartup {
 		b.congestionWindowGain = highCwndGain
@@ -1058,7 +1061,7 @@ func (b *bbrSender) debugPrint(format string, a ...any) {
 }
 
 func bdpFromRttAndBandwidth(rtt time.Duration, bandwidth Bandwidth) congestion.ByteCount {
-	return congestion.ByteCount(rtt) * congestion.ByteCount(bandwidth) / congestion.ByteCount(BytesPerSecond) / congestion.ByteCount(time.Second)
+	return congestion.ByteCount(rtt) * congestion.ByteCount(bandwidth) / congestion.ByteCount(BytesPerSecond) / congestion.ByteCount(time.Second) //nolint:gosec // bandwidth arithmetic saturates well below the type limits
 }
 
 func GetInitialPacketSize(addr net.Addr) congestion.ByteCount {

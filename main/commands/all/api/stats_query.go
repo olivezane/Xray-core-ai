@@ -37,10 +37,10 @@ func executeQueryStats(cmd *base.Command, args []string) {
 	setSharedFlags(cmd)
 	pattern := cmd.Flag.String("pattern", "", "")
 	reset := cmd.Flag.Bool("reset", false, "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := statsService.NewStatsServiceClient(conn)
 	r := &statsService.QueryStatsRequest{

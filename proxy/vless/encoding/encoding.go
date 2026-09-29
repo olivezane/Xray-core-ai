@@ -35,6 +35,7 @@ func EncodeRequestHeader(writer io.Writer, request *protocol.RequestHeader, requ
 		return errors.New("failed to write request version").Base(err)
 	}
 
+	//nolint:forcetypeassert // the account is created by proxy/vless's own NewAccount
 	if _, err := buffer.Write(request.User.Account.(*vless.MemoryAccount).ID.Bytes()); err != nil {
 		return errors.New("failed to write request user id").Base(err)
 	}
@@ -197,7 +198,7 @@ func XtlsRead(reader buf.Reader, writer buf.Writer, timer *signal.ActivityTimer,
 			}
 		}
 	}()
-	if err != nil && errors.Cause(err) != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil

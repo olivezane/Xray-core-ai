@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"io"
+	"math"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -51,14 +52,14 @@ func reloadEnvSettings() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
 		h := new(Handler)
 		if streamSettings, ok := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig); ok && streamSettings.SocketSettings != nil {
 			h.resolveStrategy = streamSettings.SocketSettings.DomainStrategy
 			h.usesDialerProxy = len(streamSettings.SocketSettings.DialerProxy) > 0
 		}
 		if err := core.RequireFeatures(ctx, func(pm policy.Manager) error {
-			return h.Init(config.(*Config), pm)
+			return h.Init(config, pm)
 		}); err != nil {
 			return nil, err
 		}
@@ -213,17 +214,17 @@ func (h *Handler) policy() policy.Session {
 }
 
 func (h *Handler) blockDelay(rule *FinalRule) time.Duration {
-	min := uint64(30)
-	max := uint64(90)
+	minVal := uint64(30)
+	maxVal := uint64(90)
 	if rule.blockDelay != nil {
-		min = rule.blockDelay.Min
-		max = rule.blockDelay.Max
+		minVal = rule.blockDelay.Min
+		maxVal = rule.blockDelay.Max
 	}
-	span := max - min
-	if max < min {
-		span = min - max
+	span := maxVal - minVal
+	if maxVal < minVal {
+		span = minVal - maxVal
 	}
-	return time.Duration(min+uint64(dice.Roll(int(span+1)))) * time.Second
+	return time.Duration(minVal+uint64(dice.Roll(int(span+1)))) * time.Second //nolint:gosec // span is the operator's blockDelay range; a value past MaxInt is not a usable delay anyway
 }
 
 func (h *Handler) blackhole(ctx context.Context, input buf.Reader, output buf.Writer, rule *FinalRule, dest *net.Destination) error {
@@ -275,6 +276,9 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 			UDPOverride.Address = destination.Address
 		}
 		if server.Port != 0 {
+			if server.Port > math.MaxUint16 {
+				return errors.New("invalid port: ", server.Port)
+			}
 			destination.Port = net.Port(server.Port)
 			UDPOverride.Port = destination.Port
 		}
@@ -501,12 +505,13 @@ func (r *PacketReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 			b.Release()
 			return nil, err
 		}
+		//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 		udpAddr := d.(*net.UDPAddr)
 		sourceAddr := net.IPAddress(udpAddr.IP)
-		if rule := r.Handler.matchFinalRule(net.Network_UDP, sourceAddr, net.Port(udpAddr.Port), r.DefaultRule); rule != nil && rule.action == RuleAction_Block {
+		if rule := r.Handler.matchFinalRule(net.Network_UDP, sourceAddr, net.Port(udpAddr.Port), r.DefaultRule); rule != nil && rule.action == RuleAction_Block { //nolint:gosec // net.UDPAddr.Port is always 0..65535
 			continue
 		}
-		b.Resize(0, int32(n))
+		b.Resize(0, int32(n)) //nolint:gosec // n <= buf.Size
 
 		// if udp dest addr is changed, we are unable to get the correct src addr
 		// so we don't attach src info to udp packet, break cone behavior, assuming the dial dest is the expected scr addr
@@ -516,7 +521,7 @@ func (r *PacketReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 			}
 			b.UDP = &net.Destination{
 				Address: sourceAddr,
-				Port:    net.Port(udpAddr.Port),
+				Port:    net.Port(udpAddr.Port), //nolint:gosec // net.UDPAddr.Port is always 0..65535
 				Network: net.Network_UDP,
 			}
 		}
@@ -686,8 +691,8 @@ func (w *NoisePacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 				noise = n.Packet
 			} else {
 				// Random noise
-				noise, err = GenerateRandomBytes(crypto.RandBetween(int64(n.LengthMin),
-					int64(n.LengthMax)))
+				noise, err = GenerateRandomBytes(crypto.RandBetween(int64(n.LengthMin), //nolint:gosec // set from an int by infra/conf, so it always fits in int64
+					int64(n.LengthMax))) //nolint:gosec // set from an int by infra/conf, so it always fits in int64
 			}
 			if err != nil {
 				return err
@@ -698,7 +703,7 @@ func (w *NoisePacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 			}
 
 			if n.DelayMin != 0 || n.DelayMax != 0 {
-				time.Sleep(time.Duration(crypto.RandBetween(int64(n.DelayMin), int64(n.DelayMax))) * time.Millisecond)
+				time.Sleep(time.Duration(crypto.RandBetween(int64(n.DelayMin), int64(n.DelayMax))) * time.Millisecond) //nolint:gosec // set from an int by infra/conf, so it always fits in int64
 			}
 		}
 
@@ -726,10 +731,10 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 		data := b[5:recordLen]
 		buff := make([]byte, 2048)
 		var hello []byte
-		maxSplit := crypto.RandBetween(int64(f.fragment.MaxSplitMin), int64(f.fragment.MaxSplitMax))
+		maxSplit := crypto.RandBetween(int64(f.fragment.MaxSplitMin), int64(f.fragment.MaxSplitMax)) //nolint:gosec // set from an int by infra/conf, so it always fits in int64
 		var splitNum int64
 		for from := 0; ; {
-			to := from + int(crypto.RandBetween(int64(f.fragment.LengthMin), int64(f.fragment.LengthMax)))
+			to := from + int(crypto.RandBetween(int64(f.fragment.LengthMin), int64(f.fragment.LengthMax))) //nolint:gosec // set from an int by infra/conf, so it always fits in int64
 			splitNum++
 			if to > len(data) || (maxSplit > 0 && splitNum >= maxSplit) {
 				to = len(data)
@@ -741,13 +746,13 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 			copy(buff[:3], b)
 			copy(buff[5:], data[from:to])
 			from = to
-			buff[3] = byte(l >> 8)
-			buff[4] = byte(l)
+			buff[3] = byte(l >> 8)           //nolint:gosec // l is a slice length below 65536
+			buff[4] = byte(l)                //nolint:gosec // l is a slice length below 65536
 			if f.fragment.IntervalMax == 0 { // combine fragmented tlshello if interval is 0
 				hello = append(hello, buff[:5+l]...)
 			} else {
 				_, err := f.writer.Write(buff[:5+l])
-				time.Sleep(time.Duration(crypto.RandBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond)
+				time.Sleep(time.Duration(crypto.RandBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond) //nolint:gosec // set from an int by infra/conf, so it always fits in int64
 				if err != nil {
 					return 0, err
 				}
@@ -773,10 +778,10 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 	if f.fragment.PacketsFrom != 0 && (f.count < f.fragment.PacketsFrom || f.count > f.fragment.PacketsTo) {
 		return f.writer.Write(b)
 	}
-	maxSplit := crypto.RandBetween(int64(f.fragment.MaxSplitMin), int64(f.fragment.MaxSplitMax))
+	maxSplit := crypto.RandBetween(int64(f.fragment.MaxSplitMin), int64(f.fragment.MaxSplitMax)) //nolint:gosec // set from an int by infra/conf, so it always fits in int64
 	var splitNum int64
 	for from := 0; ; {
-		to := from + int(crypto.RandBetween(int64(f.fragment.LengthMin), int64(f.fragment.LengthMax)))
+		to := from + int(crypto.RandBetween(int64(f.fragment.LengthMin), int64(f.fragment.LengthMax))) //nolint:gosec // set from an int by infra/conf, so it always fits in int64
 		splitNum++
 		if to > len(b) || (maxSplit > 0 && splitNum >= maxSplit) {
 			to = len(b)
@@ -786,7 +791,7 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 		if err != nil {
 			return from, err
 		}
-		time.Sleep(time.Duration(crypto.RandBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond)
+		time.Sleep(time.Duration(crypto.RandBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond) //nolint:gosec // set from an int by infra/conf, so it always fits in int64
 		if from >= len(b) {
 			return from, nil
 		}

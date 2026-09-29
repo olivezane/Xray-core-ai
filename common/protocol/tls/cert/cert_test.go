@@ -29,12 +29,10 @@ func generate(domainNames []string, isCA bool, jsonOutput bool, fileOutput strin
 
 	var opts []Option
 	if isCA {
-		opts = append(opts, Authority(isCA))
-		opts = append(opts, KeyUsage(x509.KeyUsageCertSign|x509.KeyUsageKeyEncipherment|x509.KeyUsageDigitalSignature))
+		opts = append(opts, Authority(isCA), KeyUsage(x509.KeyUsageCertSign|x509.KeyUsageKeyEncipherment|x509.KeyUsageDigitalSignature))
 	}
 
-	opts = append(opts, NotAfter(time.Now().Add(expire)))
-	opts = append(opts, CommonName(commonName))
+	opts = append(opts, NotAfter(time.Now().Add(expire)), CommonName(commonName))
 	if len(domainNames) > 0 {
 		opts = append(opts, DNSNames(domainNames...))
 	}
@@ -71,8 +69,8 @@ func printJSON(certificate *Certificate) {
 	}
 	content, err := json.MarshalIndent(jCert, "", "  ")
 	common.Must(err)
-	os.Stdout.Write(content)
-	os.Stdout.WriteString("\n")
+	_, _ = os.Stdout.Write(content)
+	_, _ = os.Stdout.WriteString("\n")
 }
 
 func printFile(certificate *Certificate, name string) error {

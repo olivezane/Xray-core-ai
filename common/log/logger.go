@@ -90,7 +90,7 @@ func (l *generalLogger) run() {
 		case <-l.done.Wait():
 			return
 		case msg := <-l.buffer:
-			logger.Write(msg.String() + platform.LineSeparator())
+			_ = logger.Write(msg.String() + platform.LineSeparator())
 			dataWritten = true
 		case <-ticker.C:
 			if !dataWritten {

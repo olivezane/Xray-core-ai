@@ -22,13 +22,14 @@ func (server *Server) Start() (net.Destination, error) {
 	if err != nil {
 		return net.Destination{}, err
 	}
-	server.Port = net.Port(conn.LocalAddr().(*net.UDPAddr).Port)
+	server.Port = net.Port(conn.LocalAddr().(*net.UDPAddr).Port) //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 	fmt.Println("UDP server started on port ", server.Port)
 
 	server.conn = conn
 	go server.handleConnection(conn)
+	//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return net.UDPDestination(net.IPAddress(localAddr.IP), net.Port(localAddr.Port)), nil
+	return net.UDPDestination(net.IPAddress(localAddr.IP), net.Port(localAddr.Port)), nil //nolint:gosec // Port of a net.Addr is always 0..65535
 }
 
 func (server *Server) handleConnection(conn *net.UDPConn) {

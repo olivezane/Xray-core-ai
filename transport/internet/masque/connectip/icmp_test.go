@@ -41,7 +41,7 @@ func TestICMPTooLargeIPv4(t *testing.T) {
 	require.Equal(t, ipProtoICMP, hdr.Protocol)
 	require.Equal(t, dst.String(), hdr.Src.String())
 	require.Equal(t, src.String(), hdr.Dst.String())
-	require.Equal(t, uint16(hdr.Checksum), calculateIPv4Checksum(data[:ipv4.HeaderLen]))
+	require.Equal(t, uint16(hdr.Checksum), calculateIPv4Checksum(data[:ipv4.HeaderLen])) //nolint:gosec // G115: the value is bounded by the fixture built above
 	icmpMsg, err := icmp.ParseMessage(ipProtoICMP, data[ipv4.HeaderLen:])
 	require.NoError(t, err)
 	require.Equal(t, ipv4.ICMPTypeDestinationUnreachable, icmpMsg.Type)

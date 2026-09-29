@@ -68,7 +68,7 @@ func (mb MultiBuffer) Copy(b []byte) int {
 	for _, bb := range mb {
 		nBytes := copy(b[total:], bb.Bytes())
 		total += nBytes
-		if int32(nBytes) < bb.Len() {
+		if int32(nBytes) < bb.Len() { //nolint:gosec // nBytes <= len(b.v), which fits in int32
 			break
 		}
 	}
@@ -87,7 +87,7 @@ func ReadFrom(reader io.Reader) (MultiBuffer, error) {
 			mb = append(mb, b)
 		}
 		if err != nil {
-			if errors.Cause(err) == io.EOF || errors.Cause(err) == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return mb, nil
 			}
 			return mb, err

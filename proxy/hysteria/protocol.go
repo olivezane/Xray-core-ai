@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 
 	"github.com/apernet/quic-go/quicvarint"
 	"github.com/xtls/xray-core/common/errors"
@@ -64,8 +65,8 @@ func WriteTCPRequest(w io.Writer, addr string) error {
 	padding := hysteria.TcpRequestPadding.String()
 	paddingLen := len(padding)
 	addrLen := len(addr)
-	sz := int(quicvarint.Len(uint64(addrLen))) + addrLen +
-		int(quicvarint.Len(uint64(paddingLen))) + paddingLen
+	sz := quicvarint.Len(uint64(addrLen)) + addrLen +
+		quicvarint.Len(uint64(paddingLen)) + paddingLen
 	buf := make([]byte, sz)
 	i := varintPut(buf, uint64(addrLen))
 	i += copy(buf[i:], addr)
@@ -124,8 +125,8 @@ func WriteTCPResponse(w io.Writer, ok bool, msg string) error {
 	padding := hysteria.TcpResponsePadding.String()
 	paddingLen := len(padding)
 	msgLen := len(msg)
-	sz := 1 + int(quicvarint.Len(uint64(msgLen))) + msgLen +
-		int(quicvarint.Len(uint64(paddingLen))) + paddingLen
+	sz := 1 + quicvarint.Len(uint64(msgLen)) + msgLen +
+		quicvarint.Len(uint64(paddingLen)) + paddingLen
 	buf := make([]byte, sz)
 	if ok {
 		buf[0] = 0
@@ -160,7 +161,7 @@ type UDPMessage struct {
 
 func (m *UDPMessage) HeaderSize() int {
 	lAddr := len(m.Addr)
-	return 4 + 2 + 1 + 1 + int(quicvarint.Len(uint64(lAddr))) + lAddr
+	return 4 + 2 + 1 + 1 + quicvarint.Len(uint64(lAddr)) + lAddr
 }
 
 func (m *UDPMessage) Size() int {
@@ -223,42 +224,46 @@ func varintPut(b []byte, i uint64) int {
 	}
 	if i <= maxVarInt2 {
 		b[0] = uint8(i>>8) | 0x40
-		b[1] = uint8(i)
+		b[1] = uint8(i) //nolint:gosec // guarded by the maxVarInt range check above
 		return 2
 	}
 	if i <= maxVarInt4 {
 		b[0] = uint8(i>>24) | 0x80
-		b[1] = uint8(i >> 16)
-		b[2] = uint8(i >> 8)
-		b[3] = uint8(i)
+		b[1] = uint8(i >> 16) //nolint:gosec // guarded by the maxVarInt range check above
+		b[2] = uint8(i >> 8)  //nolint:gosec // guarded by the maxVarInt range check above
+		b[3] = uint8(i)       //nolint:gosec // guarded by the maxVarInt range check above
 		return 4
 	}
 	if i <= maxVarInt8 {
 		b[0] = uint8(i>>56) | 0xc0
-		b[1] = uint8(i >> 48)
-		b[2] = uint8(i >> 40)
-		b[3] = uint8(i >> 32)
-		b[4] = uint8(i >> 24)
-		b[5] = uint8(i >> 16)
-		b[6] = uint8(i >> 8)
-		b[7] = uint8(i)
+		b[1] = uint8(i >> 48) //nolint:gosec // guarded by the maxVarInt range check above
+		b[2] = uint8(i >> 40) //nolint:gosec // guarded by the maxVarInt range check above
+		b[3] = uint8(i >> 32) //nolint:gosec // guarded by the maxVarInt range check above
+		b[4] = uint8(i >> 24) //nolint:gosec // guarded by the maxVarInt range check above
+		b[5] = uint8(i >> 16) //nolint:gosec // guarded by the maxVarInt range check above
+		b[6] = uint8(i >> 8)  //nolint:gosec // guarded by the maxVarInt range check above
+		b[7] = uint8(i)       //nolint:gosec // guarded by the maxVarInt range check above
 		return 8
 	}
 	panic(fmt.Sprintf("%#x doesn't fit into 62 bits", i))
 }
 
-func FragUDPMessage(m *UDPMessage, maxSize int) []UDPMessage {
+func FragUDPMessage(m *UDPMessage, maxSize int) ([]UDPMessage, error) {
 	if m.Size() <= maxSize {
-		return []UDPMessage{*m}
+		return []UDPMessage{*m}, nil
 	}
 	fullPayload := m.Data
 	maxPayloadSize := maxSize - m.HeaderSize()
 	if maxPayloadSize <= 0 {
-		return nil
+		return nil, errors.New("max payload size is too small: ", maxSize)
 	}
 	off := 0
 	fragID := uint8(0)
-	fragCount := uint8((len(fullPayload) + maxPayloadSize - 1) / maxPayloadSize) // round up
+	fragCount64 := (len(fullPayload) + maxPayloadSize - 1) / maxPayloadSize // round up
+	if fragCount64 > math.MaxUint8 {
+		return nil, errors.New("message requires ", fragCount64, " fragments, but the FragCount field only holds 255")
+	}
+	fragCount := uint8(fragCount64) //nolint:gosec // bounded by the check above
 	frags := make([]UDPMessage, fragCount)
 	for off < len(fullPayload) {
 		payloadSize := min(len(fullPayload)-off, maxPayloadSize)
@@ -270,7 +275,7 @@ func FragUDPMessage(m *UDPMessage, maxSize int) []UDPMessage {
 		off += payloadSize
 		fragID++
 	}
-	return frags
+	return frags, nil
 }
 
 // Defragger handles the defragmentation of UDP messages.
@@ -292,7 +297,7 @@ func (d *Defragger) Feed(m *UDPMessage) *UDPMessage {
 		// wtf is this?
 		return nil
 	}
-	if m.PacketID != d.pktID || m.FragCount != uint8(len(d.frags)) {
+	if m.PacketID != d.pktID || m.FragCount != uint8(len(d.frags)) { //nolint:gosec // len(d.frags) is always m.FragCount, which is a uint8
 		// new message, clear previous state
 		d.pktID = m.PacketID
 		d.frags = make([]*UDPMessage, m.FragCount)

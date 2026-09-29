@@ -32,6 +32,7 @@ func TestTCPRequest(t *testing.T) {
 	defer buffer.Release()
 
 	destination := net.Destination{Network: net.Network_TCP, Address: net.LocalHostIP, Port: 1234}
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	writer := &ConnWriter{Writer: buffer, Target: destination, Account: user.Account.(*MemoryAccount)}
 	common.Must(writer.WriteMultiBuffer(buf.MultiBuffer{data}))
 
@@ -64,6 +65,7 @@ func TestUDPRequest(t *testing.T) {
 	defer buffer.Release()
 
 	destination := net.Destination{Network: net.Network_UDP, Address: net.LocalHostIP, Port: 1234}
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	writer := &PacketWriter{Writer: &ConnWriter{Writer: buffer, Target: destination, Account: user.Account.(*MemoryAccount)}, Target: destination}
 	common.Must(writer.WriteMultiBuffer(buf.MultiBuffer{data}))
 

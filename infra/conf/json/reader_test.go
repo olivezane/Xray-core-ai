@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/xtls/xray-core/common"
+	"github.com/xtls/xray-core/common/errors"
 	. "github.com/xtls/xray-core/infra/conf/json"
 )
 
@@ -87,7 +88,7 @@ func TestReader1(t *testing.T) {
 			target = append(target, buf[:n]...)
 			buf = make([]byte, bufLen)
 		}
-		if err != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			t.Error("error: ", err)
 		}
 		if string(target) != testCase.output {

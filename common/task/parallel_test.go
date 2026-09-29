@@ -44,7 +44,7 @@ func TestParallelForN_Error(t *testing.T) {
 		}
 		return nil
 	})
-	if err != boom {
+	if !errors.Is(err, boom) {
 		t.Fatalf("expected %v, got %v", boom, err)
 	}
 }

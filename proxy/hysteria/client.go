@@ -30,8 +30,10 @@ type Client struct {
 
 func NewClient(ctx context.Context, config *ClientConfig) (*Client, error) {
 	v := core.MustFromContext(ctx)
+	//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 	p := v.GetFeature(policy.ManagerType()).(policy.Manager)
 
+	//nolint:forcetypeassert // session.StreamSettingsFromContext only ever stores *internet.MemoryStreamConfig
 	streamSettings := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig)
 	if _, ok := streamSettings.ProtocolSettings.(*hysteria.Config); !ok {
 		return nil, errors.New("not hysteria transport")
@@ -169,8 +171,8 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewClient(ctx, config.(*ClientConfig))
+	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config *ClientConfig) (any, error) {
+		return NewClient(ctx, config)
 	}))
 }
 
@@ -206,10 +208,13 @@ func (w *UDPWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 		}
 
 		err := w.SendMessage(msg)
-		var errTooLarge *quic.DatagramTooLargeError
-		if go_errors.As(err, &errTooLarge) {
-			msg.PacketID = uint16(rand.Intn(0xFFFF)) + 1
-			fMsgs := FragUDPMessage(msg, int(errTooLarge.MaxDatagramPayloadSize))
+		if errTooLarge, ok := go_errors.AsType[*quic.DatagramTooLargeError](err); ok {
+			msg.PacketID = uint16(rand.Intn(0xFFFF)) + 1 //nolint:gosec // rand.Intn(0xFFFF) + 1 is at most 65535
+			fMsgs, err := FragUDPMessage(msg, int(errTooLarge.MaxDatagramPayloadSize))
+			if err != nil {
+				buf.ReleaseMulti(mb[i:])
+				return err
+			}
 			for _, fMsg := range fMsgs {
 				err := w.SendMessage(&fMsg)
 				if err != nil {
@@ -279,7 +284,7 @@ func (r *UDPReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 		b.Release()
 		return nil, err
 	}
-	b.Resize(0, int32(n))
+	b.Resize(0, int32(n)) //nolint:gosec // read length is bounded by the buffer size
 	b.UDP = addr
 	return buf.MultiBuffer{b}, nil
 }

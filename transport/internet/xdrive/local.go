@@ -52,7 +52,7 @@ func (s *localStorage) Put(ctx context.Context, name string, data []byte) error 
 		return errors.New("failed to create temp file in ", dir).Base(err)
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
+	defer func() { _ = os.Remove(tmpName) }()
 
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()

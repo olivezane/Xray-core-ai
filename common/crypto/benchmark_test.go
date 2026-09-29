@@ -14,7 +14,7 @@ func benchmarkStream(b *testing.B, c cipher.Stream) {
 	input := make([]byte, benchSize)
 	output := make([]byte, benchSize)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		c.XORKeyStream(output, input)
 	}
 }

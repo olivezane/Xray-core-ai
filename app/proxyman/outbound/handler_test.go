@@ -43,13 +43,14 @@ func TestOutboundWithoutStatCounter(t *testing.T) {
 	}
 
 	v, _ := core.New(config)
-	v.AddFeature(outbound.Manager(new(Manager)))
+	_ = v.AddFeature(outbound.Manager(new(Manager)))
 	ctx := context.WithValue(context.Background(), xrayKey, v)
 	ctx = session.ContextWithOutbounds(ctx, []*session.Outbound{{}})
 	h, _ := NewHandler(ctx, &core.OutboundHandlerConfig{
 		Tag:           "tag",
 		ProxySettings: serial.ToTypedMessage(&freedom.Config{FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}}}),
 	})
+	//nolint:forcetypeassert // the test asserts the handler type
 	conn, _ := h.(*Handler).Dial(ctx, net.TCPDestination(net.DomainAddress("localhost"), 13146))
 	_, ok := conn.(*stat.CounterConnection)
 	if ok {
@@ -73,13 +74,14 @@ func TestOutboundWithStatCounter(t *testing.T) {
 	}
 
 	v, _ := core.New(config)
-	v.AddFeature(outbound.Manager(new(Manager)))
+	_ = v.AddFeature(outbound.Manager(new(Manager)))
 	ctx := context.WithValue(context.Background(), xrayKey, v)
 	ctx = session.ContextWithOutbounds(ctx, []*session.Outbound{{}})
 	h, _ := NewHandler(ctx, &core.OutboundHandlerConfig{
 		Tag:           "tag",
 		ProxySettings: serial.ToTypedMessage(&freedom.Config{FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}}}),
 	})
+	//nolint:forcetypeassert // the test asserts the handler type
 	conn, _ := h.(*Handler).Dial(ctx, net.TCPDestination(net.DomainAddress("localhost"), 13146))
 	_, ok := conn.(*stat.CounterConnection)
 	if !ok {
@@ -104,7 +106,7 @@ func TestTagsCache(t *testing.T) {
 		App: []*serial.TypedMessage{},
 	}
 	v, _ := core.New(config)
-	v.AddFeature(ohm)
+	_ = v.AddFeature(ohm)
 	ctx := context.WithValue(context.Background(), xrayKey, v)
 
 	stop_add_rm := false
@@ -139,7 +141,7 @@ func TestTagsCache(t *testing.T) {
 			tags.Range(func(key any, value any) bool {
 				if _, ok := tags.LoadAndDelete(key); ok {
 					// t.Log("remove handler:", key)
-					ohm.RemoveHandler(ctx, key.(string))
+					_ = ohm.RemoveHandler(ctx, key.(string)) //nolint:forcetypeassert // the loop iterates over keys produced by this test itself
 					return false
 				}
 				return true

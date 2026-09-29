@@ -122,6 +122,7 @@ func (t *serverTunnel) close() {
 func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	v := core.MustFromContext(ctx)
 
+	//nolint:forcetypeassert // session.StreamSettingsFromContext only ever stores *internet.MemoryStreamConfig
 	streamSettings := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig)
 	if _, ok := streamSettings.ProtocolSettings.(*masque.Config); !ok {
 		return nil, errors.New("not masque transport")
@@ -171,9 +172,14 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 		return nil, err
 	}
 
+	dispatcher, ok := v.GetFeature(routing.DispatcherType()).(routing.Dispatcher)
+	if !ok {
+		return nil, errors.New("routing.Dispatcher is not registered in Xray core")
+	}
+
 	s := &Server{
 		validator:  users,
-		dispatcher: v.GetFeature(routing.DispatcherType()).(routing.Dispatcher),
+		dispatcher: dispatcher,
 		ctx:        core.ToBackgroundDetachedContext(ctx),
 		mtu:        mtu,
 		dev:        dev,
@@ -430,8 +436,10 @@ func (s *Server) readFromTunnel(t *serverTunnel) error {
 		}
 		if other := s.lookup(dst); other != nil {
 			if other != t {
-				packet := buf.NewWithSize(int32(n))
-				packet.Write(b[:n])
+				packet := buf.NewWithSize(int32(n)) //nolint:gosec // read length is bounded by the buffer size
+				if _, err := packet.Write(b[:n]); err != nil {
+					return err
+				}
 				if !other.send(packet) {
 					packet.Release()
 				}
@@ -441,7 +449,9 @@ func (s *Server) readFromTunnel(t *serverTunnel) error {
 		if s.inPool(dst) && !slices.Contains(s.local, dst) {
 			continue
 		}
-		s.dev.Write([][]byte{b[:n]}, 0)
+		if _, err := s.dev.Write([][]byte{b[:n]}, 0); err != nil {
+			return err
+		}
 	}
 }
 
@@ -450,14 +460,14 @@ func (s *Server) readFromStack() {
 	var b *buf.Buffer
 	for {
 		if b == nil {
-			b = buf.NewWithSize(int32(s.mtu))
+			b = buf.NewWithSize(int32(s.mtu)) //nolint:gosec // the MTU is a small config value
 		}
 		b.Clear()
-		if _, err := s.dev.Read([][]byte{b.Extend(int32(s.mtu))}, sizes, 0); err != nil {
+		if _, err := s.dev.Read([][]byte{b.Extend(int32(s.mtu))}, sizes, 0); err != nil { //nolint:gosec // the MTU is a small config value
 			b.Release()
 			return
 		}
-		b.Resize(0, int32(sizes[0]))
+		b.Resize(0, int32(sizes[0])) //nolint:gosec // read length is bounded by the buffer size
 		dst, ok := packetDestination(b.Bytes())
 		if !ok {
 			continue
@@ -475,7 +485,7 @@ func (s *Server) writeToTunnel(t *serverTunnel) {
 			_, err := t.conn.Write(b.Bytes())
 			b.Release()
 			if ptb, ok := go_errors.AsType[*masque.PacketTooBigError](err); ok {
-				s.dev.Write([][]byte{ptb.ICMP}, 0)
+				_, _ = s.dev.Write([][]byte{ptb.ICMP}, 0)
 			}
 		case <-t.done:
 			return
@@ -544,7 +554,7 @@ func (s *Server) handleConnection(conn net.Conn, dest net.Destination) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewServer(ctx, config.(*ServerConfig))
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config *ServerConfig) (any, error) {
+		return NewServer(ctx, config)
 	}))
 }

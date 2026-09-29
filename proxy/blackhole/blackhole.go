@@ -24,7 +24,7 @@ type Handler struct {
 }
 
 var http403response = http.Response{
-	StatusCode: 403,
+	StatusCode: http.StatusForbidden,
 	ProtoMajor: 1,
 	ProtoMinor: 1,
 	Header: http.Header{
@@ -63,7 +63,9 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 	if len(h.response) > 0 {
 		mbc := buf.MultiBufferContainer{}
 		common.Must2(mbc.Write(h.response))
-		link.Writer.WriteMultiBuffer(mbc.MultiBuffer)
+		if err := link.Writer.WriteMultiBuffer(mbc.MultiBuffer); err != nil {
+			return err
+		}
 		// Sleep a little here to make sure the response is sent to client.
 		time.Sleep(time.Second)
 	}
@@ -75,14 +77,14 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 		timer := signal.CancelAfterInactivity(ctx, func() {
 			cancel()
 		}, time.Duration(30+dice.Roll(61))*time.Second)
-		go buf.Copy(link.Reader, buf.Discard, buf.UpdateActivity(timer))
+		go func() { _ = buf.Copy(link.Reader, buf.Discard, buf.UpdateActivity(timer)) }()
 		<-ctx.Done()
 	}
 	return nil
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return New(ctx, config)
 	}))
 }

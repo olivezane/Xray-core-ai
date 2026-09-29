@@ -623,10 +623,12 @@ func TestDomainSniffing(t *testing.T) {
 			Transport: transport,
 		}
 
-		resp, err := client.Get("https://www.github.com/")
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://www.github.com/", nil)
+		common.Must(err)
+		resp, err := client.Do(req)
 		common.Must(err)
 		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			t.Error("unexpected status code: ", resp.StatusCode)
 		}
 		common.Must(resp.Write(io.Discard))

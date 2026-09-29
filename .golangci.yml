@@ -1,0 +1,257 @@
+version: "2"
+run:
+  concurrency: 4
+  # Timeout for analysis
+  timeout: 10m
+  # Include test files
+  tests: true
+
+issues:
+  max-issues-per-linter: 0 # 0 = unlimited (we want ALL issues)
+  max-same-issues: 0
+
+linters:
+  enable:
+    # correctness
+    - govet # built-in checker: copylocks, printf formats, struct tags, unreachable code
+    - staticcheck # extensive static analysis: deprecated APIs, common mistakes, simplifications
+    - unused # unused variables, functions, types
+    - errcheck # unchecked error returns and type assertions
+    - errorlint # correct use of errors.Is/As and %w wrapping (Go 1.13+)
+    - nilerr # returning nil error when err is non-nil
+    - forcetypeassert # type assertions without comma-ok check
+    - copyloopvar # loop variable copy issues (Go 1.22+)
+    - durationcheck # detect time.Duration * time.Duration bugs
+    - reassign # package-level variable reassignment
+    # style (kept minimal on purpose)
+    - gocritic # opinionated style: unnecessary conversions, range copies, redundant code
+    - errname # error type/var naming conventions (ErrFoo, FooError)
+    - asciicheck # non-ASCII identifiers (prevents homoglyph/trojan source attacks)
+    - predeclared # shadowing Go built-ins (len, cap, error)
+    # performance
+    - perfsprint # faster alternatives to fmt.Sprintf
+    - unconvert # unnecessary type conversions
+    - ineffassign # assignments to variables never read
+    # security & resources
+    - gosec # security scanner: SQL injection, hardcoded credentials, weak crypto, path traversal
+    - bidichk # dangerous bidirectional Unicode sequences (trojan source CVE-2021-42574)
+    - bodyclose # unclosed HTTP response bodies (connection leaks)
+    - noctx # HTTP requests missing context.Context
+    # containedctx is disabled, see the `disable` list.
+    - fatcontext # context.WithValue/WithCancel in loops (unbounded context chain, memory leak)
+    - sqlclosecheck # unclosed sql.Rows and sql.Stmt
+    - rowserrcheck # unchecked sql.Rows.Err() after iteration
+    # logging
+    - sloglint # consistent log/slog code style
+    - loggercheck # key-value pair validation for structured loggers (zap, slog, logr)
+    # testing
+    - testifylint # testify best practices
+    - usetesting # use t.Setenv/t.TempDir instead of os equivalents in tests
+    # modernization & meta
+    - modernize # old patterns replaceable with newer Go features
+    - exptostd # replace golang.org/x/exp/ functions with stdlib equivalents
+    - intrange # range over integer instead of C-style loop (Go 1.22+)
+    - usestdlibvars # use stdlib constants instead of hardcoded values
+    - exhaustive # switch statements not covering all enum values
+    - nolintlint # enforces proper //nolint directive usage
+
+  # Disabled: pure style / churn. Formatting is handled by `golangci-lint fmt`.
+  disable:
+    - lll
+    - revive
+    - wsl_v5
+    - whitespace
+    - godot
+    - misspell
+    - dupword
+    - goconst
+    - dupl
+    - funlen
+    - gocyclo
+    - nestif
+    - paralleltest
+    - thelper
+    - gocognit
+    - cyclop
+    - nakedret
+    - mnd
+    - iface
+    - prealloc
+    - wrapcheck
+    - err113
+    - noinlineerr
+    - depguard
+    - goheader
+    - importas
+    - funcorder
+    - godoclint
+    - varnamelen
+    - exhaustruct
+    - gochecknoglobals
+    - gochecknoinits
+    - unparam
+    - makezero
+    - testpackage
+    - embeddedstructfieldcheck
+    - iotamixing
+    - unqueryvet
+    - recvcheck
+    - mirror
+    - protogetter
+    - spancheck
+    - zerologlint
+    # containedctx: Xray's services (router, dispatcher, inbound workers, tun stacks)
+    # are long-lived objects that own a server-lifetime context; threading it through
+    # every method would be a re-architecture, not a fix. Re-enable per-package if a
+    # new type starts parking a *request-scoped* context in a field.
+    - containedctx
+
+  exclusions:
+    paths:
+      - vendor$
+      - third_party$
+      - testutils$
+      - examples$
+
+    rules:
+      # Bare teardown calls. The error of a close/interrupt is not actionable: the
+      # peer is already gone and the handle is being released. Write
+      # `if err := x.Close(); err != nil` explicitly when a close error matters.
+      # Applied to gosec as well, whose G104 reports the same call sites.
+      - linters: [errcheck, gosec]
+        source: '^\s*(defer\s+)?\S+\.Close\(\)$'
+      - linters: [errcheck, gosec]
+        source: '^\s*(defer\s+)?common\.(Interrupt|Close|CloseIfExists)\('
+      # G304: file paths are supplied by the user's own config / CLI arguments.
+      - linters: [gosec]
+        text: "G304:"
+      # G401/G501/G505: MD5/SHA1 are mandated by the VMess, Shadowsocks and UUID
+      # wire formats. Swapping them would break protocol compatibility.
+      - linters: [gosec]
+        text: "G401:|G501:|G505:"
+      # G103: unsafe is used deliberately on hot paths (readv, MPH matchers,
+      # vless XOR, cfb8, sockopt) with the required pointer/lifetime discipline.
+      - linters: [gosec]
+        text: "G103:"
+      # G101: entropy heuristic false positives on test vectors, protocol
+      # constants and dev-only fixtures.
+      - linters: [gosec]
+        text: "G101:"
+      # G404: math/rand is used for padding length, jitter, dice and UA
+      # obfuscation - none of it is security-sensitive.
+      - linters: [gosec]
+        text: "G404:"
+      # G118: "goroutine uses context.Background while a request-scoped context is
+      # available". The goroutines it flags are listener accept loops, keep-alive
+      # and connection-handling loops (tcp/udp/masque/hysteria/httpupgrade hubs,
+      # reverse bridge, tun address server). They are owned by a long-lived service
+      # and deliberately outlive any single request - binding them to the caller's
+      # context would tear the listener down on the first cancelled dial. Same
+      # architectural reason `containedctx` is disabled below. The one genuine
+      # cancellation finding it also covers (app/router/command/command.go) is
+      # marked with an explicit //nolint:govet // lostcancel and a comment.
+      - linters: [gosec]
+        text: "G118:"
+
+  settings:
+    staticcheck:
+      # Drop the QF ("quickfix") and ST ("style") families: purely stylistic rewrites
+      # (remove an embedded field from a selector, omit an inferable type, apply De
+      # Morgan, doc-comment phrasing). The SA (bugs) and S (gosimple) families - the
+      # ones that find real defects - stay on.
+      checks:
+        - all
+        - -QF*
+        - -ST*
+    exhaustive:
+      # A switch that has a default arm has already decided what to do with the
+      # values it does not name; requiring every enum member adds noise, not safety.
+      default-signifies-exhaustive: true
+    errcheck:
+      # Type assertions are covered by forcetypeassert (below), which has fewer
+      # false positives; running both duplicates every finding.
+      check-type-assertions: false
+    gocritic:
+      # Explicit list of gocritic's correctness (diagnostic) and speed
+      # (performance) checks. The style/opinionated tags (ifElseChain,
+      # commentFormatting, ...) are left to review.
+      #
+      # Three checks from those two tags are deliberately absent:
+      #   commentedOutCode - tagged `diagnostic` but a formatting opinion: it fires
+      #     on any comment that parses as an expression. Xray keeps prose comments,
+      #     wire-format samples and reference notes next to the code.
+      #   hugeParam / rangeValCopy - tagged `performance` but their advice is to
+      #     thread pointers through signatures that carry protocol structs by value
+      #     (buf.MultiBuffer, protocol.MemoryUser, Destination, ...). That is an API
+      #     re-architecture with no measured win; the copies are cheap next to the
+      #     syscalls and allocations on the same paths. Revisit with a profile.
+      disable-all: true
+      enabled-checks:
+        - appendAssign
+        - appendCombine
+        - argOrder
+        - badCall
+        - badCond
+        - badLock
+        - badRegexp
+        - badSorting
+        - badSyncOnceFunc
+        - builtinShadowDecl
+        - caseOrder
+        - codegenComment
+        - deferInLoop
+        - deprecatedComment
+        - dupArg
+        - dupBranchBody
+        - dupCase
+        - dupOption
+        - dupSubExpr
+        - dynamicFmtString
+        - emptyDecl
+        - equalFold
+        - evalOrder
+        - exitAfterDefer
+        - externalErrorReassign
+        - filepathJoin
+        - flagDeref
+        - flagName
+        - indexAlloc
+        - mapKey
+        - nilValReturn
+        - offBy1
+        - preferDecodeRune
+        - preferFprint
+        - preferStringWriter
+        - preferWriteByte
+        - rangeAppendAll
+        - rangeExprCopy
+        - regexpPattern
+        - returnAfterHttpError
+        - sliceClear
+        - sloppyLen
+        - sloppyReassign
+        - sloppyTypeAssert
+        - sortSlice
+        - sprintfQuotedString
+        - sqlQuery
+        - stringXbytes
+        - syncMapLoadAndDelete
+        - truncateCmp
+        - uncheckedInlineErr
+        - unnecessaryDefer
+        - weakCond
+        - zeroByteRepeat
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+formatters:
+  # Formatting is out of scope for this project's lint gate: run `gofmt`/`goimports`
+  # in your editor. Keeping the formatters off keeps the diff reviewable.
+  enable: []
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

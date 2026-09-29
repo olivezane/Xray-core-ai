@@ -40,7 +40,7 @@ func TestBlackholeHTTPResponse(t *testing.T) {
 	mb.Copy(data)
 	resp := common.Must2(http.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), nil)) //nolint:bodyclose // bodyclose cannot track the value through the generic common.Must2 wrapper; it is closed on the next line
 	defer resp.Body.Close()
-	if resp.StatusCode != 403 {
+	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("expected 403 response, got %d", resp.StatusCode)
 	}
 }

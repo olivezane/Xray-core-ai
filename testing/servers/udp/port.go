@@ -14,6 +14,7 @@ func PickPort() net.Port {
 	common.Must(err)
 	defer conn.Close()
 
+	//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 	addr := conn.LocalAddr().(*net.UDPAddr)
-	return net.Port(addr.Port)
+	return net.Port(addr.Port) //nolint:gosec // Port of a net.Addr is always 0..65535
 }

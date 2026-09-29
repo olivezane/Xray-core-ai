@@ -10,9 +10,9 @@ func BenchmarkMapFilter(b *testing.B) {
 	filter := NewMapFilter[[16]byte](120)
 	var sample [16]byte
 	reader := bufio.NewReader(rand.Reader)
-	reader.Read(sample[:])
+	_, _ = reader.Read(sample[:])
 	for b.Loop() {
-		reader.Read(sample[:])
+		_, _ = reader.Read(sample[:])
 		filter.Check(sample)
 	}
 }

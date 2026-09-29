@@ -161,6 +161,7 @@ func (c *xicmpConnServer) recv4() {
 		}
 
 		if len(c.ips) > 0 {
+			//nolint:forcetypeassert // the address was built by this package as a *net.IPAddr
 			netipAddr, ok := netip.AddrFromSlice(addr.(*net.IPAddr).IP)
 			if !ok {
 				continue
@@ -183,6 +184,7 @@ func (c *xicmpConnServer) recv4() {
 		}
 		c.mu.Unlock()
 
+		//nolint:forcetypeassert // the pool only ever stores []byte
 		p := pool.Get().([]byte)[:len(echo.Data[8:])]
 		copy(p, echo.Data[8:])
 
@@ -192,7 +194,7 @@ func (c *xicmpConnServer) recv4() {
 			addr: cAddr,
 		}:
 		case <-c.closeCh:
-			pool.Put(p)
+			pool.Put(p) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 			return
 		}
 	}
@@ -242,6 +244,7 @@ func (c *xicmpConnServer) recv6() {
 		}
 
 		if len(c.ips) > 0 {
+			//nolint:forcetypeassert // the address was built by this package as a *net.IPAddr
 			netipAddr, ok := netip.AddrFromSlice(addr.(*net.IPAddr).IP)
 			if !ok {
 				continue
@@ -264,6 +267,7 @@ func (c *xicmpConnServer) recv6() {
 		}
 		c.mu.Unlock()
 
+		//nolint:forcetypeassert // the pool only ever stores []byte
 		p := pool.Get().([]byte)[:len(echo.Data[8:])]
 		copy(p, echo.Data[8:])
 
@@ -273,7 +277,7 @@ func (c *xicmpConnServer) recv6() {
 			addr: cAddr,
 		}:
 		case <-c.closeCh:
-			pool.Put(p)
+			pool.Put(p) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 			return
 		}
 	}
@@ -284,7 +288,7 @@ func (c *xicmpConnServer) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if ok {
 		if packet.p != nil {
 			n = copy(p, packet.p)
-			pool.Put(packet.p)
+			pool.Put(packet.p) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 		}
 		return n, packet.addr, packet.err
 	}
@@ -310,11 +314,13 @@ func (c *xicmpConnServer) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 
 	// errors.LogDebug(context.Background(), "id ", r.id, " seq ", r.seq, " addr ", r.addr)
 
+	//nolint:forcetypeassert // the pool only ever stores []byte
 	b := pool.Get().([]byte)[:finalmask.UDPSize]
-	defer pool.Put(b)
+	defer pool.Put(b) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 
 	copy(b[8:], p)
 
+	//nolint:forcetypeassert // the address was built by this package as a *net.IPAddr
 	if r.addr.(*net.IPAddr).IP.To4() != nil {
 		b = marshal(b, ipv4.ICMPTypeEchoReply, r.id, r.seq, len(p))
 		_, err = c.ipv4PC.WriteTo(b, &ipv4.ControlMessage{Src: r.dst}, r.addr)
@@ -343,7 +349,7 @@ func (c *xicmpConnServer) Close() error {
 	select {
 	case p := <-c.readCh:
 		if p.p != nil {
-			pool.Put(p.p)
+			pool.Put(p.p) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 		}
 	default:
 	}

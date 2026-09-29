@@ -81,6 +81,7 @@ func (v *TimedUserValidator) GetAEAD(userHash []byte) (*protocol.MemoryUser, boo
 	if err != nil {
 		return nil, false, err
 	}
+	//nolint:forcetypeassert // the user registry only ever stores *protocol.MemoryUser
 	return userd.(*protocol.MemoryUser), true, nil
 }
 
@@ -94,6 +95,7 @@ func (v *TimedUserValidator) Remove(email string) bool {
 		if strings.EqualFold(u.Email, email) {
 			idx = i
 			var cmdkeyfl [16]byte
+			//nolint:forcetypeassert // the account is created by this package's own NewAccount
 			copy(cmdkeyfl[:], u.Account.(*MemoryAccount).ID.CmdKey())
 			v.aeadDecoderHolder.RemoveUser(cmdkeyfl)
 			break

@@ -50,7 +50,7 @@ type LinuxTun struct {
 
 // resolvectlRunner runs a resolvectl command. Overridable for tests.
 var resolvectlRunner = func(name string, args ...string) ([]byte, error) {
-	return exec.Command(name, args...).CombinedOutput()
+	return exec.Command(name, args...).CombinedOutput() //nolint:gosec // only the internal resolvectl wrappers call this, with constant command names
 }
 
 // systemDNSAddrs derives the addresses used for the system DNS takeover from the
@@ -333,7 +333,7 @@ func openFromEnv(expectedName string) (int, netlink.Link, bool, error) {
 	if err != nil {
 		return -1, nil, true, err
 	}
-	if err = unix.IoctlIfreq(fd, unix.TUNGETIFF, ifr); err != nil {
+	if err := unix.IoctlIfreq(fd, unix.TUNGETIFF, ifr); err != nil {
 		return -1, nil, true, err
 	}
 
@@ -355,7 +355,7 @@ func openFromEnv(expectedName string) (int, netlink.Link, bool, error) {
 		return -1, nil, true, err
 	}
 
-	if err = unix.SetNonblock(fd, true); err != nil {
+	if err := unix.SetNonblock(fd, true); err != nil {
 		return -1, nil, true, err
 	}
 

@@ -36,9 +36,14 @@ type Server struct {
 // NewServer creates a new Server object.
 func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
+	//nolint:forcetypeassert // session.ConeKey is only ever set to a bool
 	s := &Server{
 		config:        config,
-		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager: pm,
 		cone:          ctx.Value(session.ConeKey).(bool),
 	}
 	httpConfig := &http.ServerConfig{
@@ -105,11 +110,16 @@ func (s *Server) processTCP(ctx context.Context, conn stat.Connection, dispatche
 		return errors.New("inbound gateway not specified")
 	}
 
+	localAddr, ok := conn.LocalAddr().(*net.TCPAddr)
+	if !ok {
+		return errors.New("unexpected local address type: ", conn.LocalAddr())
+	}
+
 	svrSession := &ServerSession{
 		config:       s.config,
 		address:      inbound.Gateway.Address,
 		port:         inbound.Gateway.Port,
-		localAddress: net.IPAddress(conn.LocalAddr().(*net.TCPAddr).IP),
+		localAddress: net.IPAddress(localAddr.IP),
 	}
 
 	// Firstbyte is for forwarded conn from SOCKS inbound
@@ -177,7 +187,9 @@ func (s *Server) processTCP(ctx context.Context, conn stat.Connection, dispatche
 		// Associated TCP keeps the UDP alive
 		// Close UDP if TCP connection is closed
 		// Or Close TCP if UDP is idle timeout
-		io.Copy(buf.DiscardBytes, conn)
+		if _, err := io.Copy(buf.DiscardBytes, conn); err != nil {
+			return err
+		}
 		tempUDPConn.Close()
 		return <-errCh
 	}
@@ -211,7 +223,7 @@ func (s *Server) handleUDPPayload(ctx context.Context, conn stat.Connection, dis
 			return
 		}
 
-		conn.Write(udpMessage.Bytes())
+		_, _ = conn.Write(udpMessage.Bytes())
 		udpMessage.Release()
 	})
 	defer udpServer.RemoveRay()
@@ -278,7 +290,7 @@ func (s *Server) handleUDPPayload(ctx context.Context, conn stat.Connection, dis
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewServer(ctx, config.(*ServerConfig))
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config *ServerConfig) (any, error) {
+		return NewServer(ctx, config)
 	}))
 }

@@ -84,7 +84,7 @@ func (c *addressAssignCapsule) append(b []byte) []byte {
 			b = append(b, 6)
 		}
 		b = append(b, addr.IPPrefix.Addr().AsSlice()...)
-		b = append(b, byte(addr.IPPrefix.Bits()))
+		b = append(b, byte(addr.IPPrefix.Bits())) //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 	}
 	return b
 }
@@ -128,7 +128,7 @@ func (c *addressRequestCapsule) append(b []byte) []byte {
 			b = append(b, 6)
 		}
 		b = append(b, p.Addr().AsSlice()...)
-		b = append(b, byte(p.Bits()))
+		b = append(b, byte(p.Bits())) //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 	}
 	return b
 }

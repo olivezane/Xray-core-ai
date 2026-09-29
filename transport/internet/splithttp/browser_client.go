@@ -26,7 +26,7 @@ func (c *BrowserDialerClient) OpenStream(ctx context.Context, url string, sessio
 		return nil, nil, nil, errors.New("bidirectional streaming for browser dialer not implemented yet")
 	}
 
-	request, err := http.NewRequest("GET", url, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -44,7 +44,7 @@ func (c *BrowserDialerClient) OpenStream(ctx context.Context, url string, sessio
 
 func (c *BrowserDialerClient) PostPacket(ctx context.Context, url string, sessionId string, seqStr string, payload buf.MultiBuffer) error {
 	method := c.transportConfig.GetNormalizedUplinkHTTPMethod()
-	request, err := http.NewRequest(method, url, nil)
+	request, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
 		return err
 	}

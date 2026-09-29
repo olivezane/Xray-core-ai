@@ -58,21 +58,21 @@ func executeECH(cmd *base.Command, args []string) {
 		})
 		configBuffer, _ = b.Bytes()
 		var b2 cryptobyte.Builder
-		b2.AddUint16(uint16(len(priv)))
+		b2.AddUint16(uint16(len(priv))) //nolint:gosec // sizes are bounded well below 65535
 		b2.AddBytes(priv)
-		b2.AddUint16(uint16(len(configBytes)))
+		b2.AddUint16(uint16(len(configBytes))) //nolint:gosec // sizes are bounded well below 65535
 		b2.AddBytes(configBytes)
 		keyBuffer, _ = b2.Bytes()
 	} else {
 		keySetsByte, err := base64.StdEncoding.DecodeString(*input_echServerKeys)
 		if err != nil {
-			os.Stdout.WriteString("Failed to decode ECHServerKeys: " + err.Error() + "\n")
+			_, _ = os.Stdout.WriteString("Failed to decode ECHServerKeys: " + err.Error() + "\n")
 			return
 		}
 		keyBuffer = keySetsByte
 		KeySets, err := tls.ConvertToGoECHKeys(keySetsByte)
 		if err != nil {
-			os.Stdout.WriteString("Failed to decode ECHServerKeys: " + err.Error() + "\n")
+			_, _ = os.Stdout.WriteString("Failed to decode ECHServerKeys: " + err.Error() + "\n")
 			return
 		}
 		var b cryptobyte.Builder
@@ -87,11 +87,11 @@ func executeECH(cmd *base.Command, args []string) {
 	if *input_pem {
 		configPEM := string(pem.EncodeToMemory(&pem.Block{Type: "ECH CONFIGS", Bytes: configBuffer}))
 		keyPEM := string(pem.EncodeToMemory(&pem.Block{Type: "ECH KEYS", Bytes: keyBuffer}))
-		os.Stdout.WriteString(configPEM)
-		os.Stdout.WriteString(keyPEM)
+		_, _ = os.Stdout.WriteString(configPEM)
+		_, _ = os.Stdout.WriteString(keyPEM)
 	} else {
-		os.Stdout.WriteString("ECH config list: \n" + base64.StdEncoding.EncodeToString(configBuffer) + "\n")
-		os.Stdout.WriteString("ECH server keys: \n" + base64.StdEncoding.EncodeToString(keyBuffer) + "\n")
+		_, _ = os.Stdout.WriteString("ECH config list: \n" + base64.StdEncoding.EncodeToString(configBuffer) + "\n")
+		_, _ = os.Stdout.WriteString("ECH server keys: \n" + base64.StdEncoding.EncodeToString(keyBuffer) + "\n")
 	}
 }
 
@@ -123,7 +123,7 @@ func marshalBinary(ech EchConfig) ([]byte, error) {
 	b.AddUint16LengthPrefixed(func(child *cryptobyte.Builder) {
 		child.AddUint8(ech.ConfigID)
 		child.AddUint16(ech.KemID)
-		child.AddUint16(uint16(len(ech.PublicKey)))
+		child.AddUint16(uint16(len(ech.PublicKey))) //nolint:gosec // ECH public key is bounded by the ECH config size
 		child.AddBytes(ech.PublicKey)
 		child.AddUint16LengthPrefixed(func(child *cryptobyte.Builder) {
 			for _, cipherSuite := range ech.SymmetricCipherSuite {
@@ -132,7 +132,7 @@ func marshalBinary(ech EchConfig) ([]byte, error) {
 			}
 		})
 		child.AddUint8(ech.MaxNameLength)
-		child.AddUint8(uint8(len(ech.PublicName)))
+		child.AddUint8(uint8(len(ech.PublicName))) //nolint:gosec // public name is bounded by the DNS label limit
 		child.AddBytes(ech.PublicName)
 		child.AddUint16LengthPrefixed(func(child *cryptobyte.Builder) {
 			for _, extention := range ech.Extensions {

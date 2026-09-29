@@ -302,7 +302,7 @@ func (c *xdnsConnServer) sendLoop() {
 				// 	panic(len(p))
 				// }
 
-				_ = binary.Write(&payload, binary.BigEndian, uint16(len(p)))
+				_ = binary.Write(&payload, binary.BigEndian, uint16(len(p))) //nolint:gosec // DNS lengths and counts are bounded by the packet size
 				payload.Write(p)
 			}
 
@@ -387,7 +387,7 @@ func (c *xdnsConnServer) Close() error {
 
 func nextPacketServer(r *bytes.Reader) ([]byte, error) {
 	eof := func(err error) error {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			err = io.ErrUnexpectedEOF
 		}
 		return err

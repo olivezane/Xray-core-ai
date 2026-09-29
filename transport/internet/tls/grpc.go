@@ -60,6 +60,7 @@ func (c *grpcUtls) ClientHandshake(ctx context.Context, authority string, rawCon
 		}
 		cfg.ServerName = serverName
 	}
+	//nolint:forcetypeassert // UClient always returns *UConn
 	conn := UClient(rawConn, cfg, c.fingerprint).(*UConn)
 	errChannel := make(chan error, 1)
 	go func() {

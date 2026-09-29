@@ -19,5 +19,6 @@ func RequestHeaderFromContext(ctx context.Context) *RequestHeader {
 	if request == nil {
 		return nil
 	}
+	//nolint:forcetypeassert // the context is only ever given a *RequestHeader
 	return request.(*RequestHeader)
 }

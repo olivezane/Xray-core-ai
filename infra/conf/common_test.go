@@ -2,7 +2,6 @@ package conf_test
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -146,7 +145,7 @@ func TestOverRangeIntPort(t *testing.T) {
 }
 
 func TestEnvPort(t *testing.T) {
-	common.Must(os.Setenv("PORT", "1234"))
+	t.Setenv("PORT", "1234")
 
 	var portRange PortRange
 	common.Must(json.Unmarshal([]byte("\"env:PORT\""), &portRange))

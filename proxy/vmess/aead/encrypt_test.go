@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOpenVMessAEADHeader(t *testing.T) {
@@ -20,7 +21,7 @@ func TestOpenVMessAEADHeader(t *testing.T) {
 
 	var authid [16]byte
 
-	io.ReadFull(AEADR, authid[:])
+	_, _ = io.ReadFull(AEADR, authid[:])
 
 	out, _, _, err := OpenVMessAEADHeader(keyw, authid, AEADR)
 
@@ -39,16 +40,16 @@ func TestOpenVMessAEADHeader2(t *testing.T) {
 
 	var authid [16]byte
 
-	io.ReadFull(AEADR, authid[:])
+	_, _ = io.ReadFull(AEADR, authid[:])
 
 	out, _, readen, err := OpenVMessAEADHeader(keyw, authid, AEADR)
 	assert.Equal(t, len(sealed)-16-AEADR.Len(), readen)
 	assert.Equal(t, string(TestHeader), string(out))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestOpenVMessAEADHeader4(t *testing.T) {
-	for i := 0; i <= 60; i++ {
+	for i := range 61 {
 		TestHeader := []byte("Test Header")
 		key := KDF16([]byte("Demo Key for Auth ID Test"), "Demo Path for Auth ID Test")
 		var keyw [16]byte
@@ -61,12 +62,12 @@ func TestOpenVMessAEADHeader4(t *testing.T) {
 
 		var authid [16]byte
 
-		io.ReadFull(AEADR, authid[:])
+		_, _ = io.ReadFull(AEADR, authid[:])
 
 		out, drain, readen, err := OpenVMessAEADHeader(keyw, authid, AEADR)
 		assert.Equal(t, len(sealed)-16-AEADR.Len(), readen)
-		assert.Equal(t, true, drain)
-		assert.NotNil(t, err)
+		assert.True(t, drain)
+		require.Error(t, err)
 		if err == nil {
 			fmt.Println(">")
 		}
@@ -76,7 +77,7 @@ func TestOpenVMessAEADHeader4(t *testing.T) {
 
 func TestOpenVMessAEADHeader4Massive(t *testing.T) {
 	for range 1000 {
-		for i := 0; i <= 60; i++ {
+		for i := range 61 {
 			TestHeader := []byte("Test Header")
 			key := KDF16([]byte("Demo Key for Auth ID Test"), "Demo Path for Auth ID Test")
 			var keyw [16]byte
@@ -89,12 +90,12 @@ func TestOpenVMessAEADHeader4Massive(t *testing.T) {
 
 			var authid [16]byte
 
-			io.ReadFull(AEADR, authid[:])
+			_, _ = io.ReadFull(AEADR, authid[:])
 
 			out, drain, readen, err := OpenVMessAEADHeader(keyw, authid, AEADR)
 			assert.Equal(t, len(sealed)-16-AEADR.Len(), readen)
-			assert.Equal(t, true, drain)
-			assert.NotNil(t, err)
+			assert.True(t, drain)
+			require.Error(t, err)
 			if err == nil {
 				fmt.Println(">")
 			}

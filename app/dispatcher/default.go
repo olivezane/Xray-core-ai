@@ -44,7 +44,7 @@ func (r *cachedReader) Cache(b *buf.Buffer, deadline time.Duration) error {
 	b.Clear()
 	rawBytes := b.Extend(min(r.cache.Len(), b.Cap()))
 	n := r.cache.Copy(rawBytes)
-	b.Resize(0, int32(n))
+	b.Resize(0, int32(n)) //nolint:gosec // read length is bounded by the buffer size
 	r.Unlock()
 	return nil
 }
@@ -101,13 +101,13 @@ type DefaultDispatcher struct {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
 		d := new(DefaultDispatcher)
 		if err := core.RequireFeatures(ctx, func(om outbound.Manager, router routing.Router, pm policy.Manager, sm stats.Manager, dc dns.Client) error {
-			core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
+			_ = core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
 				d.fdns = fdns
 			})
-			return d.Init(config.(*Config), om, router, pm, sm)
+			return d.Init(config, om, router, pm, sm)
 		}); err != nil {
 			return nil, err
 		}
@@ -201,6 +201,7 @@ func WrapLink(ctx context.Context, policyManager policy.Manager, statsManager st
 		if p.Stats.UserUplink {
 			name := "user>>>" + user.Email + ">>>traffic>>>uplink"
 			if c, _ := statsManager.GetOrRegisterCounter(name); c != nil {
+				//nolint:forcetypeassert // the dispatcher installs the timeout wrapper itself
 				link.Reader.(*buf.TimeoutWrapperReader).Counter = c
 			}
 		}
@@ -287,9 +288,15 @@ func (d *DefaultDispatcher) Dispatch(ctx context.Context, destination net.Destin
 	if !sniffingRequest.Enabled {
 		go d.routedDispatch(ctx, outbound, destination)
 	} else {
+		reader, ok := outbound.Reader.(buf.TimeoutReader)
+		if !ok {
+			errors.LogWarning(ctx, "outbound reader does not support timeout, sniffing is skipped")
+			go d.routedDispatch(ctx, outbound, destination)
+			return inbound, nil
+		}
 		go func() {
 			cReader := &cachedReader{
-				reader: outbound.Reader.(*pipe.Reader),
+				reader: reader,
 			}
 			outbound.Reader = cReader
 			result, err := sniffer(ctx, cReader, sniffingRequest.MetadataOnly, destination.Network)
@@ -343,8 +350,14 @@ func (d *DefaultDispatcher) DispatchLink(ctx context.Context, destination net.De
 	if !sniffingRequest.Enabled {
 		d.routedDispatch(ctx, outbound, destination)
 	} else {
+		reader, ok := outbound.Reader.(buf.TimeoutReader)
+		if !ok {
+			errors.LogWarning(ctx, "outbound reader does not support timeout, sniffing is skipped")
+			d.routedDispatch(ctx, outbound, destination)
+			return nil
+		}
 		cReader := &cachedReader{
-			reader: outbound.Reader.(buf.TimeoutReader),
+			reader: reader,
 		}
 		outbound.Reader = cReader
 		result, err := sniffer(ctx, cReader, sniffingRequest.MetadataOnly, destination.Network)
@@ -405,10 +418,10 @@ func sniffer(ctx context.Context, cReader *cachedReader, metadataOnly bool, netw
 
 				if !payload.IsEmpty() {
 					result, err := sniffer.Sniff(ctx, payload.Bytes(), network)
-					switch err {
-					case common.ErrNoClue: // No Clue: protocol not matches, and sniffer cannot determine whether there will be a match or not
+					switch {
+					case errors.Is(err, common.ErrNoClue): // No Clue: protocol not matches, and sniffer cannot determine whether there will be a match or not
 						totalAttempt++
-					case protocol.ErrProtoNeedMoreData: // Protocol Need More Data: protocol matches, but need more data to complete sniffing
+					case errors.Is(err, protocol.ErrProtoNeedMoreData): // Protocol Need More Data: protocol matches, but need more data to complete sniffing
 						// in this case, do not add totalAttempt(allow to read until timeout)
 					default:
 						return result, err

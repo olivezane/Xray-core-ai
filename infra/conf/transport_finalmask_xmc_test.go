@@ -22,6 +22,7 @@ func TestXMCBuildProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build XMC config: %v", err)
 	}
+	//nolint:forcetypeassert // the test builds the transport config itself
 	config := built.(*xmc.Config)
 	if len(config.Profiles) != 1 || len(config.Profiles[0].Uuid) != 16 {
 		t.Fatalf("unexpected profiles: %+v", config.Profiles)

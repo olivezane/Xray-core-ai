@@ -150,6 +150,7 @@ func (s *LeastLoadStrategy) getNodes(candidates []string) []*node {
 		return make([]*node, 0)
 	}
 
+	//nolint:forcetypeassert // the observatory RPC always returns *observatory.ObservationResult
 	results := observeResult.(*observatory.ObservationResult)
 
 	var ret []*node

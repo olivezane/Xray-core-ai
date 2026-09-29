@@ -244,7 +244,7 @@ func NewConnection(meta ConnMetadata, writer io.Writer, closer io.Closer, config
 }
 
 func (c *Connection) Elapsed() uint32 {
-	return uint32(nowMillisec() - c.since)
+	return uint32(nowMillisec() - c.since) //nolint:gosec // session IDs and segment sizes are bounded by the protocol
 }
 
 // ReadMultiBuffer implements buf.Reader.
@@ -427,6 +427,7 @@ func (c *Connection) SetState(state State) {
 	c.stateBeginTime.Store(current)
 	errors.LogDebug(context.Background(), "#", c.meta.Conversation, " entering state ", state, " at ", current)
 
+	//nolint:exhaustive // StateActive needs no teardown action
 	switch state {
 	case StateReadyToClose:
 		c.receivingWorker.CloseRead()
@@ -543,6 +544,7 @@ func (c *Connection) HandleOption(opt SegmentOption) {
 }
 
 func (c *Connection) OnPeerClosed() {
+	//nolint:exhaustive // only ReadyToClose and Active transition on a peer close
 	switch c.State() {
 	case StateReadyToClose:
 		c.SetState(StateTerminating)
@@ -577,6 +579,7 @@ func (c *Connection) Input(segments []Segment) {
 		case *CmdOnlySegment:
 			c.HandleOption(seg.Option)
 			if seg.Command() == CommandTerminate {
+				//nolint:exhaustive // the remaining states are terminal or already terminating
 				switch c.State() {
 				case StateActive, StatePeerClosed:
 					c.SetState(StatePeerTerminating)
@@ -652,7 +655,7 @@ func (c *Connection) Ping(current uint32, cmd Command) {
 	if c.State() == StateReadyToClose {
 		seg.Option = SegmentOptionClose
 	}
-	c.output.Write(seg)
+	_ = c.output.Write(seg)
 	c.lastPingTime.Store(current)
 	seg.Release()
 }

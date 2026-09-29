@@ -73,12 +73,15 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		if fingerprint := tls.GetFingerprint(config.Fingerprint); fingerprint != nil {
 			conn = tls.UClient(conn, tlsConfig, fingerprint)
 			if len(tlsConfig.NextProtos) == 1 && tlsConfig.NextProtos[0] == "http/1.1" { // allow manually specify
+				//nolint:forcetypeassert // utls.UClient always returns *utls.UConn
 				err = conn.(*tls.UConn).WebsocketHandshakeContext(ctx)
 			} else {
+				//nolint:forcetypeassert // utls.UClient always returns *utls.UConn
 				err = conn.(*tls.UConn).HandshakeContext(ctx)
 			}
 		} else {
 			conn = tls.Client(conn, tlsConfig)
+			//nolint:forcetypeassert // tls.Server/tls.Client always return *tls.Conn
 			err = conn.(*tls.Conn).HandshakeContext(ctx)
 		}
 		if err != nil {
@@ -87,6 +90,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 			}
 			return nil, err
 		}
+		//nolint:forcetypeassert // the conn came from the TLS transport, which implements tls.Interface
 		negotiatedProtocol := conn.(tls.Interface).NegotiatedProtocol()
 		if isFromMitmAlpn && !mitmAlpn11 && negotiatedProtocol != "h2" {
 			conn.Close()
@@ -98,6 +102,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		}
 	}
 
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	tcpSettings := streamSettings.ProtocolSettings.(*Config)
 	if tcpSettings.HeaderSettings != nil {
 		headerConfig, err := tcpSettings.HeaderSettings.GetInstance()

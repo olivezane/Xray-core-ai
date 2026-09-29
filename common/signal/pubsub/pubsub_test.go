@@ -30,5 +30,7 @@ func TestPubsub(t *testing.T) {
 	default:
 	}
 
-	service.Cleanup()
+	if err := service.Cleanup(); err != nil {
+		t.Fatal(err)
+	}
 }

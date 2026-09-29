@@ -136,7 +136,7 @@ func (r *ReadVReader) ReadMultiBuffer() (MultiBuffer, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.alloc.Adjust(uint32(len(mb)))
+	r.alloc.Adjust(uint32(len(mb))) //nolint:gosec // the buffer count is bounded by the readv batch size
 	return mb, nil
 }
 

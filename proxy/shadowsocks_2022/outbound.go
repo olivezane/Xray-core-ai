@@ -21,8 +21,8 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewClient(ctx, config.(*ClientConfig))
+	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config *ClientConfig) (any, error) {
+		return NewClient(ctx, config)
 	}))
 }
 
@@ -56,13 +56,14 @@ func NewClient(ctx context.Context, config *ClientConfig) (*Outbound, error) {
 	return &Outbound{
 		server: net.Destination{
 			Address: config.Address.AsAddress(),
-			Port:    net.Port(config.Port),
+			Port:    net.Port(config.Port), //nolint:gosec // the port comes from the config layer, which rejects values above 65535
 			Network: net.Network_TCP,
 		},
-		method:        method,
-		pskList:       pskList,
-		finalPSK:      finalPSK,
-		udpCodec:      udpCodec,
+		method:   method,
+		pskList:  pskList,
+		finalPSK: finalPSK,
+		udpCodec: udpCodec,
+		//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
 	}, nil
 }
@@ -132,7 +133,7 @@ func (o *Outbound) Process(ctx context.Context, link *transport.Link, dialer int
 				return errors.New("failed to write request").Base(err)
 			}
 
-			if err = buf.CopyOnceTimeout(link.Reader, bodyWriter, time.Millisecond*100); err != nil && err != buf.ErrNotTimeoutReader && err != buf.ErrReadTimeout {
+			if err = buf.CopyOnceTimeout(link.Reader, bodyWriter, time.Millisecond*100); err != nil && !errors.Is(err, buf.ErrNotTimeoutReader) && !errors.Is(err, buf.ErrReadTimeout) {
 				return errors.New("failed to write A request payload").Base(err)
 			}
 

@@ -48,7 +48,7 @@ type pktInfo struct {
 func NewBrutalSender(bps uint64, disableLossCompensation bool) *BrutalSender {
 	debug, _ := strconv.ParseBool(os.Getenv(debugEnv))
 	bs := &BrutalSender{
-		bps:                     congestion.ByteCount(bps),
+		bps:                     congestion.ByteCount(bps), //nolint:gosec // bandwidth arithmetic saturates well below the type limits
 		maxDatagramSize:         congestion.InitialPacketSize,
 		ackRate:                 1,
 		disableLossCompensation: disableLossCompensation,

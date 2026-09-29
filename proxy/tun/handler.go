@@ -82,6 +82,7 @@ func (t *Handler) Init(ctx context.Context, pm policy.Manager, dispatcher routin
 	t.dispatcher = dispatcher
 
 	if len(t.tag) > 0 && pm.ForSystem().Stats.InboundUplink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := core.MustFromContext(ctx).GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "inbound>>>" + t.tag + ">>>traffic>>>uplink"
 		c, _ := statsManager.GetOrRegisterCounter(name)
@@ -90,6 +91,7 @@ func (t *Handler) Init(ctx context.Context, pm policy.Manager, dispatcher routin
 		}
 	}
 	if len(t.tag) > 0 && pm.ForSystem().Stats.InboundDownlink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := core.MustFromContext(ctx).GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "inbound>>>" + t.tag + ">>>traffic>>>downlink"
 		c, _ := statsManager.GetOrRegisterCounter(name)
@@ -119,7 +121,7 @@ func (t *Handler) Start() error {
 		}
 		updater = &InterfaceUpdater{tunIndex: tunIndex, fixedName: t.config.AutoOutboundsInterface}
 		updater.Update()
-		internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
+		_ = internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
 			iface := updater.Get()
 			if iface == nil {
 				return nil
@@ -273,8 +275,8 @@ func (t *Handler) Process(ctx context.Context, network net.Network, conn stat.Co
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		t := &Handler{config: config.(*Config)}
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		t := &Handler{config: config}
 		err := core.RequireFeatures(ctx, func(pm policy.Manager, dispatcher routing.Dispatcher) error {
 			return t.Init(ctx, pm, dispatcher)
 		})

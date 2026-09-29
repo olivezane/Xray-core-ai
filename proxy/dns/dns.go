@@ -28,13 +28,13 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
 		h := new(Handler)
 		if err := core.RequireFeatures(ctx, func(dnsClient dns.Client, policyManager policy.Manager) error {
-			core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
+			_ = core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
 				h.fdns = fdns
 			})
-			return h.Init(config.(*Config), dnsClient, policyManager)
+			return h.Init(config, dnsClient, policyManager)
 		}); err != nil {
 			return nil, err
 		}
@@ -93,10 +93,10 @@ func (h *Handler) Init(config *Config, dnsClient dns.Client, policyManager polic
 		rule := &DNSRule{
 			action: r.Action,
 			qTypes: make([]uint16, 0, len(r.QType)),
-			rCode:  dnsmessage.RCode(r.RCode),
+			rCode:  dnsmessage.RCode(r.RCode), //nolint:gosec // DNS query types and response codes are small protocol constants
 		}
 		for _, t := range r.QType {
-			rule.qTypes = append(rule.qTypes, uint16(t))
+			rule.qTypes = append(rule.qTypes, uint16(t)) //nolint:gosec // DNS query types and response codes are small protocol constants
 		}
 		if len(r.Domain) > 0 {
 			m, err := geodata.DomainReg.BuildDomainMatcher(r.Domain)
@@ -226,7 +226,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, d internet.
 		defer timer.SetTimeout(0)
 		for {
 			b, err := reader.ReadMessage()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			if err != nil {
@@ -283,7 +283,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, d internet.
 		defer timer.SetTimeout(0)
 		for {
 			b, err := connReader.ReadMessage()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 
@@ -311,6 +311,7 @@ func (h *Handler) handleIPQuery(id uint16, qType dnsmessage.Type, domain string,
 	var ttl uint32
 	var err error
 
+	//nolint:exhaustive // only A and AAAA produce an IP answer
 	switch qType {
 	case dnsmessage.TypeA:
 		ips, ttl, err = h.client.LookupIP(domain, dns.IPOption{
@@ -352,6 +353,7 @@ func (h *Handler) handleIPQuery(id uint16, qType dnsmessage.Type, domain string,
 	common.Must(builder.StartAnswers())
 
 	rHeader := dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName(domain), Class: dnsmessage.ClassINET, TTL: ttl}
+	//nolint:exhaustive // only A and AAAA produce an IP answer
 	switch qType {
 	case dnsmessage.TypeA:
 		for _, ip := range ips {
@@ -378,7 +380,7 @@ func (h *Handler) handleIPQuery(id uint16, qType dnsmessage.Type, domain string,
 		b.Release()
 		timer.SetTimeout(0)
 	}
-	b.Resize(0, int32(len(msgBytes)))
+	b.Resize(0, int32(len(msgBytes))) //nolint:gosec // bounded by the buffer size / buf.Size
 
 	if err := writer.WriteMessage(b); err != nil {
 		errors.LogInfoInner(context.Background(), err, "write IP answer")
@@ -420,7 +422,7 @@ func (h *Handler) rejectNonIPQuery(id uint16, qType dnsmessage.Type, domain stri
 		b.Release()
 		return err
 	}
-	b.Resize(0, int32(len(msgBytes)))
+	b.Resize(0, int32(len(msgBytes))) //nolint:gosec // bounded by the buffer size / buf.Size
 
 	if err := writer.WriteMessage(b); err != nil {
 		errors.LogInfoInner(context.Background(), err, "write reject answer")

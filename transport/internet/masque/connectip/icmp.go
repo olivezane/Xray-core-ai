@@ -74,7 +74,7 @@ func composeICMPTooLargePacket(b []byte, mtu int) ([]byte, error) {
 		var header [ipv4.HeaderLen]byte
 		header[0] = 4<<4 | ipv4.HeaderLen>>2
 		ipLen := ipv4.HeaderLen + len(icmp)
-		binary.BigEndian.PutUint16(header[2:4], uint16(ipLen))
+		binary.BigEndian.PutUint16(header[2:4], uint16(ipLen)) //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 		header[8] = 64
 		header[9] = 1
 		copy(header[12:16], b[16:20]) //nolint:gosec // len(b) >= ipv4.HeaderLen is checked above
@@ -85,7 +85,7 @@ func composeICMPTooLargePacket(b []byte, mtu int) ([]byte, error) {
 
 	var header [ipv6.HeaderLen]byte
 	header[0] = 6 << 4
-	binary.BigEndian.PutUint16(header[4:6], uint16(len(icmp)))
+	binary.BigEndian.PutUint16(header[4:6], uint16(len(icmp))) //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 	header[6] = 58
 	header[7] = 64
 	copy(header[8:24], b[24:40]) //nolint:gosec // len(b) >= ipv6.HeaderLen is checked above

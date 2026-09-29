@@ -69,11 +69,12 @@ func (b *bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 					bufs[0][3] = 0
 				}
 				sizes[0] = n
+				//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 				eps[0] = &conn.StdNetEndpoint{AddrPort: addr.(*net.UDPAddr).AddrPort()}
 				return 1, nil
 			}
 		},
-	}, uint16(c.LocalAddr().(*net.UDPAddr).Port), nil
+	}, uint16(c.LocalAddr().(*net.UDPAddr).Port), nil //nolint:gosec,forcetypeassert // G115: the value is bounded by the fixture built above
 }
 
 func (b *bind) Close() error {
@@ -106,6 +107,7 @@ func (b *bind) Send(bufs [][]byte, ep conn.Endpoint) (err error) {
 			bufs[i][2] = b.reserved[1]
 			bufs[i][3] = b.reserved[2]
 		}
+		//nolint:forcetypeassert // wireguard's bind only produces *conn.StdNetEndpoint
 		_, err = c.WriteTo(bufs[i], net.UDPAddrFromAddrPort(ep.(*conn.StdNetEndpoint).AddrPort))
 		if err != nil {
 			errors.LogErrorInner(context.Background(), err, "bind send err")

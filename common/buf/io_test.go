@@ -30,6 +30,7 @@ func TestWriterCreation(t *testing.T) {
 			t.Fatal("writer is not a BufferToBytesWriter")
 		}
 
+		//nolint:forcetypeassert // the test passes an io.Writer
 		writer2 := NewWriter(writer.(io.Writer))
 		if writer2 != writer {
 			t.Fatal("writer is not reused")
@@ -37,7 +38,7 @@ func TestWriterCreation(t *testing.T) {
 	}
 
 	tlsConn := tls.Client(conn, &tls.Config{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, //nolint:gosec // the test talks to a throwaway self-signed server it started itself
 	})
 	defer tlsConn.Close()
 

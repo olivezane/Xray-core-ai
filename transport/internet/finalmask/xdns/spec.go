@@ -29,9 +29,9 @@ func parseDomainSpec(s string, defaultMethod string) (domainSpec, error) {
 	method := ""
 	hasMethod := false
 
-	if i := strings.LastIndex(s, ":"); i >= 0 {
-		domainPart = s[:i]
-		method = s[i+1:]
+	if before, after, found := strings.CutLast(s, ":"); found {
+		domainPart = before
+		method = after
 		hasMethod = true
 	} else if defaultMethod != "" {
 		method = defaultMethod

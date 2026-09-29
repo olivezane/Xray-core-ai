@@ -2,6 +2,7 @@ package custom
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -142,13 +143,13 @@ func TestMetadataUDPStandaloneWriteUsesRemotePort(t *testing.T) {
 		},
 	}
 
-	clientRaw, err := net.ListenPacket("udp", "127.0.0.1:0")
+	clientRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer clientRaw.Close()
 
-	serverRaw, err := net.ListenPacket("udp", "127.0.0.1:0")
+	serverRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +171,7 @@ func TestMetadataUDPStandaloneWriteUsesRemotePort(t *testing.T) {
 			errCh <- err
 			return
 		}
-		wantPort := uint16(serverRaw.LocalAddr().(*net.UDPAddr).Port)
+		wantPort := uint16(serverRaw.LocalAddr().(*net.UDPAddr).Port) //nolint:gosec,forcetypeassert // G115: the value is bounded by the fixture built above
 		if n != 2 {
 			errCh <- fmt.Errorf("unexpected handshake size: %d", n)
 			return
@@ -266,7 +267,7 @@ func TestMetadataTCPHandshakeUsesEndpointPorts(t *testing.T) {
 		},
 	}
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +284,7 @@ func TestMetadataTCPHandshakeUsesEndpointPorts(t *testing.T) {
 		serverRawCh <- conn
 	}()
 
-	clientRaw, err := net.Dial("tcp", listener.Addr().String())
+	clientRaw, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", listener.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}

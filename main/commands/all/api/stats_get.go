@@ -37,10 +37,10 @@ func executeGetStats(cmd *base.Command, args []string) {
 	setSharedFlags(cmd)
 	statName := cmd.Flag.String("name", "", "")
 	reset := cmd.Flag.Bool("reset", false, "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := statsService.NewStatsServiceClient(conn)
 	r := &statsService.GetStatsRequest{

@@ -72,7 +72,7 @@ func (cf *cfb8) XORKeyStream(dst, src []byte) {
 		if cf.de && // and requires to be non-overlapping at all
 			uintptr(unsafe.Pointer(&dst[0])) <= uintptr(unsafe.Pointer(&src[len(src)-1])) &&
 			uintptr(unsafe.Pointer(&src[0])) <= uintptr(unsafe.Pointer(&dst[len(dst)-1])) {
-			for i = 0; i < len(src)-cf.blockSize; i += 1 {
+			for i = 0; i < len(src)-cf.blockSize; i += 1 { //nolint:intrange // i is reused after the loop for the tail XOR
 				cf.c.Encrypt(dst[i:], ciphertext[i:])
 			}
 			subtle.XORBytes(dst, src[:i], dst)

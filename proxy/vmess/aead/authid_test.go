@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateAuthID(t *testing.T) {
@@ -32,7 +33,7 @@ func TestCreateAuthIDAndDecode(t *testing.T) {
 	fmt.Println(res)
 	fmt.Println(err)
 	assert.Equal(t, "Demo User", res)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCreateAuthIDAndDecode2(t *testing.T) {
@@ -50,13 +51,13 @@ func TestCreateAuthIDAndDecode2(t *testing.T) {
 	fmt.Println(res)
 	fmt.Println(err)
 	assert.Equal(t, "Demo User", res)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	key2 := KDF16([]byte("Demo Key for Auth ID Test2"), "Demo Path for Auth ID Test")
 	authid2 := CreateAuthID(key2, time.Now().Unix())
 
 	res2, err2 := AuthDecoder.Match(authid2)
-	assert.EqualError(t, err2, "user do not exist")
+	require.EqualError(t, err2, "user do not exist")
 	assert.Nil(t, res2)
 }
 
@@ -75,9 +76,9 @@ func TestCreateAuthIDAndDecodeMassive(t *testing.T) {
 	fmt.Println(res)
 	fmt.Println(err)
 	assert.Equal(t, "Demo User", res)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
-	for i := 0; i <= 10000; i++ {
+	for i := range 10001 {
 		key2 := KDF16([]byte("Demo Key for Auth ID Test2"), "Demo Path for Auth ID Test", strconv.Itoa(i))
 		var keyw2 [16]byte
 		copy(keyw2[:], key2)
@@ -88,7 +89,7 @@ func TestCreateAuthIDAndDecodeMassive(t *testing.T) {
 
 	res2, err2 := AuthDecoder.Match(authid3)
 	assert.Equal(t, "Demo User", res2)
-	assert.Nil(t, err2)
+	assert.NoError(t, err2)
 }
 
 func TestCreateAuthIDAndDecodeSuperMassive(t *testing.T) {
@@ -106,9 +107,9 @@ func TestCreateAuthIDAndDecodeSuperMassive(t *testing.T) {
 	fmt.Println(res)
 	fmt.Println(err)
 	assert.Equal(t, "Demo User", res)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
-	for i := 0; i <= 1000000; i++ {
+	for i := range 1000001 {
 		key2 := KDF16([]byte("Demo Key for Auth ID Test2"), "Demo Path for Auth ID Test", strconv.Itoa(i))
 		var keyw2 [16]byte
 		copy(keyw2[:], key2)
@@ -121,7 +122,7 @@ func TestCreateAuthIDAndDecodeSuperMassive(t *testing.T) {
 	res2, err2 := AuthDecoder.Match(authid3)
 	after := time.Now()
 	assert.Equal(t, "Demo User", res2)
-	assert.Nil(t, err2)
+	require.NoError(t, err2)
 
 	fmt.Println(after.Sub(before).Seconds())
 }

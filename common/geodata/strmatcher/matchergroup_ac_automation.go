@@ -80,12 +80,12 @@ func (ac *ACAutomatonMatcherGroup) addPattern(nodeIdx uint32, pattern string, ma
 
 func (ac *ACAutomatonMatcherGroup) addNode() uint32 {
 	ac.nodes = append(ac.nodes, acNode{})
-	return uint32(len(ac.nodes) - 1)
+	return uint32(len(ac.nodes) - 1) //nolint:gosec // matcher table sizes fit comfortably in uint32
 }
 
 func (ac *ACAutomatonMatcherGroup) addMatchEntry() uint32 {
 	ac.values = append(ac.values, acValue{})
-	return uint32(len(ac.values) - 1)
+	return uint32(len(ac.values) - 1) //nolint:gosec // matcher table sizes fit comfortably in uint32
 }
 
 func (ac *ACAutomatonMatcherGroup) Build() error {
@@ -102,6 +102,7 @@ func (ac *ACAutomatonMatcherGroup) Build() error {
 			break
 		}
 		queue.Remove(front)
+		//nolint:forcetypeassert // the Aho-Corasick queue only stores uint32 node indices
 		nodeIdx := front.Value.(uint32)
 		node := &ac.nodes[nodeIdx]           // Current node
 		failNode := &ac.nodes[fail[nodeIdx]] // Fail node of currrent node

@@ -52,6 +52,7 @@ func GetPool(size int32) *sync.Pool {
 func Alloc(size int32) []byte {
 	pool := GetPool(size)
 	if pool != nil {
+		//nolint:forcetypeassert // the pool only ever stores []byte
 		return pool.Get().([]byte)
 	}
 	return make([]byte, size)
@@ -61,11 +62,11 @@ func Alloc(size int32) []byte {
 //
 // xray:api:stable
 func Free(b []byte) {
-	size := int32(cap(b))
+	size := int32(cap(b)) //nolint:gosec // pool buffers are bounded by the pool's size classes
 	b = b[0:cap(b)]
 	for i := numPools - 1; i >= 0; i-- {
 		if size >= poolSize[i] {
-			pool[i].Put(b)
+			pool[i].Put(b) //nolint:staticcheck // SA6002: the pool is typed []byte by its exported API; switching to *[]byte is a benchmark-first change
 			return
 		}
 	}

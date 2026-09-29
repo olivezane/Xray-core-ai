@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -310,7 +311,7 @@ func (s *driveStorage) query(ctx context.Context, condition string) (map[string]
 		params := url.Values{
 			"q":                         {"'" + quoteDriveValue(s.folder) + "' in parents and trashed = false and " + condition},
 			"fields":                    {"nextPageToken,files(id,name,description)"},
-			"pageSize":                  {fmt.Sprint(drivePageSize)},
+			"pageSize":                  {strconv.Itoa(drivePageSize)},
 			"supportsAllDrives":         {"true"},
 			"includeItemsFromAllDrives": {"true"},
 		}
@@ -518,7 +519,7 @@ func (s *driveStorage) Delete(ctx context.Context, name string) error {
 		if err := s.deleteID(ctx, flat, id); err != nil {
 			return err
 		}
-	} else if err != errNotFound {
+	} else if !errors.Is(err, errNotFound) {
 		return err
 	}
 

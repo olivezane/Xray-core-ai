@@ -100,7 +100,7 @@ func (m *PortMapper) Renew(ctx context.Context) (bool, error) {
 	if !ok || addr.IsUnspecified() || addr.IsLoopback() {
 		return false, fmt.Errorf("gateway returned unusable external address: %s", externalIP)
 	}
-	externalAddr := netip.AddrPortFrom(addr.Unmap(), uint16(externalPort))
+	externalAddr := netip.AddrPortFrom(addr.Unmap(), uint16(externalPort)) //nolint:gosec // the port is a 16-bit field on the NAT-PMP wire
 
 	m.mu.Lock()
 	changed := externalAddr != m.externalAddr

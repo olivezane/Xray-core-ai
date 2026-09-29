@@ -94,7 +94,7 @@ func (l *AckList) Flush(current uint32, rto uint32) {
 	l.flushCandidates = l.flushCandidates[:0]
 
 	seg := NewAckSegment((int(l.mss) - 17) / 4)
-	for i := 0; i < len(l.numbers); i++ {
+	for i := range len(l.numbers) {
 		if l.nextFlush[i] > current {
 			if len(l.flushCandidates) < cap(l.flushCandidates) {
 				l.flushCandidates = append(l.flushCandidates, l.numbers[i])
@@ -107,7 +107,7 @@ func (l *AckList) Flush(current uint32, rto uint32) {
 		l.nextFlush[i] = current + timeout
 
 		if seg.IsFull() {
-			l.writer.Write(seg)
+			_ = l.writer.Write(seg)
 			seg.Release()
 			seg = NewAckSegment((int(l.mss) - 17) / 4)
 			l.dirty = false
@@ -121,7 +121,7 @@ func (l *AckList) Flush(current uint32, rto uint32) {
 			}
 			seg.PutNumber(number)
 		}
-		l.writer.Write(seg)
+		_ = l.writer.Write(seg)
 		l.dirty = false
 	}
 
@@ -236,6 +236,7 @@ func (w *ReceivingWorker) Flush(current uint32) {
 }
 
 func (w *ReceivingWorker) Write(seg Segment) error {
+	//nolint:forcetypeassert // the KCP receive queue only ever stores *AckSegment
 	ackSeg := seg.(*AckSegment)
 	ackSeg.Conv = w.conn.meta.Conversation
 	ackSeg.ReceivingNext = w.nextNumber

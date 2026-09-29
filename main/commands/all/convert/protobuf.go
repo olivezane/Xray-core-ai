@@ -51,11 +51,11 @@ func executeConvertConfigsToProtobuf(cmd *base.Command, args []string) {
 	cmd.Flag.BoolVar(&optDump, "debug", false, "")
 	cmd.Flag.BoolVar(&optType, "t", false, "")
 	cmd.Flag.BoolVar(&optType, "type", false, "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 
 	unnamedArgs := cmdarg.Arg{}
 	for _, v := range cmd.Flag.Args() {
-		unnamedArgs.Set(v)
+		_ = unnamedArgs.Set(v)
 	}
 
 	if len(optFile) > 0 {

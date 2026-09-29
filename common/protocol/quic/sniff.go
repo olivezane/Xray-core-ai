@@ -122,7 +122,7 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
 
 		if isQUICInitial { // Only initial packets have token, see https://datatracker.ietf.org/doc/html/rfc9000#section-17.2.2
 			tokenLen, err := readShortQUICVarint(buffer)
-			if err != nil || tokenLen > int32(len(b)) {
+			if err != nil || tokenLen > int32(len(b)) { //nolint:gosec // bounded by the buffer size / buf.Size
 				return nil, errNotQUIC
 			}
 
@@ -164,7 +164,7 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
 			return nil, errNotQUIC
 		}
 		cache.Clear()
-		mask := cache.Extend(int32(block.BlockSize()))
+		mask := cache.Extend(int32(block.BlockSize())) //nolint:gosec // cipher block size is a small constant
 		block.Encrypt(mask, b[hdrLen+4:hdrLen+4+len(mask)])
 		b[0] ^= mask[0] & 0xf
 		packetNumberLength := int(b[0]&0x3 + 1)
@@ -176,7 +176,7 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
 		iv := hkdfExpandLabel(secret, label+" iv", 12)
 		cipher := AEADAESGCMTLS13(key, iv)
 
-		nonce := cache.Extend(int32(cipher.NonceSize()))
+		nonce := cache.Extend(int32(cipher.NonceSize())) //nolint:gosec // cipher nonce size is a small constant
 		_, err = buffer.Read(nonce[len(nonce)-packetNumberLength:])
 		if err != nil {
 			return nil, err
@@ -211,7 +211,7 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
 				if _, err = readShortQUICVarint(buffer); err != nil { // Field: First ACK Range
 					return nil, io.ErrUnexpectedEOF
 				}
-				for i := 0; i < int(ackRangeCount); i++ { // Field: ACK Range
+				for range int(ackRangeCount) { // Field: ACK Range
 					if _, err = readShortQUICVarint(buffer); err != nil { // Field: ACK Range -> Gap
 						return nil, io.ErrUnexpectedEOF
 					}
@@ -239,7 +239,7 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
 				if err != nil || length > buffer.Len() {
 					return nil, io.ErrUnexpectedEOF
 				}
-				currentCryptoLen := int32(offset + length)
+				currentCryptoLen := offset + length
 				if cryptoLen < currentCryptoLen {
 					if cryptoDataBuf.Cap() < currentCryptoLen {
 						return nil, io.ErrShortBuffer
@@ -261,7 +261,7 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
 				if err != nil {
 					return nil, io.ErrUnexpectedEOF
 				}
-				if _, err := buffer.ReadBytes(int32(length)); err != nil { // Field: Reason Phrase
+				if _, err := buffer.ReadBytes(length); err != nil { // Field: Reason Phrase
 					return nil, io.ErrUnexpectedEOF
 				}
 			default:
@@ -287,8 +287,8 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
 
 func hkdfExpandLabel(secret []byte, label string, length int) []byte {
 	b := make([]byte, 0, 2+1+6+len(label)+1)
-	b = binary.BigEndian.AppendUint16(b, uint16(length))
-	b = append(b, byte(6+len(label)))
+	b = binary.BigEndian.AppendUint16(b, uint16(length)) //nolint:gosec // QUIC varint / label lengths are locally produced and bounded
+	b = append(b, byte(6+len(label)))                    //nolint:gosec // QUIC varint / label lengths are locally produced and bounded
 	b = append(b, "tls13 "...)
 	b = append(b, label...)
 	b = append(b, 0) // context

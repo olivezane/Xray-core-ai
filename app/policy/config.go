@@ -19,10 +19,10 @@ func defaultPolicy() *Policy {
 
 	return &Policy{
 		Timeout: &Policy_Timeout{
-			Handshake:      &Second{Value: uint32(p.Timeouts.Handshake / time.Second)},
-			ConnectionIdle: &Second{Value: uint32(p.Timeouts.ConnectionIdle / time.Second)},
-			UplinkOnly:     &Second{Value: uint32(p.Timeouts.UplinkOnly / time.Second)},
-			DownlinkOnly:   &Second{Value: uint32(p.Timeouts.DownlinkOnly / time.Second)},
+			Handshake:      &Second{Value: uint32(p.Timeouts.Handshake / time.Second)},      //nolint:gosec // a timeout in seconds cannot overflow uint32
+			ConnectionIdle: &Second{Value: uint32(p.Timeouts.ConnectionIdle / time.Second)}, //nolint:gosec // a timeout in seconds cannot overflow uint32
+			UplinkOnly:     &Second{Value: uint32(p.Timeouts.UplinkOnly / time.Second)},     //nolint:gosec // a timeout in seconds cannot overflow uint32
+			DownlinkOnly:   &Second{Value: uint32(p.Timeouts.DownlinkOnly / time.Second)},   //nolint:gosec // a timeout in seconds cannot overflow uint32
 		},
 		Buffer: &Policy_Buffer{
 			Connection: p.Buffer.PerConnection,

@@ -83,7 +83,7 @@ func (c *Config) BuildCertificates() []*tls.Certificate {
 			if isOcspstapling {
 				if newOCSPData, err := ocsp.GetOCSPForCert(cert.Certificate); err != nil {
 					errors.LogWarningInner(context.Background(), err, "ignoring invalid OCSP")
-				} else if string(newOCSPData) != string(cert.OCSPStaple) {
+				} else if !bytes.Equal(newOCSPData, cert.OCSPStaple) {
 					cert.OCSPStaple = newOCSPData
 				}
 			}
@@ -118,7 +118,7 @@ func setupOcspTicker(entry *Certificate, callback func(isReloaded, isOcspstaplin
 					errors.LogErrorInner(context.Background(), err, "failed to parse key")
 					return
 				}
-				if string(newCert) != string(entry.Certificate) || string(newKey) != string(entry.Key) {
+				if !bytes.Equal(newCert, entry.Certificate) || !bytes.Equal(newKey, entry.Key) {
 					entry.Certificate = newCert
 					entry.Key = newKey
 					isReloaded = true
@@ -325,7 +325,9 @@ func (r *RandCarrier) verifyPeerCert(rawCerts [][]byte, verifiedChains [][]*x509
 			}
 		}
 		if verifyResult == foundCA {
-			errors.New("peer cert is invalid (against pinned CA and verifyPeerCertByName)")
+			if err := errors.New("peer cert is invalid (against pinned CA and verifyPeerCertByName)"); err != nil {
+				return err
+			}
 		}
 		return errors.New("peer cert is invalid (against root CAs and verifyPeerCertByName)")
 	}
@@ -389,7 +391,7 @@ func (c *Config) GetTLSConfig(opts ...Option) *tls.Config {
 		RootCAs:                root,
 		NextProtos:             slices.Clone(c.NextProtocol),
 		SessionTicketsDisabled: !c.EnableSessionResumption,
-		VerifyPeerCertificate:  randCarrier.verifyPeerCert,
+		VerifyPeerCertificate:  randCarrier.verifyPeerCert, //nolint:gosec // G123: resumption is opt-in and keyed by ServerName; the pinned cert was verified on the cached full handshake
 	}
 	randCarrier.Config = config
 	if len(c.VerifyPeerCertByName) > 0 {
@@ -465,7 +467,7 @@ func (c *Config) GetTLSConfig(opts ...Option) *tls.Config {
 	}
 
 	if len(c.MasterKeyLog) > 0 && c.MasterKeyLog != "none" {
-		writer, err := os.OpenFile(c.MasterKeyLog, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o644)
+		writer, err := os.OpenFile(c.MasterKeyLog, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 		if err != nil {
 			errors.LogErrorInner(context.Background(), err, "failed to open ", c.MasterKeyLog, " as master key log")
 		} else {
@@ -547,7 +549,7 @@ func ParseCurveName(curveNames []string) []tls.CurveID {
 }
 
 func IsFromMitm(str string) bool {
-	return strings.ToLower(str) == "frommitm"
+	return strings.EqualFold(str, "frommitm")
 }
 
 type verifyResult int

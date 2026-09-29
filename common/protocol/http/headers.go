@@ -67,7 +67,8 @@ func ParseHost(rawHost string, defaultPort net.Port) (net.Destination, error) {
 	port := defaultPort
 	host, rawPort, err := net.SplitHostPort(rawHost)
 	if err != nil {
-		if addrError, ok := err.(*net.AddrError); ok && strings.Contains(addrError.Err, "missing port") {
+		var addrError *net.AddrError
+		if errors.As(err, &addrError) && strings.Contains(addrError.Err, "missing port") {
 			host = rawHost
 		} else {
 			return net.Destination{}, err
@@ -76,6 +77,9 @@ func ParseHost(rawHost string, defaultPort net.Port) (net.Destination, error) {
 		intPort, err := strconv.Atoi(rawPort)
 		if err != nil {
 			return net.Destination{}, err
+		}
+		if intPort < 0 || intPort > 65535 {
+			return net.Destination{}, errors.New("invalid port: ", rawPort)
 		}
 		port = net.Port(intPort)
 	}

@@ -66,14 +66,16 @@ func NewUDPHopConn(c *Config, dest *net.Destination, dialer *finalmask.Dialer) (
 			dest.Address = net.IPAddress(randPrefix(remoteIPs[mrand.Intn(len(remoteIPs))]))
 		}
 		if len(remotePorts) > 0 {
-			dest.Port = net.Port(remotePorts[mrand.Intn(len(remotePorts))])
+			dest.Port = net.Port(remotePorts[mrand.Intn(len(remotePorts))]) //nolint:gosec // ports come from the config layer, which rejects values above 65535
 		}
 	}
 	conn, err := dialer.DialUDP(*dest)
 	if err != nil {
 		return nil, err
 	}
+	//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
 	cur := conn.(*finalmask.PacketConnWrapper).PacketConn
+	//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 	addr := conn.RemoteAddr().(*net.UDPAddr)
 	client := &udpHopConn{
 		dialer: dialer,
@@ -136,20 +138,21 @@ func (c *udpHopConn) hop() {
 		}
 	}
 	if c.local {
-		conn, err := c.dialer.DialUDP(net.UDPDestination(net.IPAddress(c.addr.IP), net.Port(c.addr.Port)))
+		conn, err := c.dialer.DialUDP(net.UDPDestination(net.IPAddress(c.addr.IP), net.Port(c.addr.Port))) //nolint:gosec // Port of a net.Addr is always 0..65535
 		if err != nil {
 			c.addr.IP = oldIP
 			c.addr.Port = oldPort
 			errors.LogErrorInner(context.Background(), err, "hop err")
 			return
 		}
-		conn.SetDeadline(c.deadline)
-		conn.SetReadDeadline(c.readDeadline)
-		conn.SetWriteDeadline(c.writeDeadline)
+		_ = conn.SetDeadline(c.deadline)
+		_ = conn.SetReadDeadline(c.readDeadline)
+		_ = conn.SetWriteDeadline(c.writeDeadline)
 		if c.pre != nil {
 			_ = c.pre.Close()
 		}
 		c.pre = c.cur
+		//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
 		c.cur = conn.(*finalmask.PacketConnWrapper).PacketConn
 		c.wg.Add(1)
 		go c.recv(c.cur)
@@ -160,10 +163,11 @@ func (c *udpHopConn) recv(conn net.PacketConn) {
 	defer c.wg.Done()
 
 	for {
+		//nolint:forcetypeassert // the pool only ever stores []byte
 		p := pool.Get().([]byte)
 		n, addr, err := conn.ReadFrom(p)
 		if err != nil {
-			pool.Put(p[:cap(p)])
+			pool.Put(p[:cap(p)]) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 			if c.closed() {
 				return
 			}
@@ -182,7 +186,7 @@ func (c *udpHopConn) recv(conn net.PacketConn) {
 		select {
 		case c.readCh <- packet{p: p[:n], addr: addr}:
 		case <-c.closeCh:
-			pool.Put(p[:cap(p)])
+			pool.Put(p[:cap(p)]) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 			return
 		}
 	}
@@ -193,7 +197,7 @@ func (c *udpHopConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if ok {
 		if packet.p != nil {
 			n = copy(p, packet.p)
-			pool.Put(packet.p[:cap(packet.p)])
+			pool.Put(packet.p[:cap(packet.p)]) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 		}
 		return n, packet.addr, packet.err
 	}
@@ -226,7 +230,7 @@ func (c *udpHopConn) Close() error {
 	select {
 	case packet := <-c.readCh:
 		if packet.p != nil {
-			pool.Put(packet.p[:cap(packet.p)])
+			pool.Put(packet.p[:cap(packet.p)]) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 		}
 	default:
 	}
@@ -276,14 +280,14 @@ func randPrefix(p netip.Prefix) []byte {
 	}
 	b := p.Addr().AsSlice()
 	prefix := p.Bits()
-	var new [16]byte
-	common.Must2(rand.Read(new[:len(b)]))
+	var randBytes [16]byte
+	common.Must2(rand.Read(randBytes[:len(b)]))
 	i := prefix / 8
 	j := prefix % 8
 	if i+1 < len(b) {
-		copy(b[i+1:], new[i+1:])
+		copy(b[i+1:], randBytes[i+1:])
 	}
 	mask := byte(0xff << (8 - j))
-	b[i] = (b[i] & mask) | (new[i] &^ mask)
+	b[i] = (b[i] & mask) | (randBytes[i] &^ mask)
 	return b
 }

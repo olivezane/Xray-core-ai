@@ -77,7 +77,7 @@ func (s *DataSegment) parse(conv uint16, cmd Command, opt SegmentOption, buf []b
 		return false, nil
 	}
 	s.Data().Clear()
-	s.Data().Write(buf[:dataLen])
+	_, _ = s.Data().Write(buf[:dataLen])
 	buf = buf[dataLen:]
 
 	return true, buf
@@ -111,7 +111,7 @@ func (s *DataSegment) Serialize(b []byte) {
 	binary.BigEndian.PutUint32(b[4:], s.Timestamp)
 	binary.BigEndian.PutUint32(b[8:], s.Number)
 	binary.BigEndian.PutUint32(b[12:], s.SendingNext)
-	binary.BigEndian.PutUint16(b[16:], uint16(s.payload.Len()))
+	binary.BigEndian.PutUint16(b[16:], uint16(s.payload.Len())) //nolint:gosec // session IDs and segment sizes are bounded by the protocol
 	copy(b[18:], s.payload.Bytes())
 }
 
@@ -206,7 +206,7 @@ func (s *AckSegment) IsEmpty() bool {
 }
 
 func (s *AckSegment) ByteSize() int32 {
-	return 2 + 1 + 1 + 4 + 4 + 4 + 1 + int32(len(s.NumberList)*4)
+	return 2 + 1 + 1 + 4 + 4 + 4 + 1 + int32(len(s.NumberList)*4) //nolint:gosec // segment sizes are bounded by the MTU
 }
 
 func (s *AckSegment) Serialize(b []byte) {
@@ -216,7 +216,7 @@ func (s *AckSegment) Serialize(b []byte) {
 	binary.BigEndian.PutUint32(b[4:], s.ReceivingWindow)
 	binary.BigEndian.PutUint32(b[8:], s.ReceivingNext)
 	binary.BigEndian.PutUint32(b[12:], s.Timestamp)
-	b[16] = byte(len(s.NumberList))
+	b[16] = byte(len(s.NumberList)) //nolint:gosec // session IDs and segment sizes are bounded by the protocol
 	n := 17
 	for _, number := range s.NumberList {
 		binary.BigEndian.PutUint32(b[n:], number)

@@ -104,7 +104,7 @@ func (h *HealthPing) StartScheduler(selector func() ([]string, error)) {
 			errors.LogWarning(h.ctx, "error select outbounds for initial health check: ", err)
 			return
 		}
-		h.Check(tags)
+		_ = h.Check(tags)
 	}()
 
 	go func() {

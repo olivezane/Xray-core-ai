@@ -12,11 +12,11 @@ import (
 )
 
 func TestFileLogger(t *testing.T) {
-	f, err := os.CreateTemp("", "vtest")
+	f, err := os.CreateTemp(t.TempDir(), "vtest")
 	common.Must(err)
 	path := f.Name()
 	common.Must(f.Close())
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 
 	creator, err := CreateFileLogWriter(path)
 	common.Must(err)

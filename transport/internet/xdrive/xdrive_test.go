@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/stat"
@@ -127,7 +128,7 @@ func TestMultiSegmentTransfer(t *testing.T) {
 	}
 
 	go func() {
-		client.Write(payload)
+		_, _ = client.Write(payload)
 	}()
 
 	if err := server.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
@@ -199,7 +200,7 @@ func TestLocalMissingObject(t *testing.T) {
 		t.Fatalf("newLocalStorage: %v", err)
 	}
 
-	if _, err := storage.Get(context.Background(), "nothing/here"); err != errNotFound {
+	if _, err := storage.Get(context.Background(), "nothing/here"); !errors.Is(err, errNotFound) {
 		t.Fatalf("Get returned %v, want errNotFound", err)
 	}
 	names, err := storage.List(context.Background(), "nothing")
@@ -385,7 +386,7 @@ func TestStaleAnnounce(t *testing.T) {
 func TestFreshAnnounce(t *testing.T) {
 	folder := t.TempDir()
 	listener := newTestListener(t, folder)
-	listener.addConn = func(conn stat.Connection) { conn.Close() }
+	listener.addConn = func(conn stat.Connection) { _ = conn.Close() }
 
 	ctx := context.Background()
 	if err := listener.storage.Put(ctx, announceName("fresh", time.Now()), nil); err != nil {
@@ -417,7 +418,7 @@ func TestAnnouncePrecision(t *testing.T) {
 func TestRecentAnnounceTTL(t *testing.T) {
 	folder := t.TempDir()
 	listener := newTestListener(t, folder)
-	listener.addConn = func(conn stat.Connection) { conn.Close() }
+	listener.addConn = func(conn stat.Connection) { _ = conn.Close() }
 
 	ctx := context.Background()
 	recent := time.Now().Add(-900 * time.Millisecond)
@@ -440,8 +441,7 @@ func TestMissingSegment(t *testing.T) {
 		t.Fatalf("newLocalStorage: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	p := paramsFromConfig(&Config{PollIntervalMs: 5, MaxPollIntervalMs: 20, HoleTimeoutMs: 200})
 	if err := storage.Put(ctx, objectName("hole", 1, segSuffix), []byte("second")); err != nil {
@@ -459,7 +459,7 @@ func TestMissingSegment(t *testing.T) {
 	}
 
 	err = reader.Err()
-	if err == nil || err == io.EOF {
+	if err == nil || errors.Is(err, io.EOF) {
 		t.Fatalf("Err returned %v, want a failure", err)
 	}
 }
@@ -470,8 +470,7 @@ func TestIdleStreamWaits(t *testing.T) {
 		t.Fatalf("newLocalStorage: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	p := paramsFromConfig(&Config{PollIntervalMs: 5, MaxPollIntervalMs: 20, HoleTimeoutMs: 100})
 	reader := newWALReader(ctx, storage, "idle", p)
@@ -500,8 +499,7 @@ func TestFailureMarker(t *testing.T) {
 		t.Fatalf("newLocalStorage: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	p := paramsFromConfig(&Config{PollIntervalMs: 5, MaxPollIntervalMs: 20})
 	if err := storage.Put(ctx, objectName("broken", 0, segSuffix), []byte("first")); err != nil {
@@ -531,7 +529,7 @@ func TestFailureMarker(t *testing.T) {
 		t.Fatal("reader did not stop on the failure marker")
 	}
 
-	if err := reader.Err(); err == nil || err == io.EOF {
+	if err := reader.Err(); err == nil || errors.Is(err, io.EOF) {
 		t.Fatalf("Err returned %v, want a failure", err)
 	}
 }
@@ -561,8 +559,7 @@ func TestInlinePayload(t *testing.T) {
 	}
 	storage := &inlineOnlyStorage{Storage: base}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	reader := newWALReader(ctx, storage, "inline", paramsFromConfig(&Config{PollIntervalMs: 5}))
 	select {

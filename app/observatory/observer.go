@@ -178,7 +178,10 @@ func (o *Observer) probe(outbound string) ProbeResult {
 		if o.config.ProbeUrl != "" {
 			probeURL = o.config.ProbeUrl
 		}
-		req, _ := http.NewRequest(http.MethodGet, probeURL, nil)
+		req, err := http.NewRequestWithContext(o.ctx, http.MethodGet, probeURL, nil)
+		if err != nil {
+			return errors.New("failed to create probe request").Base(err)
+		}
 		utils.TryDefaultHeadersWith(req.Header, "nav")
 		response, err := httpClient.Do(req)
 		if err != nil {
@@ -252,7 +255,7 @@ func New(ctx context.Context, config *Config) (*Observer, error) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return New(ctx, config)
 	}))
 }

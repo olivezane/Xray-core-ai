@@ -52,6 +52,7 @@ func (l Listener) Addr() net.Addr {
 }
 
 func Listen(ctx context.Context, address net.Address, port net.Port, settings *internet.MemoryStreamConfig, handler internet.ConnHandler) (internet.Listener, error) {
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	grpcSettings := settings.ProtocolSettings.(*Config)
 	var listener *Listener
 	if port == net.Port(0) { // unix

@@ -16,9 +16,9 @@ type Destination struct {
 func DestinationFromAddr(addr net.Addr) Destination {
 	switch addr := addr.(type) {
 	case *net.TCPAddr:
-		return TCPDestination(IPAddress(addr.IP), Port(addr.Port))
+		return TCPDestination(IPAddress(addr.IP), Port(addr.Port)) //nolint:gosec // Port of a net.Addr is always 0..65535
 	case *net.UDPAddr:
-		return UDPDestination(IPAddress(addr.IP), Port(addr.Port))
+		return UDPDestination(IPAddress(addr.IP), Port(addr.Port)) //nolint:gosec // Port of a net.Addr is always 0..65535
 	case *net.UnixAddr:
 		return UnixDestination(DomainAddress(addr.Name))
 	default:
@@ -100,6 +100,7 @@ func (d Destination) NetAddr() string {
 // RawNetAddr converts a net.Addr from its Destination presentation.
 func (d Destination) RawNetAddr() net.Addr {
 	var addr net.Addr
+	//nolint:exhaustive // only TCP/UDP/unix have a net.Addr; Network_Unknown yields nil
 	switch d.Network {
 	case Network_TCP:
 		if d.Address.Family().IsIP() {
@@ -129,6 +130,7 @@ func (d Destination) RawNetAddr() net.Addr {
 // String returns the strings form of this Destination.
 func (d Destination) String() string {
 	prefix := "unknown:"
+	//nolint:exhaustive // the default prefix already covers every other network
 	switch d.Network {
 	case Network_TCP:
 		prefix = "tcp:"
@@ -150,6 +152,6 @@ func (p *Endpoint) AsDestination() Destination {
 	return Destination{
 		Network: p.Network,
 		Address: p.Address.AsAddress(),
-		Port:    Port(p.Port),
+		Port:    Port(p.Port), //nolint:gosec // Port of a net.Addr is always 0..65535
 	}
 }

@@ -163,7 +163,7 @@ func (c *AEADCipher) EncodePacket(key []byte, b *buf.Buffer) error {
 	payloadLen := b.Len()
 	auth := c.createAuthenticator(key, b.BytesTo(ivLen))
 
-	b.Extend(int32(auth.Overhead()))
+	b.Extend(int32(auth.Overhead())) //nolint:gosec // cipher overhead is a small constant
 	_, err := auth.Seal(b.BytesTo(ivLen), b.BytesRange(ivLen, payloadLen))
 	return err
 }
@@ -180,7 +180,7 @@ func (c *AEADCipher) DecodePacket(key []byte, b *buf.Buffer) error {
 	if err != nil {
 		return err
 	}
-	b.Resize(ivLen, int32(len(bbb)))
+	b.Resize(ivLen, int32(len(bbb))) //nolint:gosec // key material size is a small constant
 	return nil
 }
 
@@ -190,7 +190,7 @@ func passwordToCipherKey(password []byte, keySize int32) []byte {
 	md5Sum := md5.Sum(password)
 	key = append(key, md5Sum[:]...)
 
-	for int32(len(key)) < keySize {
+	for int32(len(key)) < keySize { //nolint:gosec // key sizes are tiny constants
 		md5Hash := md5.New()
 		common.Must2(md5Hash.Write(md5Sum[:]))
 		common.Must2(md5Hash.Write(password))

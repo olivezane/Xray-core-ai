@@ -42,7 +42,6 @@ type pipe struct {
 
 var (
 	errBufferFull = errors.New("buffer full")
-	errSlowDown   = errors.New("slow down")
 )
 
 func (p *pipe) Len() int32 {
@@ -153,7 +152,7 @@ func (p *pipe) WriteMultiBuffer(mb buf.MultiBuffer) error {
 			return nil
 		}
 
-		if err == errBufferFull {
+		if errors.Is(err, errBufferFull) {
 			if p.option.discardOverflow {
 				buf.ReleaseMulti(mb)
 				return nil

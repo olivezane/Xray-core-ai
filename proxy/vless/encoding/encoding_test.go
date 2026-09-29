@@ -43,7 +43,7 @@ func TestRequestSerialization(t *testing.T) {
 	common.Must(EncodeRequestHeader(&buffer, expectedRequest, expectedAddons))
 
 	Validator := new(vless.MemoryValidator)
-	Validator.Add(user)
+	_ = Validator.Add(user)
 
 	_, actualRequest, actualAddons, _, err := DecodeRequestHeader(false, nil, &buffer, Validator)
 	common.Must(err)
@@ -84,7 +84,7 @@ func TestInvalidRequest(t *testing.T) {
 	common.Must(EncodeRequestHeader(&buffer, expectedRequest, expectedAddons))
 
 	Validator := new(vless.MemoryValidator)
-	Validator.Add(user)
+	_ = Validator.Add(user)
 
 	_, _, _, _, err := DecodeRequestHeader(false, nil, &buffer, Validator) //nolint:dogsled // the test only cares about the error
 	if err == nil {
@@ -115,7 +115,7 @@ func TestMuxRequest(t *testing.T) {
 	common.Must(EncodeRequestHeader(&buffer, expectedRequest, expectedAddons))
 
 	Validator := new(vless.MemoryValidator)
-	Validator.Add(user)
+	_ = Validator.Add(user)
 
 	_, actualRequest, actualAddons, _, err := DecodeRequestHeader(false, nil, &buffer, Validator)
 	common.Must(err)

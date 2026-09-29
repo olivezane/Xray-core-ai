@@ -100,7 +100,7 @@ func find(r io.Reader, code []byte, readBody bool) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		bodyL := int(x)
+		bodyL := int(x) //nolint:gosec // a protobuf length field is bounded well below MaxInt
 		if bodyL <= 0 {
 			return nil, errors.New("invalid body length: ", bodyL)
 		}

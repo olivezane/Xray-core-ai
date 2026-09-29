@@ -64,10 +64,10 @@ func (l *Loopback) init(config *Config, dispatcherInstance routing.Dispatcher) e
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
 		l := new(Loopback)
 		err := core.RequireFeatures(ctx, func(dispatcherInstance routing.Dispatcher) error {
-			return l.init(config.(*Config), dispatcherInstance)
+			return l.init(config, dispatcherInstance)
 		})
 		return l, err
 	}))

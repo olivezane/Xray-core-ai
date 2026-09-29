@@ -1,6 +1,7 @@
 package custom
 
 import (
+	"errors"
 	"io"
 	"net"
 	"strings"
@@ -144,7 +145,8 @@ func TestDSLTCPClientRejectsMismatchedResponseSequence(t *testing.T) {
 	if readErr == nil {
 		t.Fatal("expected server read to fail")
 	}
-	if ne, ok := readErr.(net.Error); !ok || !ne.Timeout() {
+	var ne net.Error
+	if !errors.As(readErr, &ne) || !ne.Timeout() {
 		t.Fatalf("expected server timeout after client auth failure, got %v", readErr)
 	}
 }

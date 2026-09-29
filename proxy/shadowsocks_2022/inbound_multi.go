@@ -30,8 +30,8 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*MultiUserServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewMultiServer(ctx, config.(*MultiUserServerConfig))
+	common.Must(common.RegisterConfig((*MultiUserServerConfig)(nil), func(ctx context.Context, config *MultiUserServerConfig) (any, error) {
+		return NewMultiServer(ctx, config)
 	}))
 }
 
@@ -77,6 +77,10 @@ func NewMultiServer(ctx context.Context, config *MultiUserServerConfig) (*MultiU
 	}
 
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
 	i := &MultiUserInbound{
 		networks:        networks,
 		method:          method,
@@ -86,7 +90,7 @@ func NewMultiServer(ctx context.Context, config *MultiUserServerConfig) (*MultiU
 		saltFilter:      antireplay.NewMapFilter[[32]byte](60),
 		udpSessions:     NewUDPSessionManager(500 * time.Second),
 		udpMasterCipher: masterBlock,
-		policyManager:   v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager:   pm,
 	}
 
 	for idx, user := range config.Users {
@@ -153,6 +157,7 @@ func (i *MultiUserInbound) RemoveUser(ctx context.Context, email string) error {
 		return errors.New("user ", email, " not found")
 	}
 
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	pskHash := DeriveUserPSKHash(u.Account.(*MemoryAccount).Key)
 	i.usersByHash.Delete(pskHash)
 	i.userCount.Add(-1)
@@ -239,6 +244,7 @@ func (i *MultiUserInbound) processTCP(ctx context.Context, conn net.Conn, dispat
 	if !ok || user == nil {
 		return ErrInvalidRequest
 	}
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	userPSK := user.Account.(*MemoryAccount).Key
 
 	// 3. Derive Session Subkey using matched user's PSK
@@ -255,7 +261,7 @@ func (i *MultiUserInbound) processTCP(ctx context.Context, conn net.Conn, dispat
 	if err != nil {
 		return err
 	}
-	conn.SetReadDeadline(time.Time{})
+	_ = conn.SetReadDeadline(time.Time{})
 	dest := reqHeader.Destination
 
 	// 6. Send Server Response Handshake
@@ -284,7 +290,9 @@ func (i *MultiUserInbound) processTCP(ctx context.Context, conn net.Conn, dispat
 
 	if len(reqHeader.EarlyData) > 0 {
 		earlyBuf := buf.New()
-		earlyBuf.Write(reqHeader.EarlyData)
+		if _, err := earlyBuf.Write(reqHeader.EarlyData); err != nil {
+			return err
+		}
 		if err := link.Writer.WriteMultiBuffer(buf.MultiBuffer{earlyBuf}); err != nil {
 			return err
 		}
@@ -377,6 +385,7 @@ func (i *MultiUserInbound) processUDP(ctx context.Context, conn stat.Connection,
 					continue
 				}
 				currentUser = user
+				//nolint:forcetypeassert // the account is created by this package's own NewAccount
 				userPSK = user.Account.(*MemoryAccount).Key
 
 				sessionItem.Lock()
@@ -414,7 +423,7 @@ func (i *MultiUserInbound) processUDP(ctx context.Context, conn stat.Connection,
 				continue
 			}
 			epoch := binary.BigEndian.Uint64(bodyPlain[1:9])
-			diff := time.Now().Unix() - int64(epoch)
+			diff := time.Now().Unix() - int64(epoch) //nolint:gosec // the user level is a small config value
 			if diff < -30 || diff > 30 {
 				continue
 			}
@@ -494,7 +503,9 @@ func (i *MultiUserInbound) processUDP(ctx context.Context, conn stat.Connection,
 
 			entry.timer.Update()
 			pBuf := buf.New()
-			pBuf.Write(payload)
+			if _, err := pBuf.Write(payload); err != nil {
+				return err
+			}
 			_ = entry.link.Writer.WriteMultiBuffer(buf.MultiBuffer{pBuf})
 		}
 	}

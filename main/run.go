@@ -157,7 +157,7 @@ func readConfDir(dirPath string) {
 			log.Fatalln(err)
 		}
 		if matched {
-			configFiles.Set(path.Join(dirPath, f.Name()))
+			_ = configFiles.Set(path.Join(dirPath, f.Name()))
 		}
 	}
 }

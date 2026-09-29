@@ -29,6 +29,7 @@ func TestSockOptMark(t *testing.T) {
 	common.Must(err)
 	defer conn.Close()
 
+	//nolint:forcetypeassert // the listener was created as a TCP listener
 	rawConn, err := conn.(*net.TCPConn).SyscallConn()
 	common.Must(err)
 	err = rawConn.Control(func(fd uintptr) {

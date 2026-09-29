@@ -127,7 +127,7 @@ func PrintUsage(w io.Writer, cmd *Command) {
 	buildCommandText(cmd)
 	bw := bufio.NewWriter(w)
 	tmpl(bw, usageTemplate, makeTmplData(cmd))
-	bw.Flush()
+	_ = bw.Flush()
 }
 
 // buildCommandText build command text as template

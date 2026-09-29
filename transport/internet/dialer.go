@@ -203,7 +203,7 @@ func checkAddressPortStrategy(ctx context.Context, dest net.Destination, sockopt
 		}
 		for _, txtRecord := range txtRecords {
 			errors.LogDebug(ctx, "TXT record: "+txtRecord)
-			addr_s, port_s, _ := net.SplitHostPort(string(txtRecord))
+			addr_s, port_s, _ := net.SplitHostPort(txtRecord)
 			addr := net.ParseAddress(addr_s)
 			port, err := net.PortFromString(port_s)
 			if err != nil {

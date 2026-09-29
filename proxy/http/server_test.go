@@ -3,6 +3,7 @@ package http
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -17,7 +18,7 @@ import (
 func TestReadResponseAndHandle100ContinueDoesNotPanicOnEarlyNewline(t *testing.T) {
 	payload := "X\nHTTP/1.1 100 Continue\r\n\r\n" + strings.Repeat("A", 40)
 	r := bufio.NewReader(bytes.NewReader([]byte(payload)))
-	req, err := http.NewRequest("GET", "http://example.com/", nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +34,7 @@ func TestReadResponseAndHandle100ContinueForwardsAndParsesFinalResponse(t *testi
 	payload := "HTTP/1.1 100 Continue\r\n\r\n" +
 		"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"
 	r := bufio.NewReader(bytes.NewReader([]byte(payload)))
-	req, err := http.NewRequest("GET", "http://example.com/", nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +45,7 @@ func TestReadResponseAndHandle100ContinueForwardsAndParsesFinalResponse(t *testi
 		t.Fatalf("unexpected error: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 	if !strings.Contains(forwarded.String(), "100 Continue") {

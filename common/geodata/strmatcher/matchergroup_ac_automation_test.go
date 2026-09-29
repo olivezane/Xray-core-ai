@@ -63,7 +63,7 @@ func TestACAutomatonMatcherGroup(t *testing.T) {
 		matcher, err := test.mType.New(test.pattern)
 		common.Must(err)
 		common.Must(AddMatcherToGroup(ac, matcher, 0))
-		ac.Build()
+		_ = ac.Build()
 		if m := ac.MatchAny(test.input); m != test.output {
 			t.Error("unexpected output: ", m, " for test case ", test)
 		}
@@ -100,7 +100,7 @@ func TestACAutomatonMatcherGroup(t *testing.T) {
 			common.Must(err)
 			common.Must(AddMatcherToGroup(ac, matcher, 0))
 		}
-		ac.Build()
+		_ = ac.Build()
 		cases2Output := []struct {
 			pattern string
 			res     bool
@@ -165,7 +165,7 @@ func TestACAutomatonMatcherGroup(t *testing.T) {
 			common.Must(err)
 			common.Must(AddMatcherToGroup(ac, matcher, 0))
 		}
-		ac.Build()
+		_ = ac.Build()
 		cases3Output := []struct {
 			pattern string
 			res     bool
@@ -202,7 +202,7 @@ func TestACAutomatonMatcherGroup(t *testing.T) {
 			common.Must(err)
 			common.Must(AddMatcherToGroup(ac, matcher, 0))
 		}
-		ac.Build()
+		_ = ac.Build()
 		cases4Output := []struct {
 			pattern string
 			res     bool
@@ -269,7 +269,7 @@ func TestACAutomatonMatcherGroupSubstr(t *testing.T) {
 		common.Must(err)
 		common.Must(AddMatcherToGroup(matcherGroup, matcher, uint32(id)))
 	}
-	matcherGroup.Build()
+	_ = matcherGroup.Build()
 	for _, test := range cases {
 		if r := matcherGroup.Match(test.input); !reflect.DeepEqual(r, test.output) {
 			t.Error("unexpected output: ", r, " for test case ", test)
@@ -356,7 +356,7 @@ func TestACAutomatonMatcherGroupAsIndexMatcher(t *testing.T) {
 		common.Must(err)
 		common.Must(AddMatcherToGroup(matcherGroup, matcher, uint32(i+2)))
 	}
-	matcherGroup.Build()
+	_ = matcherGroup.Build()
 	for _, test := range cases {
 		if m := matcherGroup.Match(test.Input); !reflect.DeepEqual(m, test.Output) {
 			t.Error("unexpected output: ", m, " for test case ", test)

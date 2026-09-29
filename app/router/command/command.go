@@ -107,7 +107,7 @@ func (s *routingServer) SubscribeRoutingStats(request *SubscribeRoutingStatsRequ
 	if err != nil {
 		return err
 	}
-	defer stats.UnsubscribeClosableChannel(s.routingStats, subscriber)
+	defer func() { _ = stats.UnsubscribeClosableChannel(s.routingStats, subscriber) }()
 	for {
 		select {
 		case value, ok := <-subscriber:
@@ -147,7 +147,7 @@ func (s *service) Register(server *grpc.Server) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg *Config) (any, error) {
 		s := core.MustFromContext(ctx)
 		return &service{v: s}, nil
 	}))

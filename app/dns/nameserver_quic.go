@@ -129,7 +129,7 @@ func (s *QUICNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- e
 			}
 
 			dnsReqBuf := buf.New()
-			err = binary.Write(dnsReqBuf, binary.BigEndian, uint16(b.Len()))
+			err = binary.Write(dnsReqBuf, binary.BigEndian, uint16(b.Len())) //nolint:gosec // DNS message length is bounded by the 8K buffer
 			if err != nil {
 				errors.LogErrorInner(ctx, err, "binary write failed")
 				if noResponseErrCh != nil {

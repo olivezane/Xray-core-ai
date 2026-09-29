@@ -99,9 +99,9 @@ func TestNewBbrSenderAppliesProfiles(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			b := NewBbrSender(DefaultClock{}, congestion.InitialPacketSize, tc.profile)
 			require.Equal(t, tc.profile, b.profile)
-			require.Equal(t, tc.highGain, b.highGain)
-			require.Equal(t, tc.highCwndGain, b.highCwndGain)
-			require.Equal(t, tc.congestionWindowGainConstant, b.congestionWindowGainConstant)
+			require.InDelta(t, tc.highGain, b.highGain, 0)
+			require.InDelta(t, tc.highCwndGain, b.highCwndGain, 0)
+			require.InDelta(t, tc.congestionWindowGainConstant, b.congestionWindowGainConstant, 0)
 			require.Equal(t, tc.numStartupRtts, b.numStartupRtts)
 			require.Equal(t, tc.drainToTarget, b.drainToTarget)
 			require.Equal(t, tc.detectOvershooting, b.detectOvershooting)
@@ -110,8 +110,8 @@ func TestNewBbrSenderAppliesProfiles(t *testing.T) {
 			require.Equal(t, tc.expireAckAggregationInStartup, b.expireAckAggregationInStartup)
 			require.Equal(t, tc.enableOverestimateAvoidance, b.sampler.IsOverestimateAvoidanceEnabled())
 			require.Equal(t, tc.reduceExtraAckedOnBandwidthIncrease, b.sampler.maxAckHeightTracker.reduceExtraAckedOnBandwidthIncrease)
-			require.Equal(t, b.highGain, b.pacingGain)
-			require.Equal(t, b.highCwndGain, b.congestionWindowGain)
+			require.InDelta(t, b.highGain, b.pacingGain, 0)
+			require.InDelta(t, b.highCwndGain, b.congestionWindowGain, 0)
 		})
 	}
 }

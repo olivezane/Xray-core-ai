@@ -1,6 +1,7 @@
 package scenarios
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -72,7 +73,9 @@ func TestMetrics(t *testing.T) {
 	common.Must(err)
 	defer CloseAllServers(servers)
 
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/pprof/goroutine?debug=1", metricsPort))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/debug/pprof/goroutine?debug=1", metricsPort), nil)
+	common.Must(err)
+	resp, err := http.DefaultClient.Do(req)
 	common.Must(err)
 	defer resp.Body.Close()
 	if resp == nil {
@@ -89,7 +92,9 @@ func TestMetrics(t *testing.T) {
 		t.Error("unexpected response body from pprof handler")
 	}
 
-	resp2, err2 := http.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/vars", metricsPort))
+	req2, err2 := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/debug/vars", metricsPort), nil)
+	common.Must(err2)
+	resp2, err2 := http.DefaultClient.Do(req2)
 	common.Must(err2)
 	defer resp2.Body.Close()
 	if resp2 == nil {

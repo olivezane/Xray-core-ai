@@ -1,6 +1,7 @@
 package xdrive
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet"
 )
@@ -89,7 +91,7 @@ func (d *fakeDrive) handleToken(w http.ResponseWriter, r *http.Request) {
 	d.mu.Lock()
 	d.tokens++
 	d.mu.Unlock()
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"access_token": "fake-token",
 		"expires_in":   3600,
 	})
@@ -99,7 +101,7 @@ func (d *fakeDrive) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if d.shouldFail("upload") {
 		if status, body := d.failure("upload"); status != 0 {
 			w.WriteHeader(status)
-			w.Write([]byte(body))
+			_, _ = w.Write([]byte(body))
 			return
 		}
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -137,7 +139,7 @@ func (d *fakeDrive) handleUpload(w http.ResponseWriter, r *http.Request) {
 	d.files[id] = &fakeFile{id: id, name: metadata.Name, data: data}
 	d.mu.Unlock()
 
-	json.NewEncoder(w).Encode(map[string]string{"id": id, "name": metadata.Name})
+	_ = json.NewEncoder(w).Encode(map[string]string{"id": id, "name": metadata.Name})
 }
 
 func (d *fakeDrive) handleFiles(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +154,7 @@ func (d *fakeDrive) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if d.shouldFail("upload") {
 		if status, body := d.failure("upload"); status != 0 {
 			w.WriteHeader(status)
-			w.Write([]byte(body))
+			_, _ = w.Write([]byte(body))
 			return
 		}
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -174,7 +176,7 @@ func (d *fakeDrive) handleCreate(w http.ResponseWriter, r *http.Request) {
 	d.files[id] = &fakeFile{id: id, name: meta.Name, description: meta.Description}
 	d.mu.Unlock()
 
-	json.NewEncoder(w).Encode(map[string]string{"id": id, "name": meta.Name})
+	_ = json.NewEncoder(w).Encode(map[string]string{"id": id, "name": meta.Name})
 }
 
 func (d *fakeDrive) handleList(w http.ResponseWriter, r *http.Request) {
@@ -212,7 +214,7 @@ func (d *fakeDrive) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	d.mu.Unlock()
 
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 func (d *fakeDrive) handleFile(w http.ResponseWriter, r *http.Request) {
@@ -234,10 +236,10 @@ func (d *fakeDrive) handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.Contains(r.URL.RawQuery, "fields=description") {
-		json.NewEncoder(w).Encode(map[string]string{"description": file.description})
+		_ = json.NewEncoder(w).Encode(map[string]string{"description": file.description})
 		return
 	}
-	w.Write(file.data)
+	_, _ = w.Write(file.data)
 }
 
 func (d *fakeDrive) shouldFail(kind string) bool {
@@ -330,6 +332,7 @@ func driveSettings() *internet.MemoryStreamConfig {
 func newDriveBackend(t *testing.T) *driveStorage {
 	t.Helper()
 
+	//nolint:forcetypeassert // the test builds the stream settings itself
 	storage, err := newDriveStorage(driveSettings(), driveSettings().ProtocolSettings.(*Config))
 	if err != nil {
 		t.Fatalf("newDriveStorage: %v", err)
@@ -374,7 +377,7 @@ func TestDriveRoundTrip(t *testing.T) {
 		t.Fatalf("List returned %v, want 1 segment", names)
 	}
 
-	if _, err := storage.Get(ctx, "streams/abc/c2s/000000009.seg"); err != errNotFound {
+	if _, err := storage.Get(ctx, "streams/abc/c2s/000000009.seg"); !errors.Is(err, errNotFound) {
 		t.Fatalf("Get returned %v, want errNotFound", err)
 	}
 
@@ -494,7 +497,7 @@ func TestDriveLargeTransfer(t *testing.T) {
 	}
 
 	go func() {
-		client.Write(payload)
+		_, _ = client.Write(payload)
 	}()
 
 	if err := server.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
@@ -581,7 +584,7 @@ func TestDriveInlineListing(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("List returned %v, want 1 entry", entries)
 	}
-	if string(entries[0].Inline) != string(payload) {
+	if !bytes.Equal(entries[0].Inline, payload) {
 		t.Fatalf("listing carried %q, want %q", entries[0].Inline, payload)
 	}
 
@@ -642,7 +645,7 @@ func TestDriveInlineGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if string(got) != string(payload) {
+	if !bytes.Equal(got, payload) {
 		t.Fatalf("Get returned %q, want %q", got, payload)
 	}
 }
@@ -670,6 +673,7 @@ func TestDriveFronting(t *testing.T) {
 		Network: net.Network_TCP,
 	}
 
+	//nolint:forcetypeassert // the test builds the stream settings itself
 	storage, err := newDriveStorage(settings, settings.ProtocolSettings.(*Config))
 	if err != nil {
 		t.Fatalf("newDriveStorage: %v", err)

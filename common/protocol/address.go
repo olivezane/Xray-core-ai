@@ -245,7 +245,7 @@ func (p *addressParser) writeAddress(writer io.Writer, address net.Address) erro
 			return errors.New("Super long domain is not supported: ", domain)
 		}
 
-		if _, err := writer.Write([]byte{tb, byte(len(domain))}); err != nil {
+		if _, err := writer.Write([]byte{tb, byte(len(domain))}); err != nil { //nolint:gosec // the domain length is validated before it is written
 			return err
 		}
 		if _, err := writer.Write([]byte(domain)); err != nil {

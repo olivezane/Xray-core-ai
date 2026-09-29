@@ -1,4 +1,4 @@
-package log // import "github.com/xtls/xray-core/common/log"
+package log
 
 import (
 	"sync/atomic"

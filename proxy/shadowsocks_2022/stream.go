@@ -192,7 +192,7 @@ func (r *StreamReader) Read(p []byte) (int, error) {
 func (r *StreamReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	if r.cached > 0 {
 		b := buf.New()
-		b.Write(r.buffer[r.offset : r.offset+r.cached])
+		_, _ = b.Write(r.buffer[r.offset : r.offset+r.cached])
 		r.cached = 0
 		r.offset = 0
 		return buf.MultiBuffer{b}, nil
@@ -225,7 +225,7 @@ func (r *StreamReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	IncreaseNonce(r.nonce[:])
 
 	b := buf.New()
-	b.Write(decryptedPayload)
+	_, _ = b.Write(decryptedPayload)
 	return buf.MultiBuffer{b}, nil
 }
 
@@ -251,7 +251,7 @@ func ReadClientRequestHeader(conn io.Reader, reader *StreamReader) (*ClientReque
 	}
 
 	epoch := binary.BigEndian.Uint64(plainFixed[1:9])
-	diff := int(math.Abs(float64(time.Now().Unix() - int64(epoch))))
+	diff := int(math.Abs(float64(time.Now().Unix() - int64(epoch)))) //nolint:gosec // the epoch skew is a small number of seconds
 	if diff > 30 {
 		return nil, ErrBadTimestamp
 	}
@@ -280,7 +280,7 @@ func ReadClientRequestHeader(conn io.Reader, reader *StreamReader) (*ClientReque
 	IncreaseNonce(reader.Nonce())
 
 	b := buf.New()
-	b.Write(plainVar)
+	_, _ = b.Write(plainVar)
 	defer b.Release()
 
 	dest, err := ReadAddressPort(b)
@@ -297,7 +297,7 @@ func ReadClientRequestHeader(conn io.Reader, reader *StreamReader) (*ClientReque
 		return nil, ErrNoPadding
 	}
 	if paddingLen > 0 {
-		b.Advance(int32(paddingLen))
+		b.Advance(int32(paddingLen)) //nolint:gosec // bounded by the buffer size / buf.Size
 	}
 
 	var earlyData []byte
@@ -322,6 +322,7 @@ func ClientHandshake(w io.Writer, method *CipherMethod, pskList [][]byte, dest n
 	if err != nil {
 		return nil, nil, err
 	}
+	//nolint:forcetypeassert // this package wraps the writer itself
 	return salt, writer.(*StreamWriter), nil
 }
 
@@ -331,6 +332,7 @@ func ClientVerifyServerResponse(r io.Reader, method *CipherMethod, psk []byte, c
 	if err != nil {
 		return nil, nil, err
 	}
+	//nolint:forcetypeassert // this package wraps the reader itself
 	sr := reader.(*StreamReader)
 	var initialPayload []byte
 	if sr.cached > 0 {
@@ -354,7 +356,7 @@ func WriteTCPRequest(w io.Writer, method *CipherMethod, pskList [][]byte, dest n
 	handshakeBuf := buf.New()
 	defer handshakeBuf.Release()
 
-	handshakeBuf.Write(clientSalt)
+	_, _ = handshakeBuf.Write(clientSalt)
 
 	for i, currPSK := range pskList[:len(pskList)-1] {
 		identitySubkey := DeriveIdentitySubKey(currPSK, clientSalt, method.KeySaltLength)
@@ -366,7 +368,7 @@ func WriteTCPRequest(w io.Writer, method *CipherMethod, pskList [][]byte, dest n
 		pskHash := DeriveUserPSKHash(nextPSK)
 		var encryptedEIH [AESBlockSize]byte
 		block.Encrypt(encryptedEIH[:], pskHash[:])
-		handshakeBuf.Write(encryptedEIH[:])
+		_, _ = handshakeBuf.Write(encryptedEIH[:])
 	}
 
 	payloadLen := len(payload)
@@ -379,12 +381,12 @@ func WriteTCPRequest(w io.Writer, method *CipherMethod, pskList [][]byte, dest n
 
 	var fixedHeaderPlaintext [RequestHeaderFixedChunkLength]byte
 	fixedHeaderPlaintext[0] = HeaderTypeClient
-	binary.BigEndian.PutUint64(fixedHeaderPlaintext[1:9], uint64(time.Now().Unix()))
-	binary.BigEndian.PutUint16(fixedHeaderPlaintext[9:11], uint16(varHeaderLen))
+	binary.BigEndian.PutUint64(fixedHeaderPlaintext[1:9], uint64(time.Now().Unix())) //nolint:gosec // Unix timestamps are positive
+	binary.BigEndian.PutUint16(fixedHeaderPlaintext[9:11], uint16(varHeaderLen))     //nolint:gosec // the epoch skew is a small number of seconds
 
 	fixedChunk := writer.cipher.Seal(nil, writer.nonce[:], fixedHeaderPlaintext[:], nil)
 	IncreaseNonce(writer.nonce[:])
-	handshakeBuf.Write(fixedChunk)
+	_, _ = handshakeBuf.Write(fixedChunk)
 
 	varHeaderBuf := buf.New()
 	defer varHeaderBuf.Release()
@@ -395,19 +397,19 @@ func WriteTCPRequest(w io.Writer, method *CipherMethod, pskList [][]byte, dest n
 
 	var padLenBytes [2]byte
 	binary.BigEndian.PutUint16(padLenBytes[:], uint16(paddingLen))
-	varHeaderBuf.Write(padLenBytes[:])
+	_, _ = varHeaderBuf.Write(padLenBytes[:])
 
 	if paddingLen > 0 {
-		varHeaderBuf.Write(zeroPadding[:paddingLen])
+		_, _ = varHeaderBuf.Write(zeroPadding[:paddingLen])
 	}
 
 	if payloadLen > 0 {
-		varHeaderBuf.Write(payload)
+		_, _ = varHeaderBuf.Write(payload)
 	}
 
 	varChunk := writer.cipher.Seal(nil, writer.nonce[:], varHeaderBuf.Bytes(), nil)
 	IncreaseNonce(writer.nonce[:])
-	handshakeBuf.Write(varChunk)
+	_, _ = handshakeBuf.Write(varChunk)
 
 	if _, err := w.Write(handshakeBuf.Bytes()); err != nil {
 		return nil, err
@@ -451,13 +453,13 @@ func ReadTCPResponse(r io.Reader, method *CipherMethod, psk []byte, clientSalt [
 	}
 
 	serverEpoch := binary.BigEndian.Uint64(decryptedFixed[1:9])
-	diff := int(math.Abs(float64(time.Now().Unix() - int64(serverEpoch))))
+	diff := int(math.Abs(float64(time.Now().Unix() - int64(serverEpoch)))) //nolint:gosec // the epoch skew is a small number of seconds
 	if diff > 30 {
 		return nil, ErrBadTimestamp
 	}
 
 	echoedSalt := decryptedFixed[9 : 9+method.KeySaltLength]
-	for i := 0; i < method.KeySaltLength; i++ {
+	for i := range method.KeySaltLength {
 		if echoedSalt[i] != clientSalt[i] {
 			return nil, errors.New("bad request salt")
 		}
@@ -499,23 +501,23 @@ func WriteTCPResponse(w io.Writer, method *CipherMethod, psk []byte, clientSalt 
 	respBuf := buf.New()
 	defer respBuf.Release()
 
-	respBuf.Write(serverSaltSlice)
+	_, _ = respBuf.Write(serverSaltSlice)
 
 	var fixedRespPlain [1 + 8 + 32 + 2]byte
 	fixedRespSlice := fixedRespPlain[:1+8+method.KeySaltLength+2]
 	fixedRespSlice[0] = HeaderTypeServer
-	binary.BigEndian.PutUint64(fixedRespSlice[1:9], uint64(time.Now().Unix()))
+	binary.BigEndian.PutUint64(fixedRespSlice[1:9], uint64(time.Now().Unix())) //nolint:gosec // Unix timestamps are positive
 	copy(fixedRespSlice[9:9+method.KeySaltLength], clientSalt)
-	binary.BigEndian.PutUint16(fixedRespSlice[9+method.KeySaltLength:11+method.KeySaltLength], uint16(len(initialPayload)))
+	binary.BigEndian.PutUint16(fixedRespSlice[9+method.KeySaltLength:11+method.KeySaltLength], uint16(len(initialPayload))) //nolint:gosec // initial payload is bounded by buf.Size
 
 	fixedRespChunk := writer.cipher.Seal(nil, writer.nonce[:], fixedRespSlice, nil)
 	IncreaseNonce(writer.nonce[:])
-	respBuf.Write(fixedRespChunk)
+	_, _ = respBuf.Write(fixedRespChunk)
 
 	if len(initialPayload) > 0 {
 		initialChunk := writer.cipher.Seal(nil, writer.nonce[:], initialPayload, nil)
 		IncreaseNonce(writer.nonce[:])
-		respBuf.Write(initialChunk)
+		_, _ = respBuf.Write(initialChunk)
 	}
 
 	if _, err := w.Write(respBuf.Bytes()); err != nil {

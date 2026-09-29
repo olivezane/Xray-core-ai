@@ -34,6 +34,7 @@ func (*staticHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	if opt != nil {
 		for _, o := range opt.Option {
 			if o.Option() == dns.EDNS0SUBNET {
+				//nolint:forcetypeassert // the test builds the EDNS0 option itself
 				subnet := o.(*dns.EDNS0_SUBNET)
 				clientIP = subnet.Address
 			}
@@ -108,7 +109,7 @@ func (*staticHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			ans.Answer = append(ans.Answer, rr)
 		}
 	}
-	w.WriteMsg(ans)
+	_ = w.WriteMsg(ans)
 }
 
 func TestUDPServerSubnet(t *testing.T) {
@@ -120,7 +121,7 @@ func TestUDPServerSubnet(t *testing.T) {
 		Handler: &staticHandler{},
 		UDPSize: 1200,
 	}
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	config := &core.Config{
@@ -157,6 +158,7 @@ func TestUDPServerSubnet(t *testing.T) {
 	v, err := core.New(config)
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under dns.ClientType()
 	client := v.GetFeature(feature_dns.ClientType()).(feature_dns.Client)
 
 	ips, _, err := client.LookupIP("google.com", feature_dns.IPOption{
@@ -183,7 +185,7 @@ func TestUDPServer(t *testing.T) {
 		UDPSize: 1200,
 	}
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	config := &core.Config{
@@ -219,6 +221,7 @@ func TestUDPServer(t *testing.T) {
 	v, err := core.New(config)
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under dns.ClientType()
 	client := v.GetFeature(feature_dns.ClientType()).(feature_dns.Client)
 
 	{
@@ -279,7 +282,7 @@ func TestUDPServer(t *testing.T) {
 		}
 	}
 
-	dnsServer.Shutdown()
+	_ = dnsServer.Shutdown()
 
 	{
 		ips, _, err := client.LookupIP("google.com", feature_dns.IPOption{
@@ -307,7 +310,7 @@ func TestPrioritizedDomain(t *testing.T) {
 		UDPSize: 1200,
 	}
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	config := &core.Config{
@@ -359,6 +362,7 @@ func TestPrioritizedDomain(t *testing.T) {
 	v, err := core.New(config)
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under dns.ClientType()
 	client := v.GetFeature(feature_dns.ClientType()).(feature_dns.Client)
 
 	startTime := time.Now()
@@ -394,7 +398,7 @@ func TestUDPServerIPv6(t *testing.T) {
 		UDPSize: 1200,
 	}
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	config := &core.Config{
@@ -430,6 +434,7 @@ func TestUDPServerIPv6(t *testing.T) {
 	v, err := core.New(config)
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under dns.ClientType()
 	client := v.GetFeature(feature_dns.ClientType()).(feature_dns.Client)
 	{
 		ips, _, err := client.LookupIP("ipv6.google.com", feature_dns.IPOption{
@@ -457,7 +462,7 @@ func TestStaticHostDomain(t *testing.T) {
 		UDPSize: 1200,
 	}
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	config := &core.Config{
@@ -499,6 +504,7 @@ func TestStaticHostDomain(t *testing.T) {
 	v, err := core.New(config)
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under dns.ClientType()
 	client := v.GetFeature(feature_dns.ClientType()).(feature_dns.Client)
 
 	{
@@ -516,7 +522,7 @@ func TestStaticHostDomain(t *testing.T) {
 		}
 	}
 
-	dnsServer.Shutdown()
+	_ = dnsServer.Shutdown()
 }
 
 func TestIPMatch(t *testing.T) {
@@ -529,7 +535,7 @@ func TestIPMatch(t *testing.T) {
 		UDPSize: 1200,
 	}
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	config := &core.Config{
@@ -586,6 +592,7 @@ func TestIPMatch(t *testing.T) {
 	v, err := core.New(config)
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under dns.ClientType()
 	client := v.GetFeature(feature_dns.ClientType()).(feature_dns.Client)
 
 	startTime := time.Now()
@@ -621,7 +628,7 @@ func TestLocalDomain(t *testing.T) {
 		UDPSize: 1200,
 	}
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	config := &core.Config{
@@ -705,6 +712,7 @@ func TestLocalDomain(t *testing.T) {
 	v, err := core.New(config)
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under dns.ClientType()
 	client := v.GetFeature(feature_dns.ClientType()).(feature_dns.Client)
 
 	startTime := time.Now()
@@ -845,7 +853,7 @@ func TestMultiMatchPrioritizedDomain(t *testing.T) {
 		UDPSize: 1200,
 	}
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	config := &core.Config{
@@ -962,6 +970,7 @@ func TestMultiMatchPrioritizedDomain(t *testing.T) {
 	v, err := core.New(config)
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under dns.ClientType()
 	client := v.GetFeature(feature_dns.ClientType()).(feature_dns.Client)
 
 	startTime := time.Now()

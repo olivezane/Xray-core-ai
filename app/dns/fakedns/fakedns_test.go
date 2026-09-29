@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/uuid"
@@ -76,7 +77,9 @@ func TestGetFakeIPForDomainConcurrently(t *testing.T) {
 	for i := range total {
 		errg.Go(testGetFakeIP(i, addr, fkdns))
 	}
-	errg.Wait()
+	if err := errg.Wait(); err != nil {
+		t.Fatal(err)
+	}
 	for i := range total {
 		for j := i + 1; j < total; j++ {
 			assert.NotEqual(t, addr[i][0].IP().String(), addr[j][0].IP().String())
@@ -105,7 +108,7 @@ func TestFakeDnsHolderCreateMappingAndRollOver(t *testing.T) {
 	addr := fkdns.GetFakeIPForDomain("fakednstest.example.com")
 	addr2 := fkdns.GetFakeIPForDomain("fakednstest2.example.com")
 
-	for i := 0; i <= 8192; i++ {
+	for range 8193 {
 		{
 			result := fkdns.GetDomainFromFakeDNS(addr[0])
 			assert.Equal(t, "fakednstest.example.com", result)
@@ -146,7 +149,7 @@ func TestFakeDNSMulti(t *testing.T) {
 
 	common.Must(err)
 
-	assert.Nil(t, err, "Should not throw error")
+	require.NoError(t, err, "Should not throw error")
 	_ = fakeMulti
 
 	t.Run("checkInRange", func(t *testing.T) {
@@ -156,7 +159,7 @@ func TestFakeDNSMulti(t *testing.T) {
 		})
 		t.Run("ipv6", func(t *testing.T) {
 			ip, err := net.ResolveIPAddr("ip", "fddd:c5b4:ff5f:f4f0::5")
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			inPool := fakeMulti.IsIPInIPPool(net.IPAddress(ip.IP))
 			assert.True(t, inPool)
 		})
@@ -166,7 +169,7 @@ func TestFakeDNSMulti(t *testing.T) {
 		})
 		t.Run("ipv6_inverse", func(t *testing.T) {
 			ip, err := net.ResolveIPAddr("ip", "fcdd:c5b4:ff5f:f4f0::5")
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			inPool := fakeMulti.IsIPInIPPool(net.IPAddress(ip.IP))
 			assert.False(t, inPool)
 		})

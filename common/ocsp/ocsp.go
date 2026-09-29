@@ -2,11 +2,13 @@ package ocsp
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/platform/filesystem"
@@ -42,11 +44,15 @@ func GetOCSPStapling(cert [][]byte, path string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		newFile.Write(ocspData)
+		_, _ = newFile.Write(ocspData)
 		defer newFile.Close()
 	}
 	return ocspData, nil
 }
+
+// ocspHTTPClient bounds the issuer-certificate and OCSP fetches. The default
+// client has no timeout, so an unresponsive CA would hang certificate loading.
+var ocspHTTPClient = &http.Client{Timeout: 30 * time.Second}
 
 func GetOCSPForCert(cert [][]byte) ([]byte, error) {
 	bundle := new(bytes.Buffer)
@@ -70,7 +76,11 @@ func GetOCSPForCert(cert [][]byte) ([]byte, error) {
 		if len(issuedCert.IssuingCertificateURL) == 0 {
 			return nil, errors.New("no issuing certificate URL")
 		}
-		resp, errC := http.Get(issuedCert.IssuingCertificateURL[0])
+		req, errC := http.NewRequestWithContext(context.Background(), http.MethodGet, issuedCert.IssuingCertificateURL[0], nil)
+		if errC != nil {
+			return nil, errors.New("no issuing certificate URL")
+		}
+		resp, errC := ocspHTTPClient.Do(req)
 		if errC != nil {
 			return nil, errors.New("no issuing certificate URL")
 		}
@@ -95,12 +105,17 @@ func GetOCSPForCert(cert [][]byte) ([]byte, error) {
 		return nil, err
 	}
 	reader := bytes.NewReader(ocspReq)
-	req, err := http.Post(issuedCert.OCSPServer[0], "application/ocsp-request", reader)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, issuedCert.OCSPServer[0], reader)
 	if err != nil {
 		return nil, errors.New(err)
 	}
-	defer req.Body.Close()
-	ocspResBytes, err := io.ReadAll(req.Body)
+	req.Header.Set("Content-Type", "application/ocsp-request")
+	resp, err := ocspHTTPClient.Do(req)
+	if err != nil {
+		return nil, errors.New(err)
+	}
+	defer resp.Body.Close()
+	ocspResBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.New(err)
 	}

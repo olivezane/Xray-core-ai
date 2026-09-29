@@ -36,7 +36,7 @@ func (c *DNSOutboundRuleConfig) Build() (*dns.DNSRuleConfig, error) {
 	if c.QType != nil {
 		for _, r := range c.QType.Range {
 			for qType := r.From; qType <= r.To; qType++ {
-				rule.QType = append(rule.QType, int32(qType))
+				rule.QType = append(rule.QType, int32(qType)) //nolint:gosec // config values are bounded by their declared field widths
 			}
 		}
 	}
@@ -147,8 +147,7 @@ func (c *DNSOutboundConfig) buildLegacyDNSPolicy() ([]*dns.DNSRuleConfig, error)
 
 	{
 		rule := &dns.DNSRuleConfig{Action: dns.RuleAction_Hijack}
-		rule.QType = append(rule.QType, 1)
-		rule.QType = append(rule.QType, 28)
+		rule.QType = append(rule.QType, 1, 28)
 		rules = append(rules, rule)
 	}
 

@@ -8,8 +8,6 @@ import (
 
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
-	"github.com/xtls/xray-core/features/dns"
-	"github.com/xtls/xray-core/features/outbound"
 )
 
 var (
@@ -22,11 +20,7 @@ type SystemDialer interface {
 	Dial(ctx context.Context, source net.Address, destination net.Destination, sockopt *SocketConfig) (net.Conn, error)
 	DestIpAddress() net.IP
 }
-
-type DefaultSystemDialer struct {
-	dns dns.Client
-	obm outbound.Manager
-}
+type DefaultSystemDialer struct{}
 
 func resolveSrcAddr(network net.Network, src net.Address) net.Addr {
 	if src == nil || src == net.AnyIP {
@@ -227,6 +221,7 @@ type FakePacketConn struct {
 
 func (c *FakePacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	n, err = c.Read(p)
+	//nolint:forcetypeassert // the socket was created by this package as a TCP socket
 	return n, &net.UDPAddr{IP: c.Conn.RemoteAddr().(*net.TCPAddr).IP, Port: c.Conn.RemoteAddr().(*net.TCPAddr).Port}, err
 }
 

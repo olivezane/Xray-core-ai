@@ -157,10 +157,12 @@ func (c *xicmpConnClient) recv4() {
 			continue
 		}
 
+		//nolint:forcetypeassert // the pool only ever stores []byte
 		p := pool.Get().([]byte)[:len(echo.Data)]
 		copy(p, echo.Data)
 
 		if !c.udp {
+			//nolint:forcetypeassert // the address was built by this package as a *net.IPAddr
 			addr = &net.UDPAddr{IP: addr.(*net.IPAddr).IP}
 		}
 
@@ -170,7 +172,7 @@ func (c *xicmpConnClient) recv4() {
 			addr: addr,
 		}:
 		case <-c.closeCh:
-			pool.Put(p)
+			pool.Put(p) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 			return
 		}
 	}
@@ -225,10 +227,12 @@ func (c *xicmpConnClient) recv6() {
 			continue
 		}
 
+		//nolint:forcetypeassert // the pool only ever stores []byte
 		p := pool.Get().([]byte)[:len(echo.Data)]
 		copy(p, echo.Data)
 
 		if !c.udp {
+			//nolint:forcetypeassert // the address was built by this package as a *net.IPAddr
 			addr = &net.UDPAddr{IP: addr.(*net.IPAddr).IP}
 		}
 
@@ -238,7 +242,7 @@ func (c *xicmpConnClient) recv6() {
 			addr: addr,
 		}:
 		case <-c.closeCh:
-			pool.Put(p)
+			pool.Put(p) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 			return
 		}
 	}
@@ -249,7 +253,7 @@ func (c *xicmpConnClient) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if ok {
 		if packet.p != nil {
 			n = copy(p, packet.p)
-			pool.Put(packet.p)
+			pool.Put(packet.p) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 		}
 		return n, packet.addr, packet.err
 	}
@@ -279,8 +283,9 @@ func (c *xicmpConnClient) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 		addr = &net.IPAddr{IP: ip}
 	}
 
+	//nolint:forcetypeassert // the pool only ever stores []byte
 	b := pool.Get().([]byte)[:finalmask.UDPSize]
-	defer pool.Put(b)
+	defer pool.Put(b) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 
 	copy(b[8:], c.clientID[:])
 	copy(b[16:], p)
@@ -313,7 +318,7 @@ func (c *xicmpConnClient) Close() error {
 	select {
 	case p := <-c.readCh:
 		if p.p != nil {
-			pool.Put(p.p)
+			pool.Put(p.p) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 		}
 	default:
 	}
@@ -351,18 +356,18 @@ func marshal(b []byte, typ icmp.Type, id, seq int, dataLen int) []byte {
 	switch typ := typ.(type) {
 	case ipv4.ICMPType:
 		is4 = true
-		b[0] = byte(typ)
+		b[0] = byte(typ) //nolint:gosec // ICMP identifiers and sequences are 16-bit protocol fields
 	case ipv6.ICMPType:
-		b[0] = byte(typ)
+		b[0] = byte(typ) //nolint:gosec // ICMP identifiers and sequences are 16-bit protocol fields
 	default:
 		panic(fmt.Sprintf("%T %v", typ, typ))
 	}
 	clear(b[1:4])
-	binary.BigEndian.PutUint16(b[4:], uint16(id))
-	binary.BigEndian.PutUint16(b[6:], uint16(seq))
+	binary.BigEndian.PutUint16(b[4:], uint16(id))  //nolint:gosec // ICMP identifiers and sequences are 16-bit protocol fields
+	binary.BigEndian.PutUint16(b[6:], uint16(seq)) //nolint:gosec // ICMP identifiers and sequences are 16-bit protocol fields
 	if is4 {
 		s := checksum(b[:8+dataLen])
-		b[2] ^= byte(s)
+		b[2] ^= byte(s) //nolint:gosec // ICMP identifiers and sequences are 16-bit protocol fields
 		b[3] ^= byte(s >> 8)
 	}
 	return b[:8+dataLen]

@@ -68,12 +68,10 @@ var (
 func executeCert(cmd *base.Command, args []string) {
 	var opts []cert.Option
 	if *certIsCA {
-		opts = append(opts, cert.Authority(*certIsCA))
-		opts = append(opts, cert.KeyUsage(x509.KeyUsageCertSign|x509.KeyUsageKeyEncipherment|x509.KeyUsageDigitalSignature))
+		opts = append(opts, cert.Authority(*certIsCA), cert.KeyUsage(x509.KeyUsageCertSign|x509.KeyUsageKeyEncipherment|x509.KeyUsageDigitalSignature))
 	}
 
-	opts = append(opts, cert.NotAfter(time.Now().Add(*certExpire)))
-	opts = append(opts, cert.CommonName(*certCommonName))
+	opts = append(opts, cert.NotAfter(time.Now().Add(*certExpire)), cert.CommonName(*certCommonName))
 	if len(certDomainNames) > 0 {
 		opts = append(opts, cert.DNSNames(certDomainNames...))
 	}
@@ -103,8 +101,8 @@ func printJSON(certificate *cert.Certificate) {
 	}
 	content, err := json.MarshalIndent(jCert, "", "  ")
 	common.Must(err)
-	os.Stdout.Write(content)
-	os.Stdout.WriteString("\n")
+	_, _ = os.Stdout.Write(content)
+	_, _ = os.Stdout.WriteString("\n")
 }
 
 func writeFile(content []byte, name string) error {

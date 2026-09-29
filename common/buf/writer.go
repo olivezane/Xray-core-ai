@@ -59,7 +59,7 @@ func (w *BufferToBytesWriter) WriteMultiBuffer(mb MultiBuffer) error {
 		if err != nil {
 			return err
 		}
-		size -= int32(n)
+		size -= int32(n) //nolint:gosec // read length is bounded by the buffer size
 	}
 
 	return nil
@@ -120,7 +120,7 @@ func (w *BufferedWriter) Write(b []byte) (int, error) {
 		totalBytes += nBytes
 
 		// ErrBufferFull means a partial write, so flush below and continue
-		if err != nil && err != ErrBufferFull {
+		if err != nil && !errors.Is(err, ErrBufferFull) {
 			return totalBytes, err
 		}
 		if !w.buffered || w.buffer.IsFull() {
@@ -269,7 +269,7 @@ func (noOpWriter) ReadFrom(reader io.Reader) (int64, error) {
 		_, err := b.ReadFrom(reader)
 		totalBytes += int64(b.Len())
 		if err != nil {
-			if errors.Cause(err) == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return totalBytes, nil
 			}
 			return totalBytes, err

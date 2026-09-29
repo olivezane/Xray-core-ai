@@ -54,7 +54,7 @@ func (c *client) status() status {
 }
 
 func (c *client) close() {
-	c.conn.CloseWithError(closeErrCodeOK, "")
+	_ = c.conn.CloseWithError(closeErrCodeOK, "")
 	c.tr.Close()
 	c.pktConn.Close()
 	c.conn = nil
@@ -119,6 +119,7 @@ func (c *client) dial(ctx context.Context) error {
 		if err != nil {
 			return errors.New("failed to dial to dest").Base(err)
 		}
+		//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
 		pktConn = conn.(*finalmask.PacketConnWrapper).PacketConn
 		udpAddr = conn.RemoteAddr()
 	} else {
@@ -299,6 +300,11 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 	datagram := DatagramFromContext(ctx)
 	dest.Network = net.Network_UDP
 
+	config, ok := streamSettings.ProtocolSettings.(*Config)
+	if !ok {
+		return nil, errors.New("unexpected protocol settings type: ", streamSettings.ProtocolSettings)
+	}
+
 	initmanager.Do(func() {
 		manager = &clientManager{
 			m: make(map[dialerConf]*client),
@@ -316,7 +322,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		if c == nil {
 			c = &client{
 				dest:         dest,
-				config:       streamSettings.ProtocolSettings.(*Config),
+				config:       config,
 				tlsConfig:    tlsConfig.GetTLSConfig(tls.WithDestination(dest)),
 				socketConfig: streamSettings.SocketSettings,
 				finalMask:    streamSettings.FinalMask,

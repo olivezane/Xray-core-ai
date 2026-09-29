@@ -47,7 +47,7 @@ func NewMultiHunkConn(hc MultiHunkConn, cancel context.CancelFunc, trustedXForwa
 func (h *MultiHunkReaderWriter) forceFetch() error {
 	hunk, err := h.hc.Recv()
 	if err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return err
 		}
 
@@ -78,7 +78,7 @@ func (h *MultiHunkReaderWriter) ReadMultiBuffer() (buf.MultiBuffer, error) {
 			mb = append(mb, buf.NewExisted(b))
 		} else {
 			nb := buf.New()
-			nb.Extend(int32(len(b)))
+			nb.Extend(int32(len(b))) //nolint:gosec // bounded by the buffer size / buf.Size
 			copy(nb.Bytes(), b)
 
 			mb = append(mb, nb)

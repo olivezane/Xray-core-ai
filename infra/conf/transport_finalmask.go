@@ -749,7 +749,7 @@ func (c *XMCProfile) Build() (*xmc.Profile, error) {
 		return nil, fmt.Errorf("invalid minecraft profile UUID: %w", err)
 	}
 	if c.TexturesValue == "" || c.TexturesSignature == "" {
-		return nil, fmt.Errorf("incomplete minecraft profile textures")
+		return nil, errors.New("incomplete minecraft profile textures")
 	}
 
 	return &xmc.Profile{
@@ -762,11 +762,11 @@ func (c *XMCProfile) Build() (*xmc.Profile, error) {
 
 func (c *XMC) Build() (proto.Message, error) {
 	if len(c.Profiles) == 0 {
-		return nil, fmt.Errorf("minecraft profiles are required")
+		return nil, errors.New("minecraft profiles are required")
 	}
 
 	if c.Password == "" {
-		return nil, fmt.Errorf("empty password")
+		return nil, errors.New("empty password")
 	}
 
 	rsaPrivateKey, err := xmc.DeriveRSAKey(c.Password)
@@ -891,6 +891,7 @@ func (c *Realm) Build() (proto.Message, error) {
 		if err != nil {
 			return nil, err
 		}
+		//nolint:forcetypeassert // the conf layer builds the TLS config itself
 		tlsConfig = tc.(*tls.Config)
 	}
 
@@ -979,6 +980,7 @@ func (c *Mask) Build(tcp bool) (proto.Message, error) {
 	if err != nil {
 		return nil, err
 	}
+	//nolint:forcetypeassert // infra/conf only registers Buildable configs under this key
 	ts, err := rawConfig.(Buildable).Build()
 	if err != nil {
 		return nil, err

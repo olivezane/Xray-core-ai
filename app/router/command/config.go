@@ -17,7 +17,7 @@ func (c routingContext) GetSourceIPs() []net.IP {
 }
 
 func (c routingContext) GetSourcePort() net.Port {
-	return net.Port(c.RoutingContext.GetSourcePort())
+	return net.Port(c.RoutingContext.GetSourcePort()) //nolint:gosec // diagnostic routing-test API; an out-of-range value cannot match a valid port rule
 }
 
 func (c routingContext) GetTargetIPs() []net.IP {
@@ -25,7 +25,7 @@ func (c routingContext) GetTargetIPs() []net.IP {
 }
 
 func (c routingContext) GetTargetPort() net.Port {
-	return net.Port(c.RoutingContext.GetTargetPort())
+	return net.Port(c.RoutingContext.GetTargetPort()) //nolint:gosec // diagnostic routing-test API; an out-of-range value cannot match a valid port rule
 }
 
 func (c routingContext) GetLocalIPs() []net.IP {
@@ -33,11 +33,11 @@ func (c routingContext) GetLocalIPs() []net.IP {
 }
 
 func (c routingContext) GetLocalPort() net.Port {
-	return net.Port(c.RoutingContext.GetLocalPort())
+	return net.Port(c.RoutingContext.GetLocalPort()) //nolint:gosec // diagnostic routing-test API; an out-of-range value cannot match a valid port rule
 }
 
 func (c routingContext) GetVlessRoute() net.Port {
-	return net.Port(c.RoutingContext.GetVlessRoute())
+	return net.Port(c.RoutingContext.GetVlessRoute()) //nolint:gosec // diagnostic routing-test API; an out-of-range value cannot match a valid port rule
 }
 
 func (c routingContext) GetRuleTag() string {

@@ -111,6 +111,7 @@ func (fm *FinalMask) Listen(ctx context.Context, addr net.Addr) (net.Listener, e
 			Listen(net.Listener) (net.Listener, error)
 		}); ok {
 			if i-off == 0 {
+				//nolint:forcetypeassert // the comma-ok assertion in the enclosing if already proved the method set
 				l, err := fm.tcpMasks[i].(interface {
 					Listen(net.Listener) (net.Listener, error)
 				}).Listen(listener)
@@ -120,6 +121,7 @@ func (fm *FinalMask) Listen(ctx context.Context, addr net.Addr) (net.Listener, e
 				}
 				listener = l
 			} else {
+				//nolint:forcetypeassert // the comma-ok assertion in the enclosing if already proved the method set
 				l, err := fm.tcpMasks[i].(interface {
 					Listen(net.Listener) (net.Listener, error)
 				}).Listen(&TCPListener{Listener: listener, tcpMasks: fm.tcpMasks[off:i]})
@@ -184,6 +186,7 @@ func (fm *FinalMask) DialUDP(ctx context.Context, dest net.Destination) (net.Con
 				_ = conn.Close()
 				return nil, err
 			}
+			//nolint:forcetypeassert // the comma-ok assertion in the enclosing if already proved the method set
 			sizes = append(sizes, newConn.(interface{ Size() int }).Size())
 			conns = append(conns, newConn)
 		} else {
@@ -242,6 +245,7 @@ func (fm *FinalMask) ListenPacket(ctx context.Context, addr net.Addr) (net.Packe
 				common.CloseIfExists(conn)
 				return nil, err
 			}
+			//nolint:forcetypeassert // the comma-ok assertion in the enclosing if already proved the method set
 			sizes = append(sizes, newConn.(interface{ Size() int }).Size())
 			conns = append(conns, newConn)
 		} else {

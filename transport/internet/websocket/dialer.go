@@ -21,6 +21,7 @@ import (
 func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig) (stat.Connection, error) {
 	errors.LogInfo(ctx, "creating connection to ", dest)
 	var conn net.Conn
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	if streamSettings.ProtocolSettings.(*Config).Ed > 0 {
 		ctx, cancel := context.WithCancel(ctx)
 		conn = &delayDialConn{
@@ -44,6 +45,7 @@ func init() {
 }
 
 func dialWebSocket(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig, ed []byte) (net.Conn, error) {
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	wsSettings := streamSettings.ProtocolSettings.(*Config)
 
 	dialer := &websocket.Dialer{
@@ -87,6 +89,7 @@ func dialWebSocket(ctx context.Context, dest net.Destination, streamSettings *in
 				}
 
 				// TLS and apply the handshake
+				//nolint:forcetypeassert // utls.UClient always returns *utls.UConn
 				cn := tls.UClient(pconn, tlsConfig, fingerprint).(*tls.UConn)
 				if err := cn.WebsocketHandshakeContext(ctx); err != nil {
 					errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
@@ -193,6 +196,7 @@ func (d *delayDialConn) Write(b []byte) (int, error) {
 	}
 	if d.Conn == nil {
 		ed := b
+		//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 		if len(ed) > int(d.streamSettings.ProtocolSettings.(*Config).Ed) {
 			ed = nil
 		}

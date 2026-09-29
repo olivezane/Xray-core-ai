@@ -133,7 +133,7 @@ func (c *geckoConn) readObfs(p []byte) (n int, addr net.Addr, err error) {
 
 func (c *geckoConn) writeObfs(p []byte, addr net.Addr) (n int, err error) {
 	b := buf.New()
-	b.Resize(0, int32(len(p)+smSaltLen))
+	b.Resize(0, int32(len(p)+smSaltLen)) //nolint:gosec // bounded by the buffer size / buf.Size
 	defer b.Release()
 	c.obfs.Obfuscate(p, b.Bytes())
 	return c.PacketConn.WriteTo(b.Bytes(), addr)
@@ -154,7 +154,7 @@ func (g *geckoConn) WriteTo(p []byte, addr net.Addr) (int, error) {
 func (g *geckoConn) writeFragmented(p []byte, addr net.Addr) (int, error) {
 	chunks := randomFragmentChunks()
 	chunkSize := len(p) / chunks
-	msgID := uint8(g.msgID.Add(1))
+	msgID := uint8(g.msgID.Add(1)) //nolint:gosec // chunk counts and packet sizes are bounded by the MTU
 	for i := range chunks {
 		start := i * chunkSize
 		end := len(p)
@@ -168,7 +168,7 @@ func (g *geckoConn) writeFragmented(p []byte, addr net.Addr) (int, error) {
 			padLen:      padLen,
 			msgID:       msgID,
 			chunkIdx:    uint8(i),
-			totalChunks: uint8(chunks),
+			totalChunks: uint8(chunks), //nolint:gosec // chunk counts and packet sizes are bounded by the MTU
 		}, chunk, buf)
 		if err != nil {
 			return 0, err
@@ -186,7 +186,7 @@ func (g *geckoConn) randomPadLen(chunkLen int) uint16 {
 	if lo > g.maxPkt {
 		return 0
 	}
-	return uint16(lo - base + randIntn(g.maxPkt-lo+1))
+	return uint16(lo - base + randIntn(g.maxPkt-lo+1)) //nolint:gosec // chunk counts and packet sizes are bounded by the MTU
 }
 
 func randomFragmentChunks() int {
@@ -199,7 +199,7 @@ func randIntn(n int) int {
 	}
 	var b [4]byte
 	_, _ = rand.Read(b[:])
-	return int(binary.BigEndian.Uint32(b[:]) % uint32(n))
+	return int(binary.BigEndian.Uint32(b[:]) % uint32(n)) //nolint:gosec // chunk counts and packet sizes are bounded by the MTU
 }
 
 func (g *geckoConn) ReadFrom(p []byte) (int, net.Addr, error) {

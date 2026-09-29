@@ -191,7 +191,7 @@ func (s *statsServer) GetSysStats(ctx context.Context, request *SysStatsRequest)
 
 	response := &SysStatsResponse{
 		Uptime:       uint32(uptime.Seconds()),
-		NumGoroutine: uint32(runtime.NumGoroutine()),
+		NumGoroutine: uint32(runtime.NumGoroutine()), //nolint:gosec // goroutine counts fit comfortably in uint32
 		Alloc:        rtm.Alloc,
 		TotalAlloc:   rtm.TotalAlloc,
 		Sys:          rtm.Sys,
@@ -222,12 +222,14 @@ func (s *service) Register(server *grpc.Server) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg *Config) (any, error) {
 		s := new(service)
 
-		core.RequireFeatures(ctx, func(sm feature_stats.Manager) {
+		if err := core.RequireFeatures(ctx, func(sm feature_stats.Manager) {
 			s.statsManager = sm
-		})
+		}); err != nil {
+			return nil, err
+		}
 
 		return s, nil
 	}))

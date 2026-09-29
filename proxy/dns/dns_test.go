@@ -36,6 +36,7 @@ func (*staticHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	if opt != nil {
 		for _, o := range opt.Option {
 			if o.Option() == dns.EDNS0SUBNET {
+				//nolint:forcetypeassert // the test builds the EDNS0 option itself
 				subnet := o.(*dns.EDNS0_SUBNET)
 				clientIP = subnet.Address
 			}
@@ -71,7 +72,7 @@ func (*staticHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			ans.MsgHdr.Rcode = dns.RcodeNameError
 		}
 	}
-	w.WriteMsg(ans)
+	_ = w.WriteMsg(ans)
 }
 
 func TestUDPDNSTunnel(t *testing.T) {
@@ -83,9 +84,9 @@ func TestUDPDNSTunnel(t *testing.T) {
 		Handler: &staticHandler{},
 		UDPSize: 1200,
 	}
-	defer dnsServer.Shutdown()
+	defer func() { _ = dnsServer.Shutdown() }()
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	serverPort := udp.PickPort()
@@ -202,9 +203,9 @@ func TestTCPDNSTunnel(t *testing.T) {
 		Net:     "udp",
 		Handler: &staticHandler{},
 	}
-	defer dnsServer.Shutdown()
+	defer func() { _ = dnsServer.Shutdown() }()
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	serverPort := tcp.PickPort()
@@ -288,9 +289,9 @@ func TestUDP2TCPDNSTunnel(t *testing.T) {
 		Net:     "tcp",
 		Handler: &staticHandler{},
 	}
-	defer dnsServer.Shutdown()
+	defer func() { _ = dnsServer.Shutdown() }()
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	serverPort := tcp.PickPort()
@@ -378,9 +379,9 @@ func TestDNSRules(t *testing.T) {
 		Net:     "udp",
 		Handler: &staticHandler{},
 	}
-	defer dnsServer.Shutdown()
+	defer func() { _ = dnsServer.Shutdown() }()
 
-	go dnsServer.ListenAndServe()
+	go func() { _ = dnsServer.ListenAndServe() }()
 	time.Sleep(time.Second)
 
 	serverPort := udp.PickPort()

@@ -66,6 +66,7 @@ func (w *tcpWorker) callback(conn stat.Connection) {
 	outbounds := []*session.Outbound{{}}
 	if w.recvOrigDest {
 		var dest net.Destination
+		//nolint:exhaustive // SocketConfig_Off means the inbound does not recover the original destination
 		switch getTProxyType(w.stream) {
 		case internet.SocketConfig_Redirect:
 			d, err := tcp.GetOriginalDestination(conn)
@@ -324,7 +325,7 @@ func (w *udpWorker) callback(b *buf.Buffer, source net.Destination, originalDest
 	conn, existing := w.getConnection(id)
 
 	// payload will be discarded in pipe is full.
-	conn.writer.WriteMultiBuffer(buf.MultiBuffer{b})
+	_ = conn.writer.WriteMultiBuffer(buf.MultiBuffer{b})
 
 	if !existing {
 		common.Must(w.checker.Start())
@@ -418,6 +419,7 @@ func (w *udpWorker) Start() error {
 		return err
 	}
 
+	//nolint:forcetypeassert // session.ConeKey is only ever set to a bool
 	w.cone = w.ctx.Value(session.ConeKey).(bool)
 
 	w.checker = &task.Periodic{

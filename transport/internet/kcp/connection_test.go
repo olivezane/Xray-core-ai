@@ -24,7 +24,7 @@ func TestConnectionReadTimeout(t *testing.T) {
 		CwndMultiplier:   20,
 		MaxSendingWindow: 2 * 1024 * 1024,
 	})
-	conn.SetReadDeadline(time.Now().Add(time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 
 	b := make([]byte, 1024)
 	nBytes, err := conn.Read(b)

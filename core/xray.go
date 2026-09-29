@@ -70,6 +70,7 @@ func (r *resolution) callbackResolution(allFeatures []features.Feature) error {
 		if r.Type() == errInterface {
 			v := r.Interface()
 			if v != nil {
+				//nolint:forcetypeassert // core.New only returns error values
 				err = v.(error)
 			}
 			break
@@ -97,6 +98,7 @@ func (server *Instance) IsRunning() bool {
 }
 
 func AddInboundHandler(server *Instance, config *InboundHandlerConfig) error {
+	//nolint:forcetypeassert // feature registered under inbound.ManagerType()
 	inboundManager := server.GetFeature(inbound.ManagerType()).(inbound.Manager)
 	rawHandler, err := CreateObject(server, config)
 	if err != nil {
@@ -123,6 +125,7 @@ func addInboundHandlers(server *Instance, configs []*InboundHandlerConfig) error
 }
 
 func AddOutboundHandler(server *Instance, config *OutboundHandlerConfig) error {
+	//nolint:forcetypeassert // feature registered under outbound.ManagerType()
 	outboundManager := server.GetFeature(outbound.ManagerType()).(outbound.Manager)
 	rawHandler, err := CreateObject(server, config)
 	if err != nil {
@@ -229,6 +232,7 @@ func initInstanceWithConfig(config *Config, server *Instance) (bool, error) {
 	}
 
 	internet.InitSystemDialer(
+		//nolint:forcetypeassert // feature registered under dns.ClientType()
 		server.GetFeature(dns.ClientType()).(dns.Client),
 		func() outbound.Manager {
 			obm, _ := server.GetFeature(outbound.ManagerType()).(outbound.Manager)

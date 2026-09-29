@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
+	"github.com/xtls/xray-core/common/errors"
 	"io"
 	"math/big"
 	"net"
@@ -43,10 +44,10 @@ var (
 
 func newClientConn(c net.Conn, profiles []loginProfile, password string, rsaPublicKey []byte, hostname string) (*clientConn, error) {
 	if len(rsaPublicKey) == 0 {
-		return nil, fmt.Errorf("empty rsa public key")
+		return nil, errors.New("empty rsa public key")
 	}
 	if len(profiles) == 0 {
-		return nil, fmt.Errorf("empty profiles")
+		return nil, errors.New("empty profiles")
 	}
 	paddingSchedule, err := newClientPaddingSchedule2612()
 	if err != nil {
@@ -91,7 +92,7 @@ func (c *clientConn) handshake() error {
 	if err == nil {
 		port, err := strconv.Atoi(portString)
 		if err == nil {
-			serverPort = UnsignedShort(port)
+			serverPort = UnsignedShort(port) //nolint:gosec // values are bounded by the XMC protocol field widths
 		}
 
 		if serverAddress == "" {
@@ -124,7 +125,7 @@ func (c *clientConn) handshake() error {
 	}
 
 	if pkt.packetID != 0x01 {
-		return fmt.Errorf("bad encrypt request packet id")
+		return errors.New("bad encrypt request packet id")
 	}
 
 	var (
@@ -139,7 +140,7 @@ func (c *clientConn) handshake() error {
 	}
 
 	if !bytes.Equal(publicKey, c.rsaPublicKey) {
-		return fmt.Errorf("server public key mismatch")
+		return errors.New("server public key mismatch")
 	}
 
 	k, err := x509.ParsePKIXPublicKey(publicKey)
@@ -149,7 +150,7 @@ func (c *clientConn) handshake() error {
 
 	rsaPublicKey, ok := k.(*rsa.PublicKey)
 	if !ok {
-		return fmt.Errorf("parse server public key: not rsa")
+		return errors.New("parse server public key: not rsa")
 	}
 
 	sharedSecret := make([]byte, 16)
@@ -198,7 +199,7 @@ func (c *clientConn) handshake() error {
 	if pkt.packetID == 0x00 {
 		var reason String
 		if readErr := pkt.readFields(&reason); readErr != nil {
-			return fmt.Errorf("authentication rejected")
+			return errors.New("authentication rejected")
 		}
 		return fmt.Errorf("authentication rejected: %s", reason)
 	}
@@ -211,7 +212,7 @@ func (c *clientConn) handshake() error {
 		return fmt.Errorf("read login finished fields: %w", err)
 	}
 	if receivedProfile != selectedProfile {
-		return fmt.Errorf("login profile mismatch")
+		return errors.New("login profile mismatch")
 	}
 	loginAcknowledgedLength, err := writePacketWithLength(c.writer, 0x03)
 	if err != nil {

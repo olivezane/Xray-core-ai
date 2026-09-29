@@ -46,11 +46,15 @@ func (g *MphValueMatcher) Add(matcher Matcher, value uint32) {
 func (g *MphValueMatcher) Build() error {
 	if g.mph != nil {
 		runtime.GC() // peak mem
-		g.mph.Build()
+		if err := g.mph.Build(); err != nil {
+			return err
+		}
 	}
 	runtime.GC() // peak mem
 	if g.ac != nil {
-		g.ac.Build()
+		if err := g.ac.Build(); err != nil {
+			return err
+		}
 		runtime.GC() // peak mem
 	}
 	return nil

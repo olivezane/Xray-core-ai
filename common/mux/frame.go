@@ -75,6 +75,7 @@ func (f FrameMetadata) WriteTo(b *buf.Buffer) error {
 	common.Must(b.WriteByte(byte(f.Option)))
 
 	if f.SessionStatus == SessionStatusNew {
+		//nolint:exhaustive // the mux protocol only encodes TCP and UDP targets
 		switch f.Target.Network {
 		case net.Network_TCP:
 			common.Must(b.WriteByte(byte(TargetNetworkTCP)))
@@ -98,15 +99,19 @@ func (f FrameMetadata) WriteTo(b *buf.Buffer) error {
 				}
 			}
 		} else if b.UDP != nil { // make sure it's user's proxy request
-			b.Write(f.GlobalID[:]) // no need to check whether it's empty
+			_, _ = b.Write(f.GlobalID[:]) // no need to check whether it's empty
 		}
 	} else if b.UDP != nil {
-		b.WriteByte(byte(TargetNetworkUDP))
-		addrParser.WriteAddressPort(b, b.UDP.Address, b.UDP.Port)
+		if err := b.WriteByte(byte(TargetNetworkUDP)); err != nil {
+			return err
+		}
+		if err := addrParser.WriteAddressPort(b, b.UDP.Address, b.UDP.Port); err != nil {
+			return err
+		}
 	}
 
 	len1 := b.Len()
-	binary.BigEndian.PutUint16(lenBytes, uint16(len1-len0))
+	binary.BigEndian.PutUint16(lenBytes, uint16(len1-len0)) //nolint:gosec // mux frames and session counts are bounded well below the field width
 	return nil
 }
 

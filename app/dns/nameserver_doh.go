@@ -100,6 +100,7 @@ func NewDoHNameServer(url *url.URL, dispatcher routing.Dispatcher, h2c bool, dis
 				}
 				if !h2c {
 					conn = utls.UClient(conn, &utls.Config{ServerName: url.Hostname()}, utls.HelloChrome_Auto)
+					//nolint:forcetypeassert // the TLS layer above this conn is utls
 					if err := conn.(*utls.UConn).HandshakeContext(ctx); err != nil {
 						return nil, err
 					}
@@ -225,7 +226,7 @@ func (s *DoHNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- er
 
 func (s *DoHNameServer) dohHTTPSContext(ctx context.Context, b []byte) ([]byte, error) {
 	body := bytes.NewBuffer(b)
-	req, err := http.NewRequest("POST", s.dohURL, body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.dohURL, body)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +245,7 @@ func (s *DoHNameServer) dohHTTPSContext(ctx context.Context, b []byte) ([]byte, 
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body) // flush resp.Body so that the conn is reusable
+		_, _ = io.Copy(io.Discard, resp.Body) // flush resp.Body so that the conn is reusable
 		return nil, fmt.Errorf("DOH server returned code %d", resp.StatusCode)
 	}
 

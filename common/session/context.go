@@ -123,6 +123,7 @@ type TrackedRequestErrorFeedback interface {
 
 func SubmitOutboundErrorToOriginator(ctx context.Context, err error) {
 	if errorTracker := ctx.Value(trackedConnectionErrorKey); errorTracker != nil {
+		//nolint:forcetypeassert // the error tracker was installed by the dispatcher itself
 		errorTracker := errorTracker.(TrackedRequestErrorFeedback)
 		errorTracker.SubmitError(err)
 	}

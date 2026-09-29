@@ -29,9 +29,9 @@ Example:
 
 func executeGetAllOnlineUsers(cmd *base.Command, args []string) {
 	setSharedFlags(cmd)
-	cmd.Flag.Parse(args)
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	_ = cmd.Flag.Parse(args)
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := statsService.NewStatsServiceClient(conn)
 	r := &statsService.GetAllOnlineUsersRequest{}

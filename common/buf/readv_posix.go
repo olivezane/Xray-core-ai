@@ -30,7 +30,7 @@ func (r *posixReader) Read(fd uintptr) int32 {
 	if e != 0 {
 		return -1
 	}
-	return int32(n)
+	return int32(n) //nolint:gosec // read length is bounded by the buffer size
 }
 
 func (r *posixReader) Clear() {

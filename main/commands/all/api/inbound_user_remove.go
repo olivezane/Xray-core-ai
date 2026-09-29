@@ -32,14 +32,14 @@ func executeRemoveUsers(cmd *base.Command, args []string) {
 	setSharedFlags(cmd)
 	var tag string
 	cmd.Flag.StringVar(&tag, "tag", "", "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 	emails := cmd.Flag.Args()
 	if len(tag) < 1 {
 		base.Fatalf("inbound tag not specified")
 	}
 
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 	client := handlerService.NewHandlerServiceClient(conn)
 
 	success := 0

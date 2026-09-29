@@ -1,12 +1,11 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"go/build"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -96,23 +95,8 @@ Download %s v%s or later from https://github.com/protocolbuffers/protobuf/releas
 	return path, nil
 }
 
-func getProjectProtocVersion(url string) (string, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", errors.New("can not get the version of protobuf used in xray project")
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", errors.New("can not read from body")
-	}
-	versionRegexp := regexp.MustCompile(`\/\/\s*protoc\s*v\d+\.(\d+\.\d+)`)
-	matched := versionRegexp.FindStringSubmatch(string(body))
-	return matched[1], nil
-}
-
 func getInstalledProtocVersion(protocPath string) (string, error) {
-	cmd := exec.Command(protocPath, "--version")
+	cmd := exec.CommandContext(context.Background(), protocPath, "--version")
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	output, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
@@ -146,7 +130,7 @@ func needToUpdate(targetedVersion, installedVersion string) bool {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage of vprotogen:\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage of vprotogen:\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -165,20 +149,14 @@ func main() {
 	binPath := os.Getenv("PATH")
 	pathSlice := []string{pwd, GOBIN, binPath}
 	binPath = strings.Join(pathSlice, string(os.PathListSeparator))
-	os.Setenv("PATH", binPath)
+	_ = os.Setenv("PATH", binPath)
 
 	suffix := ""
 	if runtime.GOOS == "windows" {
 		suffix = ".exe"
 	}
 
-	/*
-		targetedVersion, err := getProjectProtocVersion("https://raw.githubusercontent.com/XTLS/Xray-core/HEAD/core/config.pb.go")
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-	*/
+	// targetedVersion is intentionally empty: pinning to the version in HEAD is disabled.
 	targetedVersion := ""
 
 	protoc, err := whichProtoc(suffix, targetedVersion)
@@ -241,7 +219,7 @@ Download it from https://github.com/protocolbuffers/protobuf/releases
 				"--plugin", "protoc-gen-go-grpc=" + filepath.Join(GOBIN, "protoc-gen-go-grpc"+suffix),
 			}
 			args = append(args, relProtoFile)
-			cmd := exec.Command(protoc, args...)
+			cmd := exec.CommandContext(context.Background(), protoc, args...) //nolint:gosec // protoc is resolved from GOBIN or PATH; args are this repo's own .proto files
 			cmd.Env = append(cmd.Env, os.Environ()...)
 			cmd.Dir = pwd
 			output, cmdErr := cmd.CombinedOutput()

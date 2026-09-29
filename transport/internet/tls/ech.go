@@ -162,7 +162,7 @@ func QueryRecord(domain string, server string, sockopt *internet.SocketConfig) (
 		if echConfigCache.UpdateLock.TryLock() {
 			go func() {
 				defer echConfigCache.UpdateLock.Unlock()
-				echConfigCache.Update(domain, server, true, sockopt)
+				_, _ = echConfigCache.Update(domain, server, true, sockopt)
 			}()
 		}
 		return configRecord.config, nil
@@ -215,6 +215,7 @@ func dnsQuery(server string, domain string, sockopt *internet.SocketConfig) ([]b
 							return nil, err
 						}
 						conn = utls.UClient(conn, &utls.Config{ServerName: u.Hostname()}, utls.HelloChrome_Auto)
+						//nolint:forcetypeassert // the TLS layer above this conn is utls
 						if err := conn.(*utls.UConn).HandshakeContext(ctx); err != nil {
 							return nil, err
 						}
@@ -228,7 +229,7 @@ func dnsQuery(server string, domain string, sockopt *internet.SocketConfig) ([]b
 			}
 			client, _ = clientForECHDOH.LoadOrStore(serverKey, c)
 		}
-		req, err := http.NewRequest("POST", server, bytes.NewReader(msg))
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server, bytes.NewReader(msg))
 		if err != nil {
 			return nil, 0, err
 		}
@@ -283,9 +284,9 @@ func dnsQuery(server string, domain string, sockopt *internet.SocketConfig) ([]b
 		if err != nil {
 			return nil, 0, err
 		}
-		conn.Write(msg)
+		_, _ = conn.Write(msg)
 		udpResponse := make([]byte, 512)
-		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		_, err = conn.Read(udpResponse)
 		if err != nil {
 			return nil, 0, err
@@ -329,7 +330,7 @@ func ConvertToGoECHKeys(data []byte) ([]tls.EncryptedClientHelloKey, error) {
 		if len(s) < 2+keyLength+2+configLength {
 			return keys, ErrInvalidLen
 		}
-		child := cryptobyte.String(s[:2+keyLength+2+configLength])
+		child := s[:2+keyLength+2+configLength]
 		var sk, config cryptobyte.String
 		if !child.ReadUint16LengthPrefixed(&sk) || !child.ReadUint16LengthPrefixed(&config) || !child.Empty() {
 			return keys, ErrInvalidLen

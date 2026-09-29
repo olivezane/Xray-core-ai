@@ -2,6 +2,7 @@ package custom
 
 import (
 	"bytes"
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -47,13 +48,13 @@ func TestStateUDPResponseReusesPriorCapturedValues(t *testing.T) {
 		},
 	}
 
-	clientRaw, err := net.ListenPacket("udp", "127.0.0.1:0")
+	clientRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer clientRaw.Close()
 
-	serverRaw, err := net.ListenPacket("udp", "127.0.0.1:0")
+	serverRaw, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}

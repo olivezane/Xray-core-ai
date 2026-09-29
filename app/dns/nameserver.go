@@ -137,7 +137,7 @@ func NewClient(
 
 		timeout := 4000 * time.Millisecond
 		if ns.TimeoutMs > 0 {
-			timeout = time.Duration(ns.TimeoutMs) * time.Millisecond
+			timeout = time.Duration(ns.TimeoutMs) * time.Millisecond //nolint:gosec // a millisecond config value cannot overflow a Duration
 		}
 
 		checkSystem := ns.QueryStrategy == QueryStrategy_USE_SYS

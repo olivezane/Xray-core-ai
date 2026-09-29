@@ -19,9 +19,7 @@ func Test_parseResponse(t *testing.T) {
 
 	ans := new(dns.Msg)
 	ans.Id = 0
-	p = append(p, common.Must2(ans.Pack()))
-
-	p = append(p, []byte{})
+	p = append(p, common.Must2(ans.Pack()), []byte{})
 
 	ans = new(dns.Msg)
 	ans.Id = 1
@@ -102,7 +100,7 @@ func Test_parseResponse(t *testing.T) {
 
 func Test_buildReqMsgs(t *testing.T) {
 	stubID := func() uint16 {
-		return uint16(rand.Uint32())
+		return uint16(rand.Uint32()) //nolint:gosec // G115: the value is bounded by the fixture built above
 	}
 	type args struct {
 		domain  string

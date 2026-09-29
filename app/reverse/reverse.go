@@ -24,10 +24,10 @@ func isInternalDomain(dest net.Destination) bool {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
 		r := new(Reverse)
 		if err := core.RequireFeatures(ctx, func(d routing.Dispatcher, om outbound.Manager) error {
-			return r.Init(config.(*Config), d, om)
+			return r.Init(config, d, om)
 		}); err != nil {
 			return nil, err
 		}

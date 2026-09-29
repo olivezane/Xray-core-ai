@@ -10,6 +10,7 @@ import (
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	. "github.com/xtls/xray-core/common/crypto"
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/protocol"
 )
 
@@ -67,7 +68,7 @@ func TestAuthenticationReaderWriter(t *testing.T) {
 	}
 
 	_, err := reader.ReadMultiBuffer()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Error("error: ", err)
 	}
 }
@@ -90,11 +91,11 @@ func TestAuthenticationReaderWriterPacket(t *testing.T) {
 
 	var payload buf.MultiBuffer
 	pb1 := buf.New()
-	pb1.Write([]byte("abcd"))
+	_, _ = pb1.WriteString("abcd")
 	payload = append(payload, pb1)
 
 	pb2 := buf.New()
-	pb2.Write([]byte("efgh"))
+	_, _ = pb2.WriteString("efgh")
 	payload = append(payload, pb2)
 
 	common.Must(writer.WriteMultiBuffer(payload))
@@ -128,7 +129,7 @@ func TestAuthenticationReaderWriterPacket(t *testing.T) {
 	}
 
 	_, err = reader.ReadMultiBuffer()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Error("error: ", err)
 	}
 }

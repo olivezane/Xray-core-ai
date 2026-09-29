@@ -17,7 +17,7 @@ func NewServerSpec(dest net.Destination, user *MemoryUser) *ServerSpec {
 }
 
 func NewServerSpecFromPB(spec *ServerEndpoint) (*ServerSpec, error) {
-	dest := net.TCPDestination(spec.Address.AsAddress(), net.Port(spec.Port))
+	dest := net.TCPDestination(spec.Address.AsAddress(), net.Port(spec.Port)) //nolint:gosec // the port comes from the config layer, which rejects values above 65535
 	var dUser *MemoryUser
 	if spec.User != nil {
 		user, err := spec.User.ToMemoryUser()

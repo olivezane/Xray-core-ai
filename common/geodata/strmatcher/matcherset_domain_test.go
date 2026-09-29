@@ -76,7 +76,7 @@ func TestDomainMatcherSet(t *testing.T) {
 	}
 	s := NewDomainMatcherSet()
 	for _, pattern := range patterns {
-		AddMatcherToSet(s, DomainMatcher(pattern.Pattern))
+		_ = AddMatcherToSet(s, DomainMatcher(pattern.Pattern))
 	}
 	for _, testCase := range testCases {
 		r := s.MatchAny(testCase.Domain)

@@ -33,6 +33,7 @@ type Listener struct {
 }
 
 func NewListener(ctx context.Context, address net.Address, port net.Port, streamSettings *internet.MemoryStreamConfig, addConn internet.ConnHandler) (*Listener, error) {
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	kcpSettings := streamSettings.ProtocolSettings.(*Config)
 
 	l := &Listener{

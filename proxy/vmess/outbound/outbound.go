@@ -46,9 +46,14 @@ func New(ctx context.Context, config *Config) (*Handler, error) {
 	}
 
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
+	//nolint:forcetypeassert // session.ConeKey is only ever set to a bool
 	handler := &Handler{
 		server:        server,
-		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager: pm,
 		cone:          ctx.Value(session.ConeKey).(bool),
 	}
 
@@ -103,6 +108,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 		Option:  protocol.RequestOptionChunkStream,
 	}
 
+	//nolint:forcetypeassert // the account is created by proxy/vmess's own NewAccount
 	account := request.User.Account.(*vmess.MemoryAccount)
 	request.Security = account.Security
 
@@ -132,7 +138,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 		newCtx, newCancel = context.WithCancel(context.Background())
 	}
 
-	session := encoding.NewClientSession(ctx, int64(behaviorSeed))
+	session := encoding.NewClientSession(ctx, int64(behaviorSeed)) //nolint:gosec // the seed only perturbs the drainer, a wrap-around is harmless
 	sessionPolicy := h.policyManager.ForLevel(request.User.Level)
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -165,7 +171,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 		if request.Command == protocol.RequestCommandMux && request.Port == 666 {
 			bodyWriter = xudp.NewPacketWriter(bodyWriter, target, xudp.GetGlobalID(ctx))
 		}
-		if err := buf.CopyOnceTimeout(input, bodyWriter, time.Millisecond*100); err != nil && err != buf.ErrNotTimeoutReader && err != buf.ErrReadTimeout {
+		if err := buf.CopyOnceTimeout(input, bodyWriter, time.Millisecond*100); err != nil && !errors.Is(err, buf.ErrNotTimeoutReader) && !errors.Is(err, buf.ErrReadTimeout) {
 			return errors.New("failed to write first payload").Base(err)
 		}
 
@@ -233,8 +239,8 @@ func reloadEnvSettings() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return New(ctx, config)
 	}))
 
 	platform.RegisterEnvReload(reloadEnvSettings)

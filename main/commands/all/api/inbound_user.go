@@ -40,10 +40,10 @@ func executeInboundUser(cmd *base.Command, args []string) {
 	var email string
 	cmd.Flag.StringVar(&tag, "tag", "", "")
 	cmd.Flag.StringVar(&email, "email", "", "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := handlerService.NewHandlerServiceClient(conn)
 	r := &handlerService.GetInboundUserRequest{

@@ -83,7 +83,7 @@ func CopyFile(dst string, src string) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}

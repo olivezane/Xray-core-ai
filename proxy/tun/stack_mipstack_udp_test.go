@@ -217,6 +217,7 @@ func TestMipstackReusesAndReleasesUDPResponders(t *testing.T) {
 	defer peer.Close()
 	defer device.close()
 	defer stack.Close()
+	//nolint:forcetypeassert // the tun stack is constructed by this package as *stackMipstack
 	underTest := stack.(*stackMipstack)
 
 	client, err := peer.stack.ListenUDP(ctx, "udp", netip.AddrPortFrom(netip.MustParseAddr("10.0.0.2"), 0))
@@ -272,6 +273,7 @@ func TestMipstackReleasesIdleUDPResponders(t *testing.T) {
 	defer peer.Close()
 	defer device.close()
 	defer stack.Close()
+	//nolint:forcetypeassert // the tun stack is constructed by this package as *stackMipstack
 	underTest := stack.(*stackMipstack)
 
 	client, err := peer.stack.ListenUDP(ctx, "udp", netip.AddrPortFrom(netip.MustParseAddr("10.0.0.2"), 0))
@@ -307,7 +309,7 @@ func TestMipstackReleasesIdleUDPResponders(t *testing.T) {
 	// a reply that arrives after the release leaves no mapping, so it is
 	// dropped while the session lives on: the next datagram the client sends
 	// opens the flow again and its reply is delivered
-	writeDatagram(t, writer, "late", xnet.UDPDestination(xnet.ParseAddress(server.IP.String()), xnet.Port(server.Port)))
+	writeDatagram(t, writer, "late", xnet.UDPDestination(xnet.ParseAddress(server.IP.String()), xnet.Port(server.Port))) //nolint:gosec // G115: the port comes from a bound socket address, so it is 0..65535
 
 	if _, err := client.WriteTo([]byte("ping again"), server); err != nil {
 		t.Fatalf("send the next datagram: %v", err)
@@ -315,7 +317,7 @@ func TestMipstackReleasesIdleUDPResponders(t *testing.T) {
 	readDatagrams(t, reader, 1)
 	waitForResponderCount(t, underTest, 1)
 
-	writeDatagram(t, writer, "answered", xnet.UDPDestination(xnet.ParseAddress(server.IP.String()), xnet.Port(server.Port)))
+	writeDatagram(t, writer, "answered", xnet.UDPDestination(xnet.ParseAddress(server.IP.String()), xnet.Port(server.Port))) //nolint:gosec // G115: the port comes from a bound socket address, so it is 0..65535
 	if sources := peerReplies(t, client, 1); sources["answered"] != server.String() {
 		t.Fatalf("the reply to the reopened flow came from %s, want %s", sources["answered"], server.String())
 	}

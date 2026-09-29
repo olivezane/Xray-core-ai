@@ -26,7 +26,7 @@ func (*simple) Overhead() int {
 
 func (a *simple) Seal(dst, nonce, plain, extra []byte) []byte {
 	dst = append(dst, 0, 0, 0, 0, 0, 0)
-	binary.BigEndian.PutUint16(dst[4:], uint16(len(plain)))
+	binary.BigEndian.PutUint16(dst[4:], uint16(len(plain))) //nolint:gosec // bounded by the buffer size / buf.Size
 	dst = append(dst, plain...)
 
 	fnvHash := fnv.New32a()
@@ -100,6 +100,6 @@ func (c *simpleConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 }
 
 func (c *simpleConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	_ = c.aead.Seal(p[:0], nil, p[c.aead.Overhead():], nil)
+	_ = c.aead.Seal(p[:0], nil, p[c.aead.Overhead():], nil) //nolint:gosec // G407: simple is a nonce-less obfuscation AEAD, not encryption
 	return len(p), nil
 }

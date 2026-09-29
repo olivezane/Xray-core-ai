@@ -57,6 +57,7 @@ func (h *requestHandler) upsertSession(sessionId string) *httpSession {
 	// fast path
 	currentSessionAny, ok := h.sessions.Load(sessionId)
 	if ok {
+		//nolint:forcetypeassert // the session cache only ever stores *httpSession
 		return currentSessionAny.(*httpSession)
 	}
 
@@ -66,6 +67,7 @@ func (h *requestHandler) upsertSession(sessionId string) *httpSession {
 
 	currentSessionAny, ok = h.sessions.Load(sessionId)
 	if ok {
+		//nolint:forcetypeassert // the session cache only ever stores *httpSession
 		return currentSessionAny.(*httpSession)
 	}
 
@@ -126,7 +128,7 @@ func (h *requestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 
 	h.config.ApplyXPaddingToResponse(writer, config)
 
-	if request.Method == "OPTIONS" {
+	if request.Method == http.MethodOptions {
 		writer.WriteHeader(http.StatusOK)
 		return
 	}
@@ -143,7 +145,7 @@ func (h *requestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 	paddingValue, paddingPlacement := h.config.ExtractXPaddingFromRequest(request, h.config.XPaddingObfsMode)
 
 	if !h.config.IsPaddingValid(paddingValue, validRange.From, validRange.To, PaddingMethod(h.config.XPaddingMethod)) {
-		errors.LogInfo(context.Background(), "invalid padding ("+paddingPlacement+") length:", int32(len(paddingValue)))
+		errors.LogInfo(context.Background(), "invalid padding ("+paddingPlacement+") length:", int32(len(paddingValue))) //nolint:gosec // HTTP header padding length, bounded by the header size limit
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -157,19 +159,18 @@ func (h *requestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		return
 	}
 
-	var remoteAddr net.Addr
-	var err error
-	remoteAddr, err = net.ResolveTCPAddr("tcp", request.RemoteAddr)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", request.RemoteAddr)
 	if err != nil {
-		remoteAddr = &net.TCPAddr{
+		tcpAddr = &net.TCPAddr{
 			IP:   []byte{0, 0, 0, 0},
 			Port: 0,
 		}
 	}
+	var remoteAddr net.Addr = tcpAddr
 	if request.ProtoMajor == 3 {
 		remoteAddr = &net.UDPAddr{
-			IP:   remoteAddr.(*net.TCPAddr).IP,
-			Port: remoteAddr.(*net.TCPAddr).Port,
+			IP:   tcpAddr.IP,
+			Port: tcpAddr.Port,
 		}
 	}
 	var trustedXFF []string
@@ -186,7 +187,7 @@ func (h *requestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 	var isUplinkRequest bool
 
 	switch request.Method {
-	case "GET":
+	case http.MethodGet:
 		isUplinkRequest = seqStr != ""
 	default:
 		isUplinkRequest = true
@@ -346,7 +347,7 @@ func (h *requestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		}
 
 		writer.WriteHeader(http.StatusOK)
-	} else if request.Method == "GET" || sessionId == "" { // stream-down, stream-one
+	} else if request.Method == http.MethodGet || sessionId == "" { // stream-down, stream-one
 		if sessionId != "" {
 			// after GET is done, the connection is finished. disable automatic
 			// session reaping, and handle it in defer
@@ -367,6 +368,7 @@ func (h *requestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		}
 
 		writer.WriteHeader(http.StatusOK)
+		//nolint:forcetypeassert // the caller already checked for http.Flusher
 		writer.(http.Flusher).Flush()
 
 		httpSC := &httpServerConn{
@@ -418,6 +420,7 @@ func (c *httpServerConn) Write(b []byte) (int, error) {
 	}
 	n, err := c.ResponseWriter.Write(b)
 	if err == nil {
+		//nolint:forcetypeassert // the caller already checked for http.Flusher
 		c.ResponseWriter.(http.Flusher).Flush()
 	}
 	return n, err
@@ -444,6 +447,7 @@ func ListenXH(ctx context.Context, address net.Address, port net.Port, streamSet
 	l := &Listener{
 		addConn: addConn,
 	}
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	l.config = streamSettings.ProtocolSettings.(*Config)
 	if l.config != nil {
 		if streamSettings.SocketSettings == nil {

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/transport/internet"
 )
 
@@ -26,7 +27,7 @@ func liveDriveConfig(t *testing.T) *Config {
 		t.Skipf("set %s to run this test", liveSecretsEnv)
 	}
 
-	payload, err := os.ReadFile(path)
+	payload, err := os.ReadFile(path) //nolint:gosec // path is this test's own fixture, resolved under the repo
 	if err != nil {
 		t.Fatalf("reading %s: %v", path, err)
 	}
@@ -51,10 +52,10 @@ func liveDriveConfig(t *testing.T) *Config {
 		SessionTtlSeconds: 120,
 	}
 	if raw := os.Getenv("XRAY_XDRIVE_LIVE_SEGMENT"); raw != "" {
-		config.SegmentBytes = uint32(envInt(t, "XRAY_XDRIVE_LIVE_SEGMENT"))
+		config.SegmentBytes = uint32(envInt(t, "XRAY_XDRIVE_LIVE_SEGMENT")) //nolint:gosec // G115: bounded by the configuration the test set up
 	}
 	if raw := os.Getenv("XRAY_XDRIVE_LIVE_CONCURRENCY"); raw != "" {
-		config.Concurrency = uint32(envInt(t, "XRAY_XDRIVE_LIVE_CONCURRENCY"))
+		config.Concurrency = uint32(envInt(t, "XRAY_XDRIVE_LIVE_CONCURRENCY")) //nolint:gosec // G115: bounded by the configuration the test set up
 	}
 
 	storage, err := newDriveStorage(nil, config)
@@ -92,7 +93,7 @@ func TestLiveDriveStorage(t *testing.T) {
 	ctx := context.Background()
 	name := "streams/livetest/c2s/000000000.seg"
 	payload := []byte("xdrive over a real remote storage service")
-	defer storage.Delete(ctx, "streams/livetest")
+	defer func() { _ = storage.Delete(ctx, "streams/livetest") }()
 
 	start := time.Now()
 	if err := storage.Put(ctx, name, payload); err != nil {
@@ -120,7 +121,7 @@ func TestLiveDriveStorage(t *testing.T) {
 		t.Fatalf("Get returned %q, want %q", got, payload)
 	}
 
-	if _, err := storage.Get(ctx, "streams/livetest/c2s/000000009.seg"); err != errNotFound {
+	if _, err := storage.Get(ctx, "streams/livetest/c2s/000000009.seg"); !errors.Is(err, errNotFound) {
 		t.Fatalf("Get returned %v, want errNotFound", err)
 	}
 
@@ -175,7 +176,7 @@ func TestLiveDriveTransport(t *testing.T) {
 
 	start = time.Now()
 	go func() {
-		client.Write(payload)
+		_, _ = client.Write(payload)
 	}()
 	if err := server.SetReadDeadline(time.Now().Add(5 * time.Minute)); err != nil {
 		t.Fatalf("SetReadDeadline: %v", err)
@@ -201,7 +202,7 @@ func TestLiveDriveParallelPut(t *testing.T) {
 	defer storage.Close()
 
 	ctx := context.Background()
-	defer storage.Delete(ctx, "streams/benchtest")
+	defer func() { _ = storage.Delete(ctx, "streams/benchtest") }()
 
 	chunk := make([]byte, 256*1024)
 	if _, err := rand.Read(chunk); err != nil {
@@ -255,7 +256,7 @@ func TestLiveDriveParallelPut(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			storage.Get(ctx, fmt.Sprintf("streams/benchtest/par%d", i))
+			_, _ = storage.Get(ctx, fmt.Sprintf("streams/benchtest/par%d", i))
 		}(i)
 	}
 	wg.Wait()
@@ -273,7 +274,7 @@ func TestLiveDriveSegmentSweep(t *testing.T) {
 	defer storage.Close()
 
 	ctx := context.Background()
-	defer storage.Delete(ctx, "streams/sweeptest")
+	defer func() { _ = storage.Delete(ctx, "streams/sweeptest") }()
 
 	const total = 1024 * 1024
 	for _, size := range []int{64 * 1024, 128 * 1024, 256 * 1024, 512 * 1024} {
@@ -289,7 +290,7 @@ func TestLiveDriveSegmentSweep(t *testing.T) {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				storage.Put(ctx, fmt.Sprintf("streams/sweeptest/s%d-%d", size, i), chunk)
+				_ = storage.Put(ctx, fmt.Sprintf("streams/sweeptest/s%d-%d", size, i), chunk)
 			}(i)
 		}
 		wg.Wait()
@@ -310,7 +311,7 @@ func TestLiveDriveListLag(t *testing.T) {
 	defer storage.Close()
 
 	ctx := context.Background()
-	defer storage.Delete(ctx, "streams/lagtest")
+	defer func() { _ = storage.Delete(ctx, "streams/lagtest") }()
 
 	const rounds = 6
 	var worst time.Duration

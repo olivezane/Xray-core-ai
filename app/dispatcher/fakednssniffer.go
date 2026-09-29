@@ -18,6 +18,7 @@ func newFakeDNSSniffer(ctx context.Context) (protocolSnifferWithMetadata, error)
 	{
 		fakeDNSEngineFeat := core.MustFromContext(ctx).GetFeature((*dns.FakeDNSEngine)(nil))
 		if fakeDNSEngineFeat != nil {
+			//nolint:forcetypeassert // feature registered under dns.FakeDNSEngineType()
 			fakeDNSEngine = fakeDNSEngineFeat.(dns.FakeDNSEngine)
 		}
 	}
@@ -38,6 +39,7 @@ func newFakeDNSSniffer(ctx context.Context) (protocolSnifferWithMetadata, error)
 		}
 
 		if ipAddressInRangeValueI := ctx.Value(ipAddressInRange); ipAddressInRangeValueI != nil {
+			//nolint:forcetypeassert // the sniffed value was built by this package as *ipAddressInRangeOpt
 			ipAddressInRangeValue := ipAddressInRangeValueI.(*ipAddressInRangeOpt)
 			if fkr0, ok := fakeDNSEngine.(dns.FakeDNSEngineRev0); ok {
 				inPool := fkr0.IsIPInIPPool(ob.Target.Address)

@@ -63,7 +63,7 @@ func (t *stackGVisor) writeRawICMPPacket(netProto tcpip.NetworkProtocolNumber, m
 	if netProto == header.IPv4ProtocolNumber {
 		ipHdr := header.IPv4(pkt.NetworkHeader().Push(header.IPv4MinimumSize))
 		ipHdr.Encode(&header.IPv4Fields{
-			TotalLength: uint16(header.IPv4MinimumSize + len(message)),
+			TotalLength: uint16(header.IPv4MinimumSize + len(message)), //nolint:gosec // TUN reads are bounded by the MTU
 			TTL:         64,
 			Protocol:    uint8(transportProtocol),
 			SrcAddr:     srcIP,
@@ -73,7 +73,7 @@ func (t *stackGVisor) writeRawICMPPacket(netProto tcpip.NetworkProtocolNumber, m
 	} else {
 		ipHdr := header.IPv6(pkt.NetworkHeader().Push(header.IPv6MinimumSize))
 		ipHdr.Encode(&header.IPv6Fields{
-			PayloadLength:     uint16(len(message)),
+			PayloadLength:     uint16(len(message)), //nolint:gosec // TUN reads are bounded by the MTU
 			TransportProtocol: transportProtocol,
 			HopLimit:          64,
 			SrcAddr:           srcIP,

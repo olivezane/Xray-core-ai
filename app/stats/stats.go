@@ -172,7 +172,8 @@ func (m *Manager) RegisterChannel(name string) (stats.Channel, error) {
 	c := NewChannel(&ChannelConfig{BufferSize: 64, Blocking: false})
 	m.channels[name] = c
 	if m.running {
-		return c, c.Start()
+		err := c.Start()
+		return c, err
 	}
 	return c, nil
 }
@@ -277,7 +278,7 @@ func (m *Manager) Close() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewManager(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return NewManager(ctx, config)
 	}))
 }

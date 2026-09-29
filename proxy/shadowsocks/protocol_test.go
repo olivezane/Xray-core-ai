@@ -47,7 +47,7 @@ func TestUDPEncodingDecoding(t *testing.T) {
 		common.Must(err)
 
 		validator := new(Validator)
-		validator.Add(request.User)
+		_ = validator.Add(request.User)
 		decodedRequest, decodedData, err := DecodeUDPPacket(validator, encodedData)
 		common.Must(err)
 
@@ -71,11 +71,13 @@ func TestUDPDecodingWithPayloadTooShort(t *testing.T) {
 
 	for _, account := range testAccounts {
 		data := buf.New()
-		data.WriteString("short payload")
+		_, _ = data.WriteString("short payload")
 		validator := new(Validator)
-		validator.Add(&protocol.MemoryUser{
+		if err := validator.Add(&protocol.MemoryUser{
 			Account: account,
-		})
+		}); err != nil {
+			t.Fatal(err)
+		}
 		_, _, err := DecodeUDPPacket(validator, data)
 		if err == nil {
 			t.Fatal("expected error")
@@ -151,7 +153,7 @@ func TestTCPRequest(t *testing.T) {
 		common.Must(writer.WriteMultiBuffer(buf.MultiBuffer{data}))
 
 		validator := new(Validator)
-		validator.Add(request.User)
+		_ = validator.Add(request.User)
 		decodedRequest, reader, err := ReadTCPSession(validator, cache)
 		common.Must(err)
 		if equalRequestHeader(decodedRequest, request) == false {

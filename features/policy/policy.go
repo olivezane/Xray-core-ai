@@ -107,7 +107,7 @@ func readDefaultBufferSize() int32 {
 			return 512 * 1024
 		}
 	default:
-		return int32(size) * 1024 * 1024
+		return int32(size) * 1024 * 1024 //nolint:gosec // policy buffer size is a small config value
 	}
 }
 
@@ -156,5 +156,6 @@ func BufferPolicyFromContext(ctx context.Context) Buffer {
 	if pPolicy == nil {
 		return defaultBufferPolicy()
 	}
+	//nolint:forcetypeassert // the policy only ever holds a Buffer
 	return pPolicy.(Buffer)
 }

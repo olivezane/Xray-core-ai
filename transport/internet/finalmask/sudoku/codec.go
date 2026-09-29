@@ -2,6 +2,7 @@ package sudoku
 
 import (
 	"fmt"
+	"github.com/xtls/xray-core/common/errors"
 	"math/rand/v2"
 )
 
@@ -101,7 +102,7 @@ func (c *codec) encode(in []byte) ([]byte, error) {
 	for _, b := range in {
 		t := c.currentTable()
 		if t == nil {
-			return nil, fmt.Errorf("sudoku table set missing")
+			return nil, errors.New("sudoku table set missing")
 		}
 		if c.shouldPad() {
 			out = append(out, c.randomPadding(t))
@@ -134,7 +135,7 @@ func (c *codec) encode(in []byte) ([]byte, error) {
 
 func decodeBytes(tables []*table, tableIndex *int, in []byte, hintBuf []byte, out []byte) ([]byte, []byte, error) {
 	if len(tables) == 0 {
-		return hintBuf, out, fmt.Errorf("sudoku table set missing")
+		return hintBuf, out, errors.New("sudoku table set missing")
 	}
 	for _, b := range in {
 		t := tables[*tableIndex%len(tables)]
@@ -151,7 +152,7 @@ func decodeBytes(tables []*table, tableIndex *int, in []byte, hintBuf []byte, ou
 		key := packKey(keyBytes)
 		decoded, ok := t.decode[key]
 		if !ok {
-			return hintBuf[:0], out, fmt.Errorf("invalid sudoku hint tuple")
+			return hintBuf[:0], out, errors.New("invalid sudoku hint tuple")
 		}
 
 		out = append(out, decoded)

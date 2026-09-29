@@ -101,7 +101,7 @@ func (s *TCPNameServer) IsDisableCache() bool {
 }
 
 func (s *TCPNameServer) newReqID() uint16 {
-	return uint16(s.reqID.Add(1))
+	return uint16(s.reqID.Add(1)) //nolint:gosec // DNS request IDs wrap around by design, a uint16 counter is required
 }
 
 // getCacheController implements CachedNameserver.
@@ -170,7 +170,7 @@ func (s *TCPNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- er
 			}
 			defer conn.Close()
 			dnsReqBuf := buf.New()
-			err = binary.Write(dnsReqBuf, binary.BigEndian, uint16(b.Len()))
+			err = binary.Write(dnsReqBuf, binary.BigEndian, uint16(b.Len())) //nolint:gosec // DNS message length is bounded by the 8K buffer
 			if err != nil {
 				errors.LogErrorInner(ctx, err, "binary write failed")
 				if noResponseErrCh != nil {

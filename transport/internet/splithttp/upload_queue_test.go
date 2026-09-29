@@ -9,10 +9,12 @@ import (
 
 func Test_regression_readzero(t *testing.T) {
 	q := NewUploadQueue(10)
-	q.Push(Packet{
+	if err := q.Push(Packet{
 		Payload: []byte("x"),
 		Seq:     0,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 	buf := make([]byte, 20)
 	n, err := q.Read(buf)
 	common.Must(err)

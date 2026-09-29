@@ -246,6 +246,7 @@ func (c *TCPConfig) Build() (proto.Message, error) {
 		if err != nil {
 			return nil, errors.New("invalid TCP header config").Base(err)
 		}
+		//nolint:forcetypeassert // infra/conf only registers Buildable configs under this key
 		ts, err := headerConfig.(Buildable).Build()
 		if err != nil {
 			return nil, errors.New("invalid TCP header config").Base(err)
@@ -330,7 +331,7 @@ func (c *SplitHTTPConfig) Build() (proto.Message, error) {
 
 	// Priority (client): host > serverName > address
 	for k := range c.Headers {
-		if strings.ToLower(k) == "host" {
+		if strings.EqualFold(k, "host") {
 			return nil, errors.New(`"headers" can't contain "host"`)
 		}
 	}
@@ -421,7 +422,7 @@ func (c *SplitHTTPConfig) Build() (proto.Message, error) {
 		if c.SessionIDLength.From <= 0 {
 			return nil, errors.New("sessionIDLength.from must be greater than 0")
 		}
-		for i := 0; i < len(c.SessionIDTable); i++ {
+		for i := range len(c.SessionIDTable) {
 			if c.SessionIDTable[i] >= 0x80 {
 				return nil, errors.New("sessionIDTable must contain only ASCII characters")
 			}
@@ -513,11 +514,11 @@ func (c *SplitHTTPConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
-func roomSize(tableSize int, min, max int32) *big.Int {
+func roomSize(tableSize int, minSize, maxSize int32) *big.Int {
 	base := big.NewInt(int64(tableSize))
 	sum := new(big.Int)
 	term := new(big.Int)
-	for k := min; k <= max; k++ {
+	for k := minSize; k <= maxSize; k++ {
 		term.Exp(base, big.NewInt(int64(k)), nil)
 		sum.Add(sum, term)
 	}
@@ -538,6 +539,7 @@ type KCPConfig struct {
 
 // Build implements Buildable.
 func (c *KCPConfig) Build() (proto.Message, error) {
+	//nolint:forcetypeassert // CreateTransportConfig returns this transport's own config type
 	config := common.Must2(internet.CreateTransportConfig(kcp.ProtocolName)).(*kcp.Config)
 
 	if c.Mtu != nil {
@@ -625,7 +627,7 @@ func (c *WebSocketConfig) Build() (proto.Message, error) {
 	if u, err := url.Parse(path); err == nil {
 		if q := u.Query(); q.Get("ed") != "" {
 			Ed, _ := strconv.Atoi(q.Get("ed"))
-			ed = uint32(Ed)
+			ed = uint32(Ed) //nolint:gosec // config values are bounded by their declared field widths
 			q.Del("ed")
 			u.RawQuery = q.Encode()
 			path = u.String()
@@ -633,7 +635,7 @@ func (c *WebSocketConfig) Build() (proto.Message, error) {
 	}
 	// Priority (client): host > serverName > address
 	for k, v := range c.Headers {
-		if strings.ToLower(k) == "host" {
+		if strings.EqualFold(k, "host") {
 			errors.PrintDeprecatedFeatureWarning(`"host" in "headers"`, `independent "host"`)
 			if c.Host == "" {
 				c.Host = v
@@ -666,7 +668,7 @@ func (c *HttpUpgradeConfig) Build() (proto.Message, error) {
 	if u, err := url.Parse(path); err == nil {
 		if q := u.Query(); q.Get("ed") != "" {
 			Ed, _ := strconv.Atoi(q.Get("ed"))
-			ed = uint32(Ed)
+			ed = uint32(Ed) //nolint:gosec // config values are bounded by their declared field widths
 			q.Del("ed")
 			u.RawQuery = q.Encode()
 			path = u.String()
@@ -674,7 +676,7 @@ func (c *HttpUpgradeConfig) Build() (proto.Message, error) {
 	}
 	// Priority (client): host > serverName > address
 	for k := range c.Headers {
-		if strings.ToLower(k) == "host" {
+		if strings.EqualFold(k, "host") {
 			return nil, errors.New(`"headers" can't contain "host"`)
 		}
 	}

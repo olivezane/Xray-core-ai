@@ -224,7 +224,7 @@ func TestSocksBridageUDP(t *testing.T) {
 
 		server, _ := InitializeServerConfig(serverConfig)
 		if server != nil && WaitConnAvailableWithTest(t, testUDPConn(serverPort+1, 1024, time.Second*2)) {
-			defer CloseServer(server)
+			defer CloseServer(server) //nolint:gocritic // deferInLoop: the loop iterates over the test server table and the test function is short-lived
 			break
 		}
 		retry++
@@ -339,7 +339,7 @@ func TestSocksBridageUDPWithRouting(t *testing.T) {
 
 		server, _ := InitializeServerConfig(serverConfig)
 		if server != nil && WaitConnAvailableWithTest(t, testUDPConn(serverPort+1, 1024, time.Second*2)) {
-			defer CloseServer(server)
+			defer CloseServer(server) //nolint:gocritic // deferInLoop: the loop iterates over the test server table and the test function is short-lived
 			break
 		}
 		retry++

@@ -128,7 +128,7 @@ func (w *PacketWriter) writePacket(payload []byte, dest net.Destination) (int, e
 
 	length := len(payload)
 	lengthBuf := [2]byte{}
-	binary.BigEndian.PutUint16(lengthBuf[:], uint16(length))
+	binary.BigEndian.PutUint16(lengthBuf[:], uint16(length)) //nolint:gosec // the request length is bounded by the address size limits
 	if err := addrParser.WriteAddressPort(&buffer, dest.Address, dest.Port); err != nil {
 		return 0, err
 	}

@@ -15,16 +15,16 @@ func (h *dtls) Serialize(b []byte) {
 	b[1] = 254
 	b[2] = 253
 	b[3] = byte(h.epoch >> 8)
-	b[4] = byte(h.epoch)
+	b[4] = byte(h.epoch) //nolint:gosec // explicit byte extraction for the header fields
 	b[5] = 0
 	b[6] = 0
 	b[7] = byte(h.sequence >> 24)
-	b[8] = byte(h.sequence >> 16)
-	b[9] = byte(h.sequence >> 8)
-	b[10] = byte(h.sequence)
+	b[8] = byte(h.sequence >> 16) //nolint:gosec // explicit byte extraction from a shift
+	b[9] = byte(h.sequence >> 8)  //nolint:gosec // explicit byte extraction from a shift
+	b[10] = byte(h.sequence)      //nolint:gosec // explicit byte extraction for the header fields
 	h.sequence++
 	b[11] = byte(h.length >> 8)
-	b[12] = byte(h.length)
+	b[12] = byte(h.length) //nolint:gosec // explicit byte extraction for the header fields
 	h.length += 17
 	if h.length > 100 {
 		h.length -= 50

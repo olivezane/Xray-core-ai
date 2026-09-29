@@ -81,16 +81,17 @@ func (c *DefaultDialerClient) OpenStream(ctx context.Context, url string, sessio
 			wrc.Close()
 			return
 		}
-		if resp.StatusCode != 200 && !uploadOnly {
+		if resp.StatusCode != http.StatusOK && !uploadOnly {
 			errors.LogInfo(ctx, "unexpected status ", resp.StatusCode)
 		}
-		if resp.StatusCode != 200 || uploadOnly { // stream-up
-			io.Copy(io.Discard, resp.Body)
-			resp.Body.Close() // if it is called immediately, the upload will be interrupted also
+		if resp.StatusCode != http.StatusOK || uploadOnly { // stream-up
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close() // if it is called immediately, the upload will be interrupted also
 			common.Close(body)
 			wrc.Close()
 			return
 		}
+		//nolint:forcetypeassert // this package wraps the response body itself
 		wrc.(*WaitReadCloser).Set(resp.Body)
 	}()
 
@@ -104,7 +105,9 @@ func (c *DefaultDialerClient) PostPacket(ctx context.Context, url string, sessio
 	if err != nil {
 		return err
 	}
-	c.transportConfig.FillPacketRequest(req, sessionId, seqStr, payload)
+	if err := c.transportConfig.FillPacketRequest(req, sessionId, seqStr, payload); err != nil {
+		return err
+	}
 
 	if c.httpVersion != "1.1" {
 		resp, err := c.client.Do(req)
@@ -113,10 +116,10 @@ func (c *DefaultDialerClient) PostPacket(ctx context.Context, url string, sessio
 			return err
 		}
 
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		defer resp.Body.Close()
 
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			return errors.New("bad status code:", resp.Status)
 		}
 	} else {
@@ -142,6 +145,7 @@ func (c *DefaultDialerClient) PostPacket(ctx context.Context, url string, sessio
 				h1UploadConn = NewH1Conn(newConn)
 				uploadConn = h1UploadConn
 			} else {
+				//nolint:forcetypeassert // this package wraps the upload conn itself
 				h1UploadConn = uploadConn.(*H1Conn)
 
 				// TODO: Replace 0 here with a config value later
@@ -152,9 +156,11 @@ func (c *DefaultDialerClient) PostPacket(ctx context.Context, url string, sessio
 						c.closed.Store(true)
 						return fmt.Errorf("error while reading response: %s", err.Error())
 					}
-					io.Copy(io.Discard, resp.Body)
-					defer resp.Body.Close()
-					if resp.StatusCode != 200 {
+					_, _ = io.Copy(io.Discard, resp.Body)
+					if err := resp.Body.Close(); err != nil { // not deferred: this sits in the connection retry loop
+						return err
+					}
+					if resp.StatusCode != http.StatusOK {
 						return fmt.Errorf("got non-200 error response code: %d", resp.StatusCode)
 					}
 				}

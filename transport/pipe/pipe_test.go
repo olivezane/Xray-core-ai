@@ -18,11 +18,11 @@ func TestPipeReadWrite(t *testing.T) {
 	pReader, pWriter := New(WithSizeLimit(1024))
 
 	b := buf.New()
-	b.WriteString("abcd")
+	_, _ = b.WriteString("abcd")
 	common.Must(pWriter.WriteMultiBuffer(buf.MultiBuffer{b}))
 
 	b2 := buf.New()
-	b2.WriteString("efg")
+	_, _ = b2.WriteString("efg")
 	common.Must(pWriter.WriteMultiBuffer(buf.MultiBuffer{b2}))
 
 	rb, err := pReader.ReadMultiBuffer()
@@ -36,12 +36,12 @@ func TestPipeInterrupt(t *testing.T) {
 	pReader, pWriter := New(WithSizeLimit(1024))
 	payload := []byte{'a', 'b', 'c', 'd'}
 	b := buf.New()
-	b.Write(payload)
+	_, _ = b.Write(payload)
 	common.Must(pWriter.WriteMultiBuffer(buf.MultiBuffer{b}))
 	pWriter.Interrupt()
 
 	rb, err := pReader.ReadMultiBuffer()
-	if err != io.ErrClosedPipe {
+	if !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatal("expect io.ErrClosePipe, but got ", err)
 	}
 	if !rb.IsEmpty() {
@@ -64,7 +64,7 @@ func TestPipeClose(t *testing.T) {
 	}
 
 	rb, err = pReader.ReadMultiBuffer()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Fatal("expected EOF, but got ", err)
 	}
 	if !rb.IsEmpty() {
@@ -81,7 +81,9 @@ func TestPipeLimitZero(t *testing.T) {
 	var errg errgroup.Group
 	errg.Go(func() error {
 		b := buf.New()
-		b.Write([]byte{'c', 'd'})
+		if _, err := b.Write([]byte{'c', 'd'}); err != nil {
+			return err
+		}
 		return pWriter.WriteMultiBuffer(buf.MultiBuffer{b})
 	})
 	errg.Go(func() error {
@@ -113,13 +115,15 @@ func TestPipeWriteMultiThread(t *testing.T) {
 	for range 10 {
 		errg.Go(func() error {
 			b := buf.New()
-			b.WriteString("abcd")
+			if _, err := b.WriteString("abcd"); err != nil {
+				return err
+			}
 			return pWriter.WriteMultiBuffer(buf.MultiBuffer{b})
 		})
 	}
 	time.Sleep(time.Millisecond * 100)
 	pWriter.Close()
-	errg.Wait()
+	_ = errg.Wait()
 
 	b, err := pReader.ReadMultiBuffer()
 	common.Must(err)

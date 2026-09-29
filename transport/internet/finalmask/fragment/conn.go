@@ -93,8 +93,8 @@ func (c *fragmentConn) Write(p []byte) (n int, err error) {
 			copy(buff[:3], p)
 			copy(buff[5:], data[from:to])
 			from = to
-			buff[3] = byte(l >> 8)
-			buff[4] = byte(l)
+			buff[3] = byte(l >> 8) //nolint:gosec // explicit byte extraction from a shift
+			buff[4] = byte(l)      //nolint:gosec // packet counts come from the config layer as int64
 			if mergeHello {
 				hello = append(hello, buff[:5+l]...)
 			} else {
@@ -126,7 +126,7 @@ func (c *fragmentConn) Write(p []byte) (n int, err error) {
 		}
 	}
 
-	if c.config.PacketsFrom != 0 && (c.count < uint64(c.config.PacketsFrom) || c.count > uint64(c.config.PacketsTo)) {
+	if c.config.PacketsFrom != 0 && (c.count < uint64(c.config.PacketsFrom) || c.count > uint64(c.config.PacketsTo)) { //nolint:gosec // packet counts come from the config layer as int64
 		return c.Conn.Write(p)
 	}
 	maxSplit := crypto.RandBetween(c.config.MaxSplitMin, c.config.MaxSplitMax)

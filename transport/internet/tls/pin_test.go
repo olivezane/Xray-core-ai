@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/protocol/tls/cert"
 )
@@ -92,7 +93,7 @@ uI6HqHFD3iEct8fBkYfQiwH2e1eu9OwgujiWHsutyK8VvzVB3/YnhQ/TzciRjPqz
 	t.Run("singlepublickey", func(t *testing.T) {
 		block, _ := pem.Decode([]byte(Single))
 		cert, err := x509.ParseCertificate(block.Bytes)
-		assert.Equal(t, err, nil)
+		require.NoError(t, err)
 		hash := GenerateCertHash(cert)
 		fingerprint, _ := hex.DecodeString("ae243d668ec9c7f74a0dcd1ad21c6676b4efe30c39728934b362093af886bf77")
 		assert.Equal(t, fingerprint, hash)

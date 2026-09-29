@@ -60,7 +60,7 @@ func TestPathMatcher(t *testing.T) {
 }
 
 func connectIPRequest(target string) *http.Request {
-	r := httptest.NewRequest(http.MethodGet, "https://proxy.example"+target, nil)
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "https://proxy.example"+target, nil)
 	r.Method = http.MethodConnect
 	r.Proto, r.ProtoMajor, r.ProtoMinor = "HTTP/2.0", 2, 0
 	r.Header.Set(":protocol", "connect-ip")
@@ -82,6 +82,7 @@ func serve(t *testing.T, r *http.Request, handle func(*ServerConn)) *httptest.Re
 	require.NoError(t, err)
 	l := &Listener{path: path, addConn: func(conn stat.Connection) {
 		go func() {
+			//nolint:forcetypeassert // the test server wraps the conn itself
 			handle(conn.(*ServerConn))
 			conn.Close()
 		}()

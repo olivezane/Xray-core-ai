@@ -18,6 +18,7 @@ func TestAEADCipherUDP(t *testing.T) {
 	account, err := rawAccount.AsAccount()
 	common.Must(err)
 
+	//nolint:forcetypeassert // the account is created by proxy/shadowsocks's own NewAccount
 	cipher := account.(*shadowsocks.MemoryAccount).Cipher
 
 	key := make([]byte, cipher.KeySize())

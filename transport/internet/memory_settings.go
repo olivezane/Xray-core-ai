@@ -39,7 +39,7 @@ func ToMemoryStreamConfig(s *StreamConfig) (*MemoryStreamConfig, error) {
 		if s.Address != nil {
 			mss.Destination = &net.Destination{
 				Address: s.Address.AsAddress(),
-				Port:    net.Port(s.Port),
+				Port:    net.Port(s.Port), //nolint:gosec // the port comes from the config layer, which rejects values above 65535
 				Network: net.Network_TCP,
 			}
 		}
@@ -61,10 +61,12 @@ func ToMemoryStreamConfig(s *StreamConfig) (*MemoryStreamConfig, error) {
 	if s != nil {
 		for i := range s.Tcpmasks {
 			instance := common.Must2(s.Tcpmasks[i].GetInstance())
+			//nolint:forcetypeassert // the finalmask registry only stores finalmask.TCPMask
 			tcpMasks = append(tcpMasks, instance.(finalmask.TCPMask))
 		}
 		for i := range s.Udpmasks {
 			instance := common.Must2(s.Udpmasks[i].GetInstance())
+			//nolint:forcetypeassert // the finalmask registry only stores finalmask.UDPMask
 			udpMasks = append(udpMasks, instance.(finalmask.UDPMask))
 		}
 	}

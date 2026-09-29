@@ -26,8 +26,8 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*RelayServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewRelayServer(ctx, config.(*RelayServerConfig))
+	common.Must(common.RegisterConfig((*RelayServerConfig)(nil), func(ctx context.Context, config *RelayServerConfig) (any, error) {
+		return NewRelayServer(ctx, config)
 	}))
 }
 
@@ -77,6 +77,10 @@ func NewRelayServer(ctx context.Context, config *RelayServerConfig) (*RelayInbou
 	}
 
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
 	i := &RelayInbound{
 		networks:        networks,
 		method:          method,
@@ -84,7 +88,7 @@ func NewRelayServer(ctx context.Context, config *RelayServerConfig) (*RelayInbou
 		relayBlock:      relayBlock,
 		destinations:    make(map[[AESBlockSize]byte]*relayDest),
 		rawDestinations: config.Destinations,
-		policyManager:   v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager:   pm,
 	}
 
 	for idx, d := range config.Destinations {
@@ -105,9 +109,9 @@ func NewRelayServer(ctx context.Context, config *RelayServerConfig) (*RelayInbou
 		hash := DeriveUserPSKHash(destKey)
 
 		i.destinations[hash] = &relayDest{
-			destination: net.TCPDestination(d.Address.AsAddress(), net.Port(d.Port)),
+			destination: net.TCPDestination(d.Address.AsAddress(), net.Port(d.Port)), //nolint:gosec // the user level is a small config value
 			email:       d.Email,
-			level:       uint32(d.Level),
+			level:       uint32(d.Level), //nolint:gosec // the user level is a small config value
 			key:         destKey,
 			blockCipher: destBlock,
 		}
@@ -163,7 +167,7 @@ func (i *RelayInbound) processTCP(ctx context.Context, conn net.Conn, dispatcher
 	if !ok {
 		return ErrInvalidRequest
 	}
-	conn.SetReadDeadline(time.Time{})
+	_ = conn.SetReadDeadline(time.Time{})
 
 	inbound := session.InboundFromContext(ctx)
 	inbound.User = &protocol.MemoryUser{
@@ -187,7 +191,9 @@ func (i *RelayInbound) processTCP(ctx context.Context, conn net.Conn, dispatcher
 
 	// Unwrap outer EIH: send client salt to next hop, stripping this hop's EIH
 	saltBuf := buf.New()
-	saltBuf.Write(salt)
+	if _, err := saltBuf.Write(salt); err != nil {
+		return err
+	}
 	if err := link.Writer.WriteMultiBuffer(buf.MultiBuffer{saltBuf}); err != nil {
 		return err
 	}

@@ -21,7 +21,7 @@ func TestIPv4ChecksumTestVector(t *testing.T) {
 func TestIPv4ChecksumWithOptions(t *testing.T) {
 	data := []byte{0x46, 0x00, 0x00, 0x77, 0x00, 0x00, 0x40, 0x00, 0x40, 0x11, 0x00, 0x00, 0xc0, 0xa8, 0x00, 0x01, 0xc0, 0xa8, 0x00, 0xc7, 0x94, 0x04, 0x00, 0x00}
 	checksum := calculateIPv4Checksum(data)
-	data[10], data[11] = byte(checksum>>8), byte(checksum)
+	data[10], data[11] = byte(checksum>>8), byte(checksum) //nolint:gosec // G115: explicit low-byte extraction from a value bounded by the wire format
 	require.True(t, ipv4ChecksumValid(data))
 	require.NotEqual(t, checksum, calculateIPv4Checksum(data[:20]), "the options must be covered")
 }

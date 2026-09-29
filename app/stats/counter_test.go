@@ -13,6 +13,7 @@ func TestStatsCounter(t *testing.T) {
 	raw, err := common.CreateObject(context.Background(), &Config{})
 	common.Must(err)
 
+	//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 	m := raw.(stats.Manager)
 	c, err := m.RegisterCounter("test.counter")
 	common.Must(err)

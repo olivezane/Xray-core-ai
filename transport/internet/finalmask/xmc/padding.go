@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"github.com/xtls/xray-core/common/errors"
 	"io"
 	"math/big"
 	"time"
@@ -72,13 +73,13 @@ func runPaddingSchedule(reader io.Reader, writer io.Writer, isClient bool, first
 
 func validatePaddingSchedule(schedule []paddingTurn, firstTurnPrefixLength int) error {
 	if len(schedule) == 0 {
-		return fmt.Errorf("empty padding schedule")
+		return errors.New("empty padding schedule")
 	}
 	if firstTurnPrefixLength < 0 {
 		return fmt.Errorf("negative first turn prefix length: %d", firstTurnPrefixLength)
 	}
 	if firstTurnPrefixLength > 0 && schedule[0].direction != paddingClientToServer {
-		return fmt.Errorf("first prefixed padding turn is not client-to-server")
+		return errors.New("first prefixed padding turn is not client-to-server")
 	}
 
 	for i, turn := range schedule {
@@ -154,7 +155,7 @@ func writePaddingTurnWithBuffer(w io.Writer, turn paddingTurn, prefixLength int,
 		return fmt.Errorf("target length %d leaves an invalid record length %d", targetLength, recordLength)
 	}
 
-	encodedLength := Varint(recordLength)
+	encodedLength := Varint(recordLength) //nolint:gosec // values are bounded by the XMC protocol field widths
 	var header bytes.Buffer
 	if err = encodedLength.writeTo(&header); err != nil {
 		return fmt.Errorf("write padding header: %w", err)
@@ -326,7 +327,7 @@ func paddingTurnBounds(turn paddingTurn) (int, int, error) {
 		return turn.minLength, turn.maxLength, nil
 	}
 	if turn.minLength != 0 || turn.maxLength != 0 {
-		return 0, 0, fmt.Errorf("variants cannot be combined with a length range")
+		return 0, 0, errors.New("variants cannot be combined with a length range")
 	}
 
 	minLength := maxPaddingTurnLength + 1
@@ -407,7 +408,7 @@ func randomPaddingDelay(delay paddingDelayRange) (time.Duration, error) {
 
 func randomPaddingIndex(length int) (int, error) {
 	if length < 1 {
-		return 0, fmt.Errorf("select from empty padding choices")
+		return 0, errors.New("select from empty padding choices")
 	}
 	if length == 1 {
 		return 0, nil

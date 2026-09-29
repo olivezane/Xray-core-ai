@@ -181,10 +181,10 @@ func NewHandler(ctx context.Context, config *core.InboundHandlerConfig) (inbound
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*proxyman.InboundConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*proxyman.InboundConfig))
+	common.Must(common.RegisterConfig((*proxyman.InboundConfig)(nil), func(ctx context.Context, config *proxyman.InboundConfig) (any, error) {
+		return New(ctx, config)
 	}))
-	common.Must(common.RegisterConfig((*core.InboundHandlerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewHandler(ctx, config.(*core.InboundHandlerConfig))
+	common.Must(common.RegisterConfig((*core.InboundHandlerConfig)(nil), func(ctx context.Context, config *core.InboundHandlerConfig) (any, error) {
+		return NewHandler(ctx, config)
 	}))
 }

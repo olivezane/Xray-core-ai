@@ -108,6 +108,7 @@ func (h *Hub) start() {
 			var addr net.Addr
 			n, addr, err = h.conn.ReadFrom(rawBytes)
 			if err == nil {
+				//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 				udpAddr = addr.(*net.UDPAddr)
 			}
 		}
@@ -117,7 +118,7 @@ func (h *Hub) start() {
 			buffer.Release()
 			break
 		}
-		buffer.Resize(0, int32(n))
+		buffer.Resize(0, int32(n)) //nolint:gosec // read length is bounded by the buffer size
 
 		if buffer.IsEmpty() {
 			buffer.Release()
@@ -126,7 +127,7 @@ func (h *Hub) start() {
 
 		payload := &udp.Packet{
 			Payload: buffer,
-			Source:  net.UDPDestination(net.IPAddress(udpAddr.IP), net.Port(udpAddr.Port)),
+			Source:  net.UDPDestination(net.IPAddress(udpAddr.IP), net.Port(udpAddr.Port)), //nolint:gosec // Port of a net.Addr is always 0..65535
 		}
 		if h.recvOrigDest && noob > 0 {
 			payload.Target = RetrieveOriginalDest(oobBytes[:noob])

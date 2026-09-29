@@ -49,6 +49,7 @@ var (
 )
 
 func dialgRPC(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig) (net.Conn, error) {
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	grpcSettings := streamSettings.ProtocolSettings.(*Config)
 
 	conn, err := getGrpcClient(ctx, dest, streamSettings)
@@ -58,6 +59,7 @@ func dialgRPC(ctx context.Context, dest net.Destination, streamSettings *interne
 	client := encoding.NewGRPCServiceClient(conn)
 	if grpcSettings.MultiMode {
 		errors.LogDebug(ctx, "using gRPC multi mode service name: `"+grpcSettings.getServiceName()+"` stream name: `"+grpcSettings.getTunMultiStreamName()+"`")
+		//nolint:forcetypeassert // the generated gRPC client implements GRPCServiceClientX
 		grpcService, err := client.(encoding.GRPCServiceClientX).TunMultiCustomName(ctx, grpcSettings.getServiceName(), grpcSettings.getTunMultiStreamName())
 		if err != nil {
 			return nil, errors.New("Cannot dial gRPC").Base(err)
@@ -66,6 +68,7 @@ func dialgRPC(ctx context.Context, dest net.Destination, streamSettings *interne
 	}
 
 	errors.LogDebug(ctx, "using gRPC tun mode service name: `"+grpcSettings.getServiceName()+"` stream name: `"+grpcSettings.getTunStreamName()+"`")
+	//nolint:forcetypeassert // the generated gRPC client implements GRPCServiceClientX
 	grpcService, err := client.(encoding.GRPCServiceClientX).TunCustomName(ctx, grpcSettings.getServiceName(), grpcSettings.getTunStreamName())
 	if err != nil {
 		return nil, errors.New("Cannot dial gRPC").Base(err)
@@ -83,6 +86,7 @@ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *in
 	}
 	tlsConfig := tls.ConfigFromStreamSettings(streamSettings)
 	realityConfig := reality.ConfigFromStreamSettings(streamSettings)
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	grpcSettings := streamSettings.ProtocolSettings.(*Config)
 
 	if client, found := globalDialerMap[dialerConf{dest, streamSettings}]; found && client.GetState() != connectivity.Shutdown {

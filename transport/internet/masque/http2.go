@@ -201,7 +201,7 @@ func (c *http2ClientConn) writeHeaders(req *http.Request, maxFrameSize int) erro
 
 	c.hbuf.Reset()
 	field := func(name, value string) {
-		c.henc.WriteField(hpack.HeaderField{Name: name, Value: value})
+		_ = c.henc.WriteField(hpack.HeaderField{Name: name, Value: value})
 	}
 	host := req.Host
 	if host == "" {
@@ -354,9 +354,11 @@ func (c *http2ClientConn) abortStream(err error, reset bool) {
 		body.Close()
 	}
 	if reset {
-		go c.write(func(fr *http2.Framer) error {
-			return fr.WriteRSTStream(http2StreamID, http2.ErrCodeCancel)
-		})
+		go func() {
+			_ = c.write(func(fr *http2.Framer) error {
+				return fr.WriteRSTStream(http2StreamID, http2.ErrCodeCancel)
+			})
+		}()
 	}
 }
 
@@ -375,9 +377,11 @@ func (c *http2ClientConn) keepAlive() {
 			return
 		}
 		if idle >= http2KeepAlivePeriod {
-			go c.write(func(fr *http2.Framer) error {
-				return fr.WritePing(false, [8]byte{})
-			})
+			go func() {
+				_ = c.write(func(fr *http2.Framer) error {
+					return fr.WritePing(false, [8]byte{})
+				})
+			}()
 		}
 	}
 }
@@ -457,6 +461,7 @@ func (c *http2ClientConn) applySettings(f *http2.SettingsFrame) error {
 		if err := s.Valid(); err != nil {
 			return err
 		}
+		//nolint:exhaustive // settings we do not implement are ignored, per RFC 9113
 		switch s.ID {
 		case http2.SettingMaxFrameSize:
 			c.maxFrameSize = s.Val
@@ -536,7 +541,7 @@ func (c *http2ClientConn) handleData(f *http2.DataFrame) error {
 			return nil
 		}
 		return c.write(func(fr *http2.Framer) error {
-			return fr.WriteWindowUpdate(0, uint32(size))
+			return fr.WriteWindowUpdate(0, uint32(size)) //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 		})
 	}
 	c.streamRecvWindow -= size
@@ -583,10 +588,10 @@ func (b *http2ResponseBody) Read(p []byte) (int, error) {
 
 	if update > 0 {
 		if err := c.write(func(fr *http2.Framer) error {
-			if err := fr.WriteWindowUpdate(0, uint32(update)); err != nil {
+			if err := fr.WriteWindowUpdate(0, uint32(update)); err != nil { //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 				return err
 			}
-			return fr.WriteWindowUpdate(http2StreamID, uint32(update))
+			return fr.WriteWindowUpdate(http2StreamID, uint32(update)) //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 		}); err != nil {
 			c.fail(err)
 		}

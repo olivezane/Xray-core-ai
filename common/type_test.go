@@ -16,9 +16,9 @@ type YConfig struct {
 }
 
 func TestObjectCreation(t *testing.T) {
-	f := func(ctx context.Context, t any) (any, error) {
+	f := func(ctx context.Context, t *TConfig) (any, error) {
 		return func() int {
-			return t.(*TConfig).value
+			return t.value
 		}, nil
 	}
 
@@ -30,6 +30,7 @@ func TestObjectCreation(t *testing.T) {
 
 	g, err := CreateObject(context.Background(), &TConfig{value: 2})
 	Must(err)
+	//nolint:forcetypeassert // the comma-ok assertion in the enclosing if already proved the method set
 	if v := g.(func() int)(); v != 2 {
 		t.Error("expect return value 2, but got ", v)
 	}

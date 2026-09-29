@@ -65,7 +65,7 @@ func TestMphMatcherGroup(t *testing.T) {
 		matcher, err := test.mType.New(test.pattern)
 		common.Must(err)
 		common.Must(AddMatcherToGroup(mph, matcher, 0))
-		mph.Build()
+		_ = mph.Build()
 		if m := mph.MatchAny(test.input); m != test.output {
 			t.Error("unexpected output: ", m, " for test case ", test)
 		}
@@ -94,7 +94,7 @@ func TestMphMatcherGroup(t *testing.T) {
 			common.Must(err)
 			common.Must(AddMatcherToGroup(mph, matcher, 0))
 		}
-		mph.Build()
+		_ = mph.Build()
 		cases2Output := []struct {
 			pattern string
 			res     bool
@@ -158,7 +158,7 @@ func TestMphMatcherGroup(t *testing.T) {
 			common.Must(err)
 			common.Must(AddMatcherToGroup(mph, matcher, 0))
 		}
-		mph.Build()
+		_ = mph.Build()
 		cases3Output := []struct {
 			pattern string
 			res     bool
@@ -262,7 +262,7 @@ func TestMphMatcherGroupAsIndexMatcher(t *testing.T) {
 		common.Must(err)
 		common.Must(AddMatcherToGroup(matcherGroup, matcher, uint32(i+3)))
 	}
-	matcherGroup.Build()
+	_ = matcherGroup.Build()
 	for _, test := range cases {
 		if m := matcherGroup.Match(test.Input); !reflect.DeepEqual(m, test.Output) {
 			t.Error("unexpected output: ", m, " for test case ", test)
@@ -272,7 +272,7 @@ func TestMphMatcherGroupAsIndexMatcher(t *testing.T) {
 
 func TestEmptyMphMatcherGroup(t *testing.T) {
 	g := NewMphMatcherGroup()
-	g.Build()
+	_ = g.Build()
 	r := g.Match("example.com")
 	if len(r) != 0 {
 		t.Error("Expect [], but ", r)
@@ -290,7 +290,7 @@ func TestMphMatcherGroupRandom(t *testing.T) {
 		r := rand.New(rand.NewSource(seed))
 		g := NewMphMatcherGroup()
 		full, domain := map[string][]uint32{}, map[string][]uint32{} // Stored pattern -> values
-		for value := uint32(r.Intn(200)); value > 0; value-- {
+		for value := uint32(r.Intn(200)); value > 0; value-- {       //nolint:gosec // G115: bounded by the configuration the test set up
 			pattern := make([]byte, r.Intn(8))
 			for i := range pattern {
 				pattern[i] = "ab."[r.Intn(3)]
@@ -304,7 +304,7 @@ func TestMphMatcherGroupRandom(t *testing.T) {
 				domain["."+p] = append(domain["."+p], value)
 			}
 		}
-		g.Build()
+		_ = g.Build()
 		for _, input := range inputs {
 			keys := []string{input} // Whole input first, then "." suffixes from longest to shortest
 			for i := range len(input) {
@@ -330,7 +330,7 @@ func TestMphMatcherGroupAppend(t *testing.T) {
 	g := NewMphMatcherGroup()
 	g.AddFullMatcher(FullMatcher("a.com"), 1)
 	g.AddFullMatcher(FullMatcher("b.com"), 2)
-	g.Build()
+	_ = g.Build()
 	if m := append(g.Match("a.com"), 3); !slices.Equal(m, []uint32{1, 3}) {
 		t.Error("expect [1 3], but ", m)
 	}

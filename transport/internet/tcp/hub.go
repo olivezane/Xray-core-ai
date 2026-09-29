@@ -31,6 +31,7 @@ func ListenTCP(ctx context.Context, address net.Address, port net.Port, streamSe
 	l := &Listener{
 		addConn: handler,
 	}
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	tcpSettings := streamSettings.ProtocolSettings.(*Config)
 	l.config = tcpSettings
 	if l.config != nil {

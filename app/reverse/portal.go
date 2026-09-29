@@ -148,7 +148,7 @@ func NewStaticMuxPicker() (*StaticMuxPicker, error) {
 		Execute:  p.cleanup,
 		Interval: time.Second * 30,
 	}
-	p.cTask.Start()
+	_ = p.cTask.Start()
 	return p, nil
 }
 
@@ -261,7 +261,7 @@ func NewPortalWorker(client *mux.ClientWorker) (*PortalWorker, error) {
 		Execute:  w.heartbeat,
 		Interval: time.Second * 2,
 	}
-	w.control.Start()
+	_ = w.control.Start()
 	return w, nil
 }
 

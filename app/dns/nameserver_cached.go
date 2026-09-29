@@ -51,7 +51,7 @@ func pull(ctx context.Context, s CachedNameserver, fqdn string, option dns.IPOpt
 	nctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Second)
 	defer cancel()
 
-	fetch(nctx, s, fqdn, option)
+	_, _, _ = fetch(nctx, s, fqdn, option)
 }
 
 func fetch(ctx context.Context, s CachedNameserver, fqdn string, option dns.IPOption) ([]net.IP, uint32, error) {
@@ -68,6 +68,7 @@ func fetch(ctx context.Context, s CachedNameserver, fqdn string, option dns.IPOp
 	v, _, _ := s.getCacheController().requestGroup.Do(key, func() (any, error) {
 		return doFetch(ctx, s, fqdn, option), nil
 	})
+	//nolint:forcetypeassert // the DNS cache only stores result values
 	ret := v.(result)
 
 	return ret.ips, ret.ttl, ret.error
@@ -95,6 +96,7 @@ func doFetch(ctx context.Context, s CachedNameserver, fqdn string, option dns.IP
 			return nil, err
 		case msg := <-sub.Wait():
 			sub.Close()
+			//nolint:forcetypeassert // the DNS cache only stores *IPRecord
 			return msg.(*IPRecord), nil // should panic
 		}
 	}

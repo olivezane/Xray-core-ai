@@ -2,6 +2,7 @@ package buf
 
 import (
 	"io"
+	"math"
 
 	"github.com/xtls/xray-core/common/bytespool"
 	"github.com/xtls/xray-core/common/errors"
@@ -29,6 +30,10 @@ const (
 // Buffer is a recyclable allocation of a byte array. Buffer.Release() recycles
 // the buffer into an internal buffer pool, in order to recreate a buffer more
 // quickly.
+//
+// Invariant: len(v) <= math.MaxInt32, enforced by every constructor below. All
+// int32 conversions of len(v) and of any count derived from a slice of v are
+// therefore lossless.
 type Buffer struct {
 	v         []byte
 	start     int32
@@ -39,6 +44,7 @@ type Buffer struct {
 
 // New creates a Buffer with 0 length and 8K capacity, managed.
 func New() *Buffer {
+	//nolint:forcetypeassert // the pool only ever stores []byte
 	buf := pool.Get().([]byte)
 	if cap(buf) >= Size {
 		buf = buf[:Size]
@@ -56,6 +62,9 @@ func NewExisted(b []byte) *Buffer {
 	if cap(b) < Size {
 		panic("Invalid buffer")
 	}
+	if len(b) > math.MaxInt32 {
+		panic("Buffer is too large")
+	}
 
 	oLen := len(b)
 	if oLen < Size {
@@ -64,15 +73,18 @@ func NewExisted(b []byte) *Buffer {
 
 	return &Buffer{
 		v:   b,
-		end: int32(oLen),
+		end: int32(oLen), //nolint:gosec // invariant: len(b.v) fits in int32, enforced by the constructors
 	}
 }
 
 // FromBytes creates a Buffer with an existed bytearray, unmanaged.
 func FromBytes(b []byte) *Buffer {
+	if len(b) > math.MaxInt32 {
+		panic("Buffer is too large")
+	}
 	return &Buffer{
 		v:         b,
-		end:       int32(len(b)),
+		end:       int32(len(b)), //nolint:gosec // len(b) is bounded above by MaxInt32
 		ownership: unmanaged,
 	}
 }
@@ -80,6 +92,7 @@ func FromBytes(b []byte) *Buffer {
 // StackNew creates a new Buffer object on stack, managed.
 // This method is for buffers that is released in the same function.
 func StackNew() Buffer {
+	//nolint:forcetypeassert // the pool only ever stores []byte
 	buf := pool.Get().([]byte)
 	if cap(buf) >= Size {
 		buf = buf[:Size]
@@ -110,10 +123,11 @@ func (b *Buffer) Release() {
 	b.v = nil
 	b.Clear()
 
+	//nolint:exhaustive // unmanaged buffers are owned by the caller and must not be returned to a pool
 	switch b.ownership {
 	case managed:
 		if cap(p) == Size {
-			pool.Put(p)
+			pool.Put(p) //nolint:staticcheck // SA6002: the pool is typed []byte by its exported API; switching to *[]byte is a benchmark-first change
 		}
 	case bytespools:
 		bytespool.Free(p)
@@ -147,7 +161,7 @@ func (b *Buffer) Bytes() []byte {
 // It panics if result size is larger than size of this buffer.
 func (b *Buffer) Extend(n int32) []byte {
 	end := b.end + n
-	if end > int32(len(b.v)) {
+	if end > int32(len(b.v)) { //nolint:gosec // invariant: len(b.v) fits in int32
 		panic("extending out of bound")
 	}
 	ext := b.v[b.end:end]
@@ -241,7 +255,7 @@ func (b *Buffer) Cap() int32 {
 	if b == nil {
 		return 0
 	}
-	return int32(len(b.v))
+	return int32(len(b.v)) //nolint:gosec // invariant: len(b.v) fits in int32
 }
 
 // Available returns the available capacity of the buffer content.
@@ -249,7 +263,7 @@ func (b *Buffer) Available() int32 {
 	if b == nil {
 		return 0
 	}
-	return int32(len(b.v)) - b.end
+	return int32(len(b.v)) - b.end //nolint:gosec // invariant: len(b.v) fits in int32
 }
 
 // IsEmpty returns true if the buffer is empty.
@@ -259,13 +273,13 @@ func (b *Buffer) IsEmpty() bool {
 
 // IsFull returns true if the buffer has no more room to grow.
 func (b *Buffer) IsFull() bool {
-	return b != nil && b.end == int32(len(b.v))
+	return b != nil && b.end == int32(len(b.v)) //nolint:gosec // invariant: len(b.v) fits in int32
 }
 
 // Write implements Write method in io.Writer.
 func (b *Buffer) Write(data []byte) (int, error) {
 	nBytes := copy(b.v[b.end:], data)
-	b.end += int32(nBytes)
+	b.end += int32(nBytes) //nolint:gosec // nBytes <= len(b.v), which fits in int32
 	if nBytes < len(data) {
 		return nBytes, ErrBufferFull
 	}
@@ -284,7 +298,7 @@ func (b *Buffer) WriteByte(v byte) error {
 
 // WriteString implements io.StringWriter.
 func (b *Buffer) WriteString(s string) (int, error) {
-	return b.Write([]byte(s))
+	return b.Write([]byte(s)) //nolint:gocritic // this is the WriteString implementation itself
 }
 
 // ReadByte implements io.ByteReader
@@ -315,10 +329,10 @@ func (b *Buffer) Read(data []byte) (int, error) {
 		return 0, io.EOF
 	}
 	nBytes := copy(data, b.v[b.start:b.end])
-	if int32(nBytes) == b.Len() {
+	if int32(nBytes) == b.Len() { //nolint:gosec // nBytes <= len(b.v), which fits in int32
 		b.Clear()
 	} else {
-		b.start += int32(nBytes)
+		b.start += int32(nBytes) //nolint:gosec // nBytes <= len(b.v), which fits in int32
 	}
 	return nBytes, nil
 }
@@ -326,19 +340,19 @@ func (b *Buffer) Read(data []byte) (int, error) {
 // ReadFrom implements io.ReaderFrom.
 func (b *Buffer) ReadFrom(reader io.Reader) (int64, error) {
 	n, err := reader.Read(b.v[b.end:])
-	b.end += int32(n)
+	b.end += int32(n) //nolint:gosec // n <= len(b.v), which fits in int32
 	return int64(n), err
 }
 
 // ReadFullFrom reads exact size of bytes from given reader, or until error occurs.
 func (b *Buffer) ReadFullFrom(reader io.Reader, size int32) (int64, error) {
 	end := b.end + size
-	if end > int32(len(b.v)) {
+	if end > int32(len(b.v)) { //nolint:gosec // invariant: len(b.v) fits in int32
 		v := end
 		return 0, errors.New("out of bound: ", v)
 	}
 	n, err := io.ReadFull(reader, b.v[b.end:end])
-	b.end += int32(n)
+	b.end += int32(n) //nolint:gosec // n <= len(b.v), which fits in int32
 	return int64(n), err
 }
 

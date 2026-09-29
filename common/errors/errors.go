@@ -1,8 +1,9 @@
 // Package errors is a drop-in replacement for Golang lib 'errors'.
-package errors // import "github.com/xtls/xray-core/common/errors"
+package errors
 
 import (
 	"context"
+	stderrors "errors"
 	"runtime"
 	"strings"
 
@@ -154,6 +155,31 @@ func doLog(ctx context.Context, inner error, severity log.Severity, msg ...any) 
 	})
 }
 
+// Is reports whether any error in err's chain matches target.
+//
+// It is a thin wrapper over the standard library, so that the many callers that
+// already import this package as `errors` do not need a second import for the
+// idiomatic `errors.Is(err, target)` form.
+func Is(err, target error) bool {
+	return stderrors.Is(err, target)
+}
+
+// As finds the first error in err's chain that matches target, and if one is
+// found, sets target to that error value and returns true.
+//
+// See Is for why this package re-exports the standard library function.
+func As(err error, target any) bool {
+	return stderrors.As(err, target)
+}
+
+// AsType finds the first error in err's chain that matches the type parameter
+// and returns it. The second result reports whether a match was found.
+//
+// See Is for why this package re-exports the standard library function.
+func AsType[E error](err error) (E, bool) {
+	return stderrors.AsType[E](err)
+}
+
 // Cause returns the root cause of this error.
 func Cause(err error) error {
 	if err == nil {
@@ -161,7 +187,7 @@ func Cause(err error) error {
 	}
 L:
 	for {
-		switch inner := err.(type) {
+		switch inner := err.(type) { //nolint:errorlint // this switch *is* the chain walk that errors.As would perform
 		case hasInnerError:
 			if inner.Unwrap() == nil {
 				break L

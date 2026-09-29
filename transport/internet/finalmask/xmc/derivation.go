@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"fmt"
+	"github.com/xtls/xray-core/common/errors"
 	"math/big"
 )
 
@@ -86,7 +87,7 @@ func DeriveRSAKey(password string) (*rsa.PrivateKey, error) {
 	e := big.NewInt(65537)
 	d := new(big.Int).ModInverse(e, totient)
 	if d == nil {
-		return nil, fmt.Errorf("failed to compute mod inverse")
+		return nil, errors.New("failed to compute mod inverse")
 	}
 
 	priv := &rsa.PrivateKey{

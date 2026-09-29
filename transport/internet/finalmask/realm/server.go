@@ -72,8 +72,10 @@ func NewConnServer(config *Config, raw net.PacketConn) (net.PacketConn, error) {
 	if config.PortMapping != nil && config.PortMapping.Enabled {
 		var err error
 		start := time.Now()
+		//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 		mapper, err = NewPortMapper(context.Background(), raw.LocalAddr().(*net.UDPAddr).Port, PortMapConfig{Timeout: time.Duration(config.PortMapping.Timeout) * time.Second, Lifetime: time.Duration(config.PortMapping.Lifetime) * time.Second})
 		if err != nil {
+			//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 			errors.LogErrorInner(context.Background(), err, "[realm] [port mapping] [", raw.LocalAddr().(*net.UDPAddr).Port, "] init failed after ", time.Since(start))
 		} else {
 			errors.LogDebug(context.Background(), "[realm] [port mapping] [", mapper.InternalPort(), "] gateway ", mapper.GatewayType(), ", external ", mapper.ExternalAddr())
@@ -135,6 +137,7 @@ func (c *realmConnServer) addPunch(packet []byte, addr net.Addr) bool {
 		}
 		select {
 		case ch <- PunchPacketEvent{
+			//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 			Addr:   addr.(*net.UDPAddr).AddrPort(),
 			Packet: punchPacket,
 		}:
@@ -195,6 +198,7 @@ func (c *realmConnServer) getlocals(force bool) []netip.AddrPort {
 	c.localsMu.Lock()
 	if force || time.Since(c.localsLast) > defaultStunCacheTTL {
 		start := time.Now()
+		//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 		servers := resolveSTUNServers(c.PacketConn.LocalAddr().(*net.UDPAddr).IP, c.stunServers, c.family)
 		errors.LogDebug(context.Background(), "[realm] update stun servers ", servers, " with ", time.Since(start))
 		if len(servers) > 0 {
@@ -319,8 +323,8 @@ func (c *realmConnServer) heartbeatLoop(ctx context.Context, sid string, ttl int
 			return
 		case <-ticker.C:
 			req := HeartbeatRequest{}
-			if new := c.getlocals(false); !slices.Equal(cur, new) {
-				cur = new
+			if next := c.getlocals(false); !slices.Equal(cur, next) {
+				cur = next
 				req.Addresses = addrPortStrings(cur)
 			}
 			start := time.Now()

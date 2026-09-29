@@ -52,7 +52,11 @@ func TestMetricsListenOnlyWithoutTagDoesNotRegisterOutbound(t *testing.T) {
 		_ = server.Close()
 	})
 
-	response, err := http.Get("http://" + listen + "/debug/vars")
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+listen+"/debug/vars", nil)
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("failed to read listen-only metrics: %v", err)
 	}
@@ -61,6 +65,7 @@ func TestMetricsListenOnlyWithoutTagDoesNotRegisterOutbound(t *testing.T) {
 		t.Fatalf("unexpected listen-only metrics status: %d", response.StatusCode)
 	}
 
+	//nolint:forcetypeassert // feature registered under outbound.ManagerType()
 	outboundManager := server.GetFeature(feature_outbound.ManagerType()).(feature_outbound.Manager)
 	if handlers := outboundManager.ListHandlers(context.Background()); len(handlers) != 0 {
 		t.Fatalf("listen-only metrics registered outbound handlers: got %d, want 0", len(handlers))
@@ -102,7 +107,7 @@ func metricsTestConfig(metricsConfig *Config) *core.Config {
 func pickMetricsListenAddress(t *testing.T) string {
 	t.Helper()
 
-	listener, err := stdnet.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&stdnet.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to pick metrics listen address: %v", err)
 	}
@@ -116,7 +121,7 @@ func readMetricsVars(t *testing.T, server *core.Instance) {
 	recorder := httptest.NewRecorder()
 	metricsHandler(t, server).httpHandler().ServeHTTP(
 		recorder,
-		httptest.NewRequest(http.MethodGet, "/debug/vars", nil),
+		httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/debug/vars", nil),
 	)
 
 	if recorder.Code != http.StatusOK {
@@ -141,7 +146,7 @@ func readMetricsPprof(t *testing.T, server *core.Instance) {
 	recorder := httptest.NewRecorder()
 	metricsHandler(t, server).httpHandler().ServeHTTP(
 		recorder,
-		httptest.NewRequest(http.MethodGet, "/debug/pprof/goroutine?debug=1", nil),
+		httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/debug/pprof/goroutine?debug=1", nil),
 	)
 
 	if recorder.Code != http.StatusOK {

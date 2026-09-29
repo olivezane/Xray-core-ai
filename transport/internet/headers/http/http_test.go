@@ -118,14 +118,15 @@ func TestConnection(t *testing.T) {
 		}
 	}()
 
+	//nolint:forcetypeassert // the socket was created by this package as a TCP socket
 	conn, err := net.DialTCP("tcp", nil, listener.Addr().(*net.TCPAddr))
 	common.Must(err)
 
 	authConn := auth.Client(conn)
 	defer authConn.Close()
 
-	authConn.Write([]byte("Test payload"))
-	authConn.Write([]byte("Test payload 2"))
+	_, _ = authConn.Write([]byte("Test payload"))
+	_, _ = authConn.Write([]byte("Test payload 2"))
 
 	expectedResponse := "Test payloadTest payload 2"
 	actualResponse := make([]byte, 256)
@@ -219,14 +220,15 @@ func TestConnectionInvPath(t *testing.T) {
 		}
 	}()
 
+	//nolint:forcetypeassert // the socket was created by this package as a TCP socket
 	conn, err := net.DialTCP("tcp", nil, listener.Addr().(*net.TCPAddr))
 	common.Must(err)
 
 	authConn := authR.Client(conn)
 	defer authConn.Close()
 
-	authConn.Write([]byte("Test payload"))
-	authConn.Write([]byte("Test payload 2"))
+	_, _ = authConn.Write([]byte("Test payload"))
+	_, _ = authConn.Write([]byte("Test payload 2"))
 
 	expectedResponse := "Test payloadTest payload 2"
 	actualResponse := make([]byte, 256)
@@ -293,10 +295,11 @@ func TestConnectionInvReq(t *testing.T) {
 		}
 	}()
 
+	//nolint:forcetypeassert // the socket was created by this package as a TCP socket
 	conn, err := net.DialTCP("tcp", nil, listener.Addr().(*net.TCPAddr))
 	common.Must(err)
 
-	conn.Write([]byte("ABCDEFGHIJKMLN\r\n\r\n"))
+	_, _ = conn.Write([]byte("ABCDEFGHIJKMLN\r\n\r\n"))
 	l, _, err := bufio.NewReader(conn).ReadLine()
 	common.Must(err)
 	if !strings.HasPrefix(string(l), "HTTP/1.1 400 Bad Request") {

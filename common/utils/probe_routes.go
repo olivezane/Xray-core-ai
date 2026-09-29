@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"net"
 	"os"
 	"runtime"
@@ -9,11 +10,12 @@ import (
 )
 
 func probeRoutes() (ipv4 bool, ipv6 bool) {
-	if conn, err := net.Dial("udp4", "192.33.4.12:53"); err == nil {
+	var d net.Dialer
+	if conn, err := d.DialContext(context.Background(), "udp4", "192.33.4.12:53"); err == nil {
 		ipv4 = true
 		conn.Close()
 	}
-	if conn, err := net.Dial("udp6", "[2001:500:2::c]:53"); err == nil {
+	if conn, err := d.DialContext(context.Background(), "udp6", "[2001:500:2::c]:53"); err == nil {
 		ipv6 = true
 		conn.Close()
 	}

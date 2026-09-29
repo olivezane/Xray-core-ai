@@ -64,8 +64,8 @@ func RCodeFromError(err error) uint16 {
 	if err == nil {
 		return 0
 	}
-	cause := errors.Cause(err)
-	if r, ok := cause.(RCodeError); ok {
+	var r RCodeError
+	if errors.As(err, &r) {
 		return uint16(r)
 	}
 	return 0

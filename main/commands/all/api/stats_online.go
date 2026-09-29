@@ -33,10 +33,10 @@ Example:
 func executeOnlineStats(cmd *base.Command, args []string) {
 	setSharedFlags(cmd)
 	email := cmd.Flag.String("email", "", "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 	statName := "user>>>" + *email + ">>>online"
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := statsService.NewStatsServiceClient(conn)
 	r := &statsService.GetStatsRequest{

@@ -240,7 +240,7 @@ func (c *xdnsConnClient) sendLoop() {
 		_, _ = c.PacketConn.WriteTo(p.p, c.resolverAddrs[cur])
 		for {
 			c.resolverIdx += 1
-			c.resolverIdx %= uint32(len(c.resolverAddrs))
+			c.resolverIdx %= uint32(len(c.resolverAddrs)) //nolint:gosec // resolver index is bounded by the resolver list length
 			if c.resolverIdx == cur {
 				break
 			}
@@ -272,7 +272,7 @@ func (c *xdnsConnClient) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	}
 
-	idx := c.resolverIdx % uint32(len(c.resolverAddrs))
+	idx := c.resolverIdx % uint32(len(c.resolverAddrs)) //nolint:gosec // resolver index is bounded by the resolver list length
 	encoded, err := encode(p, c.clientID, c.domains[idx], c.resolverTypes[idx])
 	if err != nil {
 		errors.LogDebug(context.Background(), addr, " xdns wireformat err ", err, " ", len(p))
@@ -311,7 +311,7 @@ func encode(p []byte, clientID []byte, domain Name, qtype uint16) ([]byte, error
 		buf.WriteByte(byte(224 + n))
 		_, _ = io.CopyN(&buf, rand.Reader, int64(n))
 		if len(p) > 0 {
-			buf.WriteByte(byte(len(p)))
+			buf.WriteByte(byte(len(p))) //nolint:gosec // DNS lengths and counts are bounded by the packet size
 			buf.Write(p)
 		}
 		decoded = buf.Bytes()
@@ -376,7 +376,7 @@ func nextPacket(r *bytes.Reader) ([]byte, error) {
 	}
 	p := make([]byte, n)
 	_, err = io.ReadFull(r, p)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		err = io.ErrUnexpectedEOF
 	}
 	return p, err

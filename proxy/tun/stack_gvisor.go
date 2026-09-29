@@ -152,18 +152,18 @@ func (t *stackGVisor) writeRawUDPPacket(payload []byte, src net.Destination, dst
 	udpHdr.Encode(&header.UDPFields{
 		SrcPort: uint16(src.Port),
 		DstPort: uint16(dst.Port),
-		Length:  uint16(udpLen),
+		Length:  uint16(udpLen), //nolint:gosec // TUN reads are bounded by the MTU
 	})
 
 	// Calculate and set UDP checksum
-	xsum := header.PseudoHeaderChecksum(header.UDPProtocolNumber, srcIP, dstIP, uint16(udpLen))
+	xsum := header.PseudoHeaderChecksum(header.UDPProtocolNumber, srcIP, dstIP, uint16(udpLen)) //nolint:gosec // TUN reads are bounded by the MTU
 	udpHdr.SetChecksum(^udpHdr.CalculateChecksum(checksum.Checksum(payload, xsum)))
 
 	// Build IP header
 	if isIPv4 {
 		ipHdr := header.IPv4(pkt.NetworkHeader().Push(header.IPv4MinimumSize))
 		ipHdr.Encode(&header.IPv4Fields{
-			TotalLength: uint16(header.IPv4MinimumSize + udpLen),
+			TotalLength: uint16(header.IPv4MinimumSize + udpLen), //nolint:gosec // TUN reads are bounded by the MTU
 			TTL:         64,
 			Protocol:    uint8(header.UDPProtocolNumber),
 			SrcAddr:     srcIP,
@@ -173,7 +173,7 @@ func (t *stackGVisor) writeRawUDPPacket(payload []byte, src net.Destination, dst
 	} else {
 		ipHdr := header.IPv6(pkt.NetworkHeader().Push(header.IPv6MinimumSize))
 		ipHdr.Encode(&header.IPv6Fields{
-			PayloadLength:     uint16(udpLen),
+			PayloadLength:     uint16(udpLen), //nolint:gosec // TUN reads are bounded by the MTU
 			TransportProtocol: header.UDPProtocolNumber,
 			HopLimit:          64,
 			SrcAddr:           srcIP,

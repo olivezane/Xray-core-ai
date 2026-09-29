@@ -25,7 +25,7 @@ func RollingHash(hash uint32, input string) uint32 {
 // as aeshash if aes instruction is available).
 // With different seed, each MemHash<seed> performs as distinct hash functions.
 func MemHash(seed uint32, input string) uint32 {
-	return uint32(strhash(unsafe.Pointer(&input), uintptr(seed))) // nosemgrep
+	return uint32(strhash(unsafe.Pointer(&input), uintptr(seed))) //nolint:gosec // nosemgrep: a 32-bit hash is truncated on purpose
 }
 
 const (
@@ -93,9 +93,9 @@ func (g *MphMatcherGroup) addPattern(suffixHash uint32, suffixPattern string, pa
 func (g *MphMatcherGroup) Build() error {
 	ruleCount := len(*g.ruleInfos)
 	g.level0 = make([]uint32, nextPow2(ruleCount/4))
-	g.level0Mask = uint32(len(g.level0) - 1)
+	g.level0Mask = uint32(len(g.level0) - 1) //nolint:gosec // matcher table sizes fit comfortably in uint32
 	g.level1 = make([]uint32, nextPow2(ruleCount))
-	g.level1Mask = uint32(len(g.level1) - 1)
+	g.level1Mask = uint32(len(g.level1) - 1) //nolint:gosec // matcher table sizes fit comfortably in uint32
 
 	// Flatten patterns and values so the built group has no per-rule objects
 	valueCount := 0
@@ -116,9 +116,9 @@ func (g *MphMatcherGroup) Build() error {
 		ruleInfo := (*g.ruleInfos)[g.rules[ruleIdx]]
 		bucketIdx := ruleInfo.rollingHash & g.level0Mask
 		buckets[bucketIdx] = append(buckets[bucketIdx], uint32(ruleIdx))
-		g.patternOffs[ruleIdx+1] = g.patternOffs[ruleIdx] + uint32(len(g.rules[ruleIdx]))
+		g.patternOffs[ruleIdx+1] = g.patternOffs[ruleIdx] + uint32(len(g.rules[ruleIdx])) //nolint:gosec // matcher table sizes fit comfortably in uint32
 		g.values = append(append(g.values, ruleInfo.matchers[Full]...), ruleInfo.matchers[Domain]...)
-		g.valueOffs[ruleIdx+1] = uint32(len(g.values))
+		g.valueOffs[ruleIdx+1] = uint32(len(g.values)) //nolint:gosec // matcher table sizes fit comfortably in uint32
 	}
 	g.rules = nil
 	g.ruleInfos = nil // Set ruleInfos nil to release memory

@@ -115,6 +115,7 @@ func (c *UConn) VerifyPeerCertificate(rawCerts [][]byte, verifiedChains [][]*x50
 					h.Write(c.HandshakeState.Hello.Raw)
 					h.Write(c.HandshakeState.ServerHello.Raw)
 					verify, _ := mldsa65.Scheme().UnmarshalBinaryPublicKey(c.Config.Mldsa65Verify)
+					//nolint:forcetypeassert // the certificate was generated with an ML-DSA-65 key
 					if mldsa65.Verify(verify.(*mldsa65.PublicKey), h.Sum(nil), nil, certs[0].Extensions[0].Value) {
 						c.Verified = true
 						return nil
@@ -161,15 +162,15 @@ func UClient(c net.Conn, config *Config, ctx context.Context, dest net.Destinati
 	}
 	uConn.UConn = utls.UClient(c, utlsConfig, *fingerprint)
 	{
-		uConn.BuildHandshakeState()
+		_ = uConn.BuildHandshakeState()
 		hello := uConn.HandshakeState.Hello
 		hello.SessionId = make([]byte, 32)
 		copy(hello.Raw[39:], hello.SessionId) // the fixed location of `Session ID`
 		hello.SessionId[0] = core.Version_x
 		hello.SessionId[1] = core.Version_y
 		hello.SessionId[2] = core.Version_z
-		hello.SessionId[3] = 0 // reserved
-		binary.BigEndian.PutUint32(hello.SessionId[4:], uint32(time.Now().Unix()))
+		hello.SessionId[3] = 0                                                     // reserved
+		binary.BigEndian.PutUint32(hello.SessionId[4:], uint32(time.Now().Unix())) //nolint:gosec // values come from the config layer or the current time
 		copy(hello.SessionId[8:], config.ShortId)
 		if config.Show {
 			fmt.Printf("REALITY localAddr: %v\thello.SessionId[:16]: %v\n", localAddr, hello.SessionId[:16])
@@ -239,10 +240,10 @@ func UClient(c net.Conn, config *Config, ctx context.Context, dest net.Destinati
 					body []byte
 				)
 				if first {
-					req, _ = http.NewRequest("GET", firstURL, nil)
+					req, _ = http.NewRequestWithContext(ctx, http.MethodGet, firstURL, nil)
 				} else {
 					maps.Lock()
-					req, _ = http.NewRequest("GET", string(prefix)+getPathLocked(paths), nil)
+					req, _ = http.NewRequestWithContext(ctx, http.MethodGet, string(prefix)+getPathLocked(paths), nil)
 					maps.Unlock()
 				}
 				if req == nil {
@@ -256,17 +257,20 @@ func UClient(c net.Conn, config *Config, ctx context.Context, dest net.Destinati
 				if !first {
 					times = int(crypto.RandBetween(config.SpiderY[4], config.SpiderY[5]))
 				}
-				for j := 0; j < times; j++ {
+				for j := range times {
 					if !first && j == 0 {
 						req.Header.Set("Referer", firstURL)
 					}
-					req.AddCookie(&http.Cookie{Name: "padding", Value: strings.Repeat("0", int(crypto.RandBetween(config.SpiderY[0], config.SpiderY[1])))})
+					req.AddCookie(&http.Cookie{Name: "padding", Value: strings.Repeat("0", int(crypto.RandBetween(config.SpiderY[0], config.SpiderY[1])))}) //nolint:gosec // G124: outbound protocol cookie, browser cookie attributes do not apply
 					if resp, err = client.Do(req); err != nil {
 						break
 					}
-					defer resp.Body.Close()
 					req.Header.Set("Referer", req.URL.String())
-					if body, err = io.ReadAll(resp.Body); err != nil {
+					// Close eagerly: this runs inside a loop whose iteration count comes
+					// from config, so deferring would pile up open bodies until get returns.
+					body, err = io.ReadAll(resp.Body)
+					resp.Body.Close()
+					if err != nil {
 						break
 					}
 					maps.Lock()

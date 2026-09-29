@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"strings"
+	"time"
 
 	"github.com/xtls/xray-core/app/observatory"
 	"github.com/xtls/xray-core/common"
@@ -115,7 +116,12 @@ func (p *MetricsHandler) Close() error {
 }
 
 func (p *MetricsHandler) serve(listener xnet.Listener, handler http.Handler) {
-	if err := http.Serve(listener, handler); err != nil && !isClosedListenerError(err) {
+	server := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	if err := server.Serve(listener); err != nil && !isClosedListenerError(err) {
 		errors.LogErrorInner(context.Background(), err, "failed to start metrics server")
 	}
 }
@@ -161,7 +167,7 @@ func (p *MetricsHandler) handleDebugVars(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Write(payload)
+	_, _ = w.Write(payload)
 }
 
 func marshalJSON(value any) json.RawMessage {
@@ -206,11 +212,13 @@ func (p *MetricsHandler) observatoryStatus() any {
 	if feature == nil {
 		return nil
 	}
+	//nolint:forcetypeassert // feature registered under extension.ObservatoryType()
 	observatoryFeature := feature.(extension.Observatory)
 	resp := map[string]*observatory.OutboundStatus{}
 	if o, err := observatoryFeature.GetObservation(context.Background()); err != nil {
 		return err
 	} else {
+		//nolint:forcetypeassert // the observatory RPC always returns *observatory.ObservationResult
 		for _, x := range o.(*observatory.ObservationResult).GetStatus() {
 			resp[x.OutboundTag] = x
 		}
@@ -219,7 +227,7 @@ func (p *MetricsHandler) observatoryStatus() any {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg any) (any, error) {
-		return NewMetricsHandler(ctx, cfg.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg *Config) (any, error) {
+		return NewMetricsHandler(ctx, cfg)
 	}))
 }

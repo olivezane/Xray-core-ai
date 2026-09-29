@@ -32,7 +32,7 @@ Example:
 
 func executeRemoveOutbounds(cmd *base.Command, args []string) {
 	setSharedFlags(cmd)
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 	unnamedArgs := cmd.Flag.Args()
 	if len(unnamedArgs) == 0 {
 		fmt.Println("reading from stdin:")
@@ -60,8 +60,8 @@ func executeRemoveOutbounds(cmd *base.Command, args []string) {
 		base.Fatalf("no outbound to remove")
 	}
 
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := handlerService.NewHandlerServiceClient(conn)
 	for _, tag := range tags {

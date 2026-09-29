@@ -191,8 +191,8 @@ func (s *http2ResponseStream) Write(b []byte) (int, error) {
 }
 
 func (s *http2ResponseStream) Close() error                     { return nil }
-func (s *http2ResponseStream) CancelRead(quic.StreamErrorCode)  { s.body.Close() }
-func (s *http2ResponseStream) CancelWrite(quic.StreamErrorCode) { s.body.Close() }
+func (s *http2ResponseStream) CancelRead(quic.StreamErrorCode)  { _ = s.body.Close() }
+func (s *http2ResponseStream) CancelWrite(quic.StreamErrorCode) { _ = s.body.Close() }
 func (s *http2ResponseStream) SetWriteDeadline(t time.Time) error {
 	return s.controller.SetWriteDeadline(t)
 }

@@ -43,8 +43,8 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return New(ctx, config)
 	}))
 }
 
@@ -77,12 +77,18 @@ func New(ctx context.Context, config *Config) (*Handler, error) {
 	}
 
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
+	//nolint:forcetypeassert // session.ConeKey is only ever set to a bool
 	handler := &Handler{
 		server:        server,
-		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager: pm,
 		cone:          ctx.Value(session.ConeKey).(bool),
 	}
 
+	//nolint:forcetypeassert // the account is created by proxy/vless's own NewAccount
 	a := handler.server.User.Account.(*vless.MemoryAccount)
 	if a.Encryption != "" && a.Encryption != "none" {
 		s := strings.Split(a.Encryption, ".")
@@ -112,9 +118,13 @@ func New(ctx context.Context, config *Config) (*Handler, error) {
 				SniffingRequest: request,
 			})
 		}
+		rd, ok := v.GetFeature(routing.DispatcherType()).(routing.Dispatcher)
+		if !ok {
+			return nil, errors.New("routing.Dispatcher is not registered in Xray core")
+		}
 		handler.reverse = &Reverse{
 			tag:        a.Reverse.Tag,
-			dispatcher: v.GetFeature(routing.DispatcherType()).(routing.Dispatcher),
+			dispatcher: rd,
 			ctx:        rvsCtx,
 			handler:    handler,
 		}
@@ -124,7 +134,7 @@ func New(ctx context.Context, config *Config) (*Handler, error) {
 		}
 		go func() {
 			time.Sleep(2 * time.Second)
-			handler.reverse.Start()
+			_ = handler.reverse.Start()
 		}()
 	}
 
@@ -161,7 +171,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 			h.preConns = make(chan *ConnExpire)
 			for range h.testpre { // TODO: randomize
 				go func() {
-					defer func() { recover() }()
+					defer func() { _ = recover() }()
 					ctx := xctx.ContextWithID(context.Background(), session.NewID())
 					for {
 						conn, err := dialer.Dial(ctx, rec.Destination)
@@ -237,6 +247,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 		Port:    target.Port,
 	}
 
+	//nolint:forcetypeassert // the account is created by proxy/vless's own NewAccount
 	account := request.User.Account.(*vless.MemoryAccount)
 
 	requestAddons := &encoding.Addons{
@@ -336,7 +347,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 				if err := serverWriter.WriteMultiBuffer(multiBuffer); err != nil {
 					return err // ...
 				}
-			} else if err1 != buf.ErrReadTimeout {
+			} else if !errors.Is(err1, buf.ErrReadTimeout) {
 				return err1
 			} else if requestAddons.Flow == vless.XRV {
 				mb := make(buf.MultiBuffer, 1)
@@ -470,7 +481,7 @@ func (r *Reverse) monitor() error {
 			ctx := session.ContextWithOutbounds(r.ctx, []*session.Outbound{{
 				Target: net.Destination{Address: net.DomainAddress("v1.rvs.cool")},
 			}})
-			r.handler.Process(ctx, link2, session.FullHandlerFromContext(ctx).(*proxyman.Handler))
+			_ = r.handler.Process(ctx, link2, session.FullHandlerFromContext(ctx).(*proxyman.Handler)) //nolint:forcetypeassert // the reverse handler is always a *proxyman.Handler
 			common.Interrupt(reader1)
 			common.Interrupt(reader2)
 		}()

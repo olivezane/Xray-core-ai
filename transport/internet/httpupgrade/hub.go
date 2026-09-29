@@ -46,8 +46,8 @@ func (s *server) Handle(conn net.Conn) {
 // upgrade execute a fake websocket upgrade process and return the available connection
 func (s *server) upgrade(conn net.Conn) (stat.Connection, error) {
 	// timeout and header limit are the same as websocket
-	conn.SetReadDeadline(time.Now().Add(time.Second * 4))
-	defer conn.SetReadDeadline(time.Time{})
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second * 4))
+	defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
 	connReader := bufio.NewReader(io.LimitReader(conn, 12288))
 
 	req, err := http.ReadRequest(connReader)
@@ -73,7 +73,7 @@ func (s *server) upgrade(conn net.Conn) (stat.Connection, error) {
 	}
 	resp := &http.Response{
 		Status:     "101 Switching Protocols",
-		StatusCode: 101,
+		StatusCode: http.StatusSwitchingProtocols,
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
 		ProtoMinor: 1,
@@ -115,6 +115,7 @@ func (s *server) keepAccepting() {
 }
 
 func ListenHTTPUpgrade(ctx context.Context, address net.Address, port net.Port, streamSettings *internet.MemoryStreamConfig, addConn internet.ConnHandler) (internet.Listener, error) {
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	transportConfiguration := streamSettings.ProtocolSettings.(*Config)
 	if transportConfiguration != nil {
 		if streamSettings.SocketSettings == nil {

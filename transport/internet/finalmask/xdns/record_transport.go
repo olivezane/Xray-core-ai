@@ -69,13 +69,13 @@ func ipAnswersForPayload(question Question, ttl uint32, payload []byte) ([]RR, e
 	}
 
 	answers := make([]RR, 0, numRecords)
-	for i := 0; i < numRecords; i++ {
+	for i := range numRecords {
 		offset := i * chunkSize
 		n := min(max(len(payload)-offset, 0), chunkSize)
 
 		data := make([]byte, rrDataSize)
 		data[0] = byte(i)
-		data[1] = byte(n)
+		data[1] = byte(n) //nolint:gosec // DNS lengths and counts are bounded by the packet size
 		copy(data[ipRecordHeaderSize:], payload[offset:offset+n])
 
 		answers = append(answers, RR{
@@ -170,7 +170,7 @@ func computeMaxEncodedPayloadForType(limit int, rrType uint16) int {
 		}
 	}
 
-	queryLimit := uint16(limit)
+	queryLimit := uint16(limit) //nolint:gosec // DNS lengths and counts are bounded by the packet size
 	if int(queryLimit) != limit {
 		queryLimit = 0xffff
 	}

@@ -31,11 +31,11 @@ func executeListInbounds(cmd *base.Command, args []string) {
 	setSharedFlags(cmd)
 	var isOnlyTagsStr string
 	cmd.Flag.StringVar(&isOnlyTagsStr, "isOnlyTags", "", "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 	isOnlyTags := isOnlyTagsStr == "true"
 
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := handlerService.NewHandlerServiceClient(conn)
 

@@ -167,7 +167,7 @@ func (d *downloader) downloadOne(asset *Asset) (stage, error) {
 	keepTemp := false
 	defer func() {
 		if !keepTemp {
-			os.Remove(tempName)
+			_ = os.Remove(tempName)
 		}
 	}()
 
@@ -210,7 +210,7 @@ func (d *downloader) fetch(rawURL string, writer io.Writer) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return errors.New("unexpected status code: ", resp.StatusCode)
 	}
 
@@ -227,7 +227,7 @@ func (d *downloader) fetch(rawURL string, writer io.Writer) error {
 func clean(assets []stage) {
 	for _, asset := range assets {
 		if asset.temp != "" {
-			os.Remove(asset.temp)
+			_ = os.Remove(asset.temp)
 		}
 	}
 }
@@ -324,7 +324,7 @@ func (t *tx) commit() error {
 
 func tempFile(target string, suffix string) (*os.File, error) {
 	dir := filepath.Dir(target)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, err
 	}
 	return os.CreateTemp(dir, "."+filepath.Base(target)+".*"+suffix)
@@ -337,7 +337,7 @@ func backupFile(target string) (string, error) {
 	}
 	name := file.Name()
 	if err := file.Close(); err != nil {
-		os.Remove(name)
+		_ = os.Remove(name)
 		return "", err
 	}
 	if err := os.Remove(name); err != nil {

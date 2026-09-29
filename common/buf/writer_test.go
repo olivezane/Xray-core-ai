@@ -22,7 +22,7 @@ func TestWriter(t *testing.T) {
 	writeBuffer := bytes.NewBuffer(make([]byte, 0, 1024*1024))
 
 	writer := NewBufferedWriter(NewWriter(writeBuffer))
-	writer.SetBuffered(false)
+	_ = writer.SetBuffered(false)
 	common.Must(writer.WriteMultiBuffer(MultiBuffer{lb}))
 	common.Must(writer.Flush())
 
@@ -36,7 +36,7 @@ func TestBytesWriterReadFrom(t *testing.T) {
 	pReader, pWriter := pipe.New(pipe.WithSizeLimit(size))
 	reader := bufio.NewReader(io.LimitReader(rand.Reader, size))
 	writer := NewBufferedWriter(pWriter)
-	writer.SetBuffered(false)
+	_ = writer.SetBuffered(false)
 	nBytes, err := reader.WriteTo(writer)
 	if nBytes != size {
 		t.Fatal("unexpected size of bytes written: ", nBytes)

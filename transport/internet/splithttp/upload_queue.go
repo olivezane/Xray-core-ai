@@ -82,6 +82,7 @@ func (h *uploadQueue) Read(b []byte) (int, error) {
 	}
 
 	for len(h.heap) > 0 {
+		//nolint:forcetypeassert // the upload heap only ever stores Packet
 		packet := heap.Pop(&h.heap).(Packet)
 		var n int
 
@@ -131,6 +132,7 @@ func (h uploadHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 func (h *uploadHeap) Push(x any) {
 	// Push and Pop use pointer receivers because they modify the slice's length,
 	// not just its contents.
+	//nolint:forcetypeassert // the upload heap only ever stores Packet
 	*h = append(*h, x.(Packet))
 }
 

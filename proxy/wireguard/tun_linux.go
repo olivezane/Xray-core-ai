@@ -69,7 +69,7 @@ func createKernelTun(localAddresses, dnsServers []netip.Addr, mtu int) (tdev tun
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(path, []byte("0"), 0o644)
+		return os.WriteFile(path, []byte("0"), 0o644) //nolint:gosec // G306: procfs sysctl entries ignore file mode
 	}
 
 	// system configs.
@@ -121,7 +121,7 @@ func createKernelTun(localAddresses, dnsServers []netip.Addr, mtu int) (tdev tun
 			}
 			ipv6TableIndex--
 			if ipv6TableIndex < 0 {
-				return nil, nil, fmt.Errorf("failed to find available ipv6 table index")
+				return nil, nil, errors.New("failed to find available ipv6 table index")
 			}
 		}
 	}
@@ -186,10 +186,10 @@ func createKernelTun(localAddresses, dnsServers []netip.Addr, mtu int) (tdev tun
 			return nil, nil, fmt.Errorf("failed to add address %s to %s: %w", addr, n, err)
 		}
 	}
-	if err = t.handle.LinkSetMTU(l, mtu); err != nil {
+	if err := t.handle.LinkSetMTU(l, mtu); err != nil {
 		return nil, nil, err
 	}
-	if err = t.handle.LinkSetUp(l); err != nil {
+	if err := t.handle.LinkSetUp(l); err != nil {
 		return nil, nil, err
 	}
 
@@ -276,7 +276,7 @@ func KernelTunSupported() (bool, error) {
 
 	var data unix.CapUserData
 	if err := unix.Capget(&hdr, &data); err != nil {
-		return false, fmt.Errorf("failed to get capabilities: %v", err)
+		return false, fmt.Errorf("failed to get capabilities: %w", err)
 	}
 
 	return (data.Effective & (1 << unix.CAP_NET_ADMIN)) != 0, nil

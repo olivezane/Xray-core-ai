@@ -52,7 +52,7 @@ func NewHunkConn(hc HunkConn, cancel context.CancelFunc, trustedXForwardedFor []
 func (h *HunkReaderWriter) forceFetch() error {
 	hunk, err := h.hc.Recv()
 	if err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return err
 		}
 

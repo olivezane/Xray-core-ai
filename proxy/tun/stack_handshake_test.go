@@ -19,7 +19,7 @@ func buildTCPSegment(t *testing.T, client netip.AddrPort, server netip.AddrPort,
 	packet := make([]byte, header.IPv4MinimumSize+header.TCPMinimumSize)
 	ip := header.IPv4(packet)
 	ip.Encode(&header.IPv4Fields{
-		TotalLength: uint16(len(packet)),
+		TotalLength: uint16(len(packet)), //nolint:gosec // G115: length of a buffer allocated in the same statement, far below 64KiB
 		TTL:         64,
 		Protocol:    uint8(header.TCPProtocolNumber),
 		SrcAddr:     tcpip.AddrFrom4(client.Addr().As4()),
@@ -37,7 +37,7 @@ func buildTCPSegment(t *testing.T, client netip.AddrPort, server netip.AddrPort,
 		Flags:      flags,
 		WindowSize: 65535,
 	})
-	segment.SetChecksum(^segment.CalculateChecksum(header.PseudoHeaderChecksum(header.TCPProtocolNumber, ip.SourceAddress(), ip.DestinationAddress(), uint16(len(segment)))))
+	segment.SetChecksum(^segment.CalculateChecksum(header.PseudoHeaderChecksum(header.TCPProtocolNumber, ip.SourceAddress(), ip.DestinationAddress(), uint16(len(segment))))) //nolint:gosec // G115: length of a buffer allocated in the same statement, far below 64KiB
 
 	return packet
 }
@@ -65,7 +65,7 @@ func parseSynAck(t *testing.T, packet []byte, client, server netip.AddrPort) (he
 		t.Fatalf("the stack answered %d bytes, too short to be a tcp segment", len(packet))
 	}
 	ip := header.IPv4(packet)
-	if ip.Protocol() != uint8(header.TCPProtocolNumber) {
+	if uint32(ip.Protocol()) != uint32(header.TCPProtocolNumber) {
 		t.Fatalf("the stack answered with ip protocol %d, want tcp", ip.Protocol())
 	}
 	if !ip.IsChecksumValid() {
@@ -96,7 +96,7 @@ const handshakeMTU = 1500
 
 // mtuMSS is the segment size an answer to a handshake of the given MTU offers
 func mtuMSS(mtu uint32) uint16 {
-	return uint16(mtu - header.IPv4MinimumSize - header.TCPMinimumSize)
+	return uint16(mtu - header.IPv4MinimumSize - header.TCPMinimumSize) //nolint:gosec // G115: the value is bounded by the fixture built above
 }
 
 // waitForPacketUntil gives up on a packet the test never receives

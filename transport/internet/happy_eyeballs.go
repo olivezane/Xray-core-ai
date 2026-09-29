@@ -21,7 +21,7 @@ func TcpRaceDial(ctx context.Context, src net.Address, ips []net.IP, port net.Po
 
 	prioritizeIPv6 := sockopt.HappyEyeballs.PrioritizeIpv6
 	interleave := sockopt.HappyEyeballs.Interleave
-	tryDelayMs := time.Duration(sockopt.HappyEyeballs.TryDelayMs) * time.Millisecond
+	tryDelayMs := time.Duration(sockopt.HappyEyeballs.TryDelayMs) * time.Millisecond //nolint:gosec // a millisecond config value cannot overflow a Duration
 	maxConcurrentTry := sockopt.HappyEyeballs.MaxConcurrentTry
 
 	ips = sortIPs(ips, prioritizeIPv6, interleave)

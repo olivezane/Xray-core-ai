@@ -48,14 +48,18 @@ type Handler struct {
 
 func NewClient(ctx context.Context, conf *DeviceConfig) (*Handler, error) {
 	v := core.MustFromContext(ctx)
+	//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 	p := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	//nolint:forcetypeassert // feature registered under dns.ClientType()
 	d := v.GetFeature(dns.ClientType()).(dns.Client)
 
+	//nolint:forcetypeassert // session.StreamSettingsFromContext only ever stores *internet.MemoryStreamConfig
 	streamSettings := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig)
 	tag := session.FullHandlerFromContext(ctx).Tag()
 	var uplinkCounter stats.Counter
 	var downlinkCounter stats.Counter
 	if len(tag) > 0 && p.ForSystem().Stats.OutboundUplink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := v.GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "outbound>>>" + tag + ">>>traffic>>>uplink"
 		c, _ := statsManager.GetOrRegisterCounter(name)
@@ -64,6 +68,7 @@ func NewClient(ctx context.Context, conf *DeviceConfig) (*Handler, error) {
 		}
 	}
 	if len(tag) > 0 && p.ForSystem().Stats.OutboundDownlink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := v.GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "outbound>>>" + tag + ">>>traffic>>>downlink"
 		c, _ := statsManager.GetOrRegisterCounter(name)
@@ -199,9 +204,17 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 			return errors.New("failed to create UDP connection").Base(err)
 		}
 		defer conn.Close()
+		pc, ok := conn.(*internet.PacketConnWrapper)
+		if !ok {
+			return errors.New("unexpected UDP connection type: ", conn)
+		}
+		udpAddr, ok := conn.RemoteAddr().(*net.UDPAddr)
+		if !ok {
+			return errors.New("unexpected UDP remote address type: ", conn.RemoteAddr())
+		}
 		c := &UDPConnClient{
-			PacketConn: conn.(*internet.PacketConnWrapper).PacketConn,
-			Dest:       conn.RemoteAddr().(*net.UDPAddr),
+			PacketConn: pc.PacketConn,
+			Dest:       udpAddr,
 		}
 		reader = c
 		writer = c
@@ -264,6 +277,7 @@ func (h *Handler) init(ctx context.Context) error {
 			if err != nil {
 				return nil, errors.New("failed to dial to dest").Base(err)
 			}
+			//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
 			pktConn = conn.(*finalmask.PacketConnWrapper).PacketConn
 		} else {
 			conn, err := internet.DialSystem(ctx, dest, h.streamSettings.SocketSettings)
@@ -403,11 +417,17 @@ func (c *UDPConnClient) ReadMultiBuffer() (buf.MultiBuffer, error) {
 		b.Release()
 		return nil, err
 	}
-	b.Resize(0, int32(n))
+	b.Resize(0, int32(n)) //nolint:gosec // read length is bounded by the buffer size
+
+	udpAddr, ok := addr.(*net.UDPAddr)
+	if !ok {
+		b.Release()
+		return nil, errors.New("unexpected UDP address type: ", addr)
+	}
 
 	b.UDP = &net.Destination{
-		Address: net.IPAddress(addr.(*net.UDPAddr).IP),
-		Port:    net.Port(addr.(*net.UDPAddr).Port),
+		Address: net.IPAddress(udpAddr.IP),
+		Port:    net.Port(udpAddr.Port), //nolint:gosec // Port of a net.Addr is always 0..65535
 		Network: net.Network_UDP,
 	}
 
@@ -419,10 +439,11 @@ func (c *UDPConnClient) WriteMultiBuffer(mb buf.MultiBuffer) error {
 		dst := c.Dest
 		if b.UDP != nil {
 			if b.UDP.Address.Family().IsDomain() {
-				if b.UDP.Port != net.Port(dst.Port) {
+				if b.UDP.Port != net.Port(dst.Port) { //nolint:gosec // Port of a net.UDPAddr is always 0..65535
 					dst = &net.UDPAddr{IP: dst.IP, Port: int(b.UDP.Port)}
 				}
 			} else {
+				//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 				dst = b.UDP.RawNetAddr().(*net.UDPAddr)
 			}
 		}

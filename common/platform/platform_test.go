@@ -53,7 +53,7 @@ func TestGetAssetLocation(t *testing.T) {
 		t.Error("asset dir: ", loc, " not in ", exec)
 	}
 
-	os.Setenv("xray.location.asset", "/xray")
+	t.Setenv("xray.location.asset", "/xray")
 	if runtime.GOOS == "windows" {
 		if v := GetAssetLocation("t"); v != "\\xray\\t" {
 			t.Error("asset loc: ", v)

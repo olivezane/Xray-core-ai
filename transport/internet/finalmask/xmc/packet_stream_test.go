@@ -2,6 +2,7 @@ package xmc
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net"
 	"testing"
@@ -37,7 +38,7 @@ func TestPacketStreamUsesPlainFraming(t *testing.T) {
 }
 
 func TestPacketStreamRoundTrip(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +77,7 @@ func TestPacketStreamRoundTrip(t *testing.T) {
 		serverDone <- writeErr
 	}()
 
-	rawClient, err := net.Dial("tcp", ln.Addr().String())
+	rawClient, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -56,7 +56,7 @@ func (r *FullReader) Read(p []byte) (n int, err error) {
 // ReadTCPSession reads a Shadowsocks TCP session from the given reader, returns its header and remaining parts.
 func ReadTCPSession(validator *Validator, reader io.Reader) (*protocol.RequestHeader, buf.Reader, error) {
 	behaviorSeed := validator.GetBehaviorSeed()
-	drainer, errDrain := drain.NewBehaviorSeedLimitedDrainer(int64(behaviorSeed), 16+38, 3266, 64)
+	drainer, errDrain := drain.NewBehaviorSeedLimitedDrainer(int64(behaviorSeed), 16+38, 3266, 64) //nolint:gosec // the seed only perturbs the drainer, a wrap-around is harmless
 
 	if errDrain != nil {
 		return nil, nil, errors.New("failed to initialize drainer").Base(errDrain)
@@ -74,11 +74,11 @@ func ReadTCPSession(validator *Validator, reader io.Reader) (*protocol.RequestHe
 	bs := buffer.Bytes()
 	user, aead, _, ivLen, err := validator.Get(bs, protocol.RequestCommandTCP)
 
-	switch err {
-	case ErrNotFound:
+	switch {
+	case errors.Is(err, ErrNotFound):
 		drainer.AcknowledgeReceive(int(buffer.Len()))
 		return nil, nil, drain.WithError(drainer, reader, errors.New("failed to match an user").Base(err))
-	case ErrIVNotUnique:
+	case errors.Is(err, ErrIVNotUnique):
 		drainer.AcknowledgeReceive(int(buffer.Len()))
 		return nil, nil, drain.WithError(drainer, reader, errors.New("failed iv check").Base(err))
 	default:
@@ -94,6 +94,7 @@ func ReadTCPSession(validator *Validator, reader io.Reader) (*protocol.RequestHe
 				Auth: auth,
 			}, reader, protocol.TransferTypeStream, nil)
 		} else {
+			//nolint:forcetypeassert // the account is created by this package's own NewAccount
 			account := user.Account.(*MemoryAccount)
 			iv := append([]byte(nil), buffer.BytesTo(ivLen)...)
 			r, err = account.Cipher.NewDecryptionReader(account.Key, iv, reader)
@@ -133,6 +134,7 @@ func ReadTCPSession(validator *Validator, reader io.Reader) (*protocol.RequestHe
 // WriteTCPRequest writes Shadowsocks request into the given writer, and returns a writer for body.
 func WriteTCPRequest(request *protocol.RequestHeader, writer io.Writer) (buf.Writer, error) {
 	user := request.User
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	account := user.Account.(*MemoryAccount)
 
 	var iv []byte
@@ -163,6 +165,7 @@ func WriteTCPRequest(request *protocol.RequestHeader, writer io.Writer) (buf.Wri
 }
 
 func ReadTCPResponse(user *protocol.MemoryUser, reader io.Reader) (buf.Reader, error) {
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	account := user.Account.(*MemoryAccount)
 
 	hashkdf := hmac.New(sha256.New, []byte("SSBSKDF"))
@@ -190,6 +193,7 @@ func ReadTCPResponse(user *protocol.MemoryUser, reader io.Reader) (buf.Reader, e
 
 func WriteTCPResponse(request *protocol.RequestHeader, writer io.Writer) (buf.Writer, error) {
 	user := request.User
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	account := user.Account.(*MemoryAccount)
 
 	var iv []byte
@@ -206,6 +210,7 @@ func WriteTCPResponse(request *protocol.RequestHeader, writer io.Writer) (buf.Wr
 
 func EncodeUDPPacket(request *protocol.RequestHeader, payload []byte) (*buf.Buffer, error) {
 	user := request.User
+	//nolint:forcetypeassert // the account is created by this package's own NewAccount
 	account := user.Account.(*MemoryAccount)
 
 	buffer := buf.New()
@@ -218,7 +223,7 @@ func EncodeUDPPacket(request *protocol.RequestHeader, payload []byte) (*buf.Buff
 		return nil, errors.New("failed to write address").Base(err)
 	}
 
-	buffer.Write(payload)
+	_, _ = buffer.Write(payload)
 
 	if err := account.Cipher.EncodePacket(account.Key, buffer); err != nil {
 		return nil, errors.New("failed to encrypt UDP payload").Base(err)
@@ -250,7 +255,7 @@ func DecodeUDPPacket(validator *Validator, payload *buf.Buffer) (*protocol.Reque
 
 	if account.Cipher.IsAEAD() {
 		payload.Clear()
-		payload.Write(d)
+		_, _ = payload.Write(d)
 	} else {
 		if account.Cipher.IVSize() > 0 {
 			iv := make([]byte, account.Cipher.IVSize())
@@ -292,7 +297,7 @@ func (v *UDPReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 		return nil, err
 	}
 	validator := new(Validator)
-	validator.Add(v.User)
+	_ = validator.Add(v.User)
 
 	u, payload, err := DecodeUDPPacket(validator, buffer)
 	if err != nil {

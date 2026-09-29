@@ -37,15 +37,15 @@ Example:
 
 func executeBalancerInfo(cmd *base.Command, args []string) {
 	setSharedFlags(cmd)
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 	unnamedArgs := cmd.Flag.Args()
 	if len(unnamedArgs) == 0 {
 		fmt.Println("set balancer tag")
 		unnamedArgs = []string{""}
 	}
 
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 	client := routerService.NewRoutingServiceClient(conn)
 	r := &routerService.GetBalancerInfoRequest{Tag: unnamedArgs[0]}
 	resp, err := client.GetBalancerInfo(ctx, r)
@@ -78,15 +78,7 @@ func showBalancerInfo(b *routerService.BalancerMsg) {
 			writeRow(sb, tableIndent, i+1, []string{o}, nil)
 		}
 	}
-	os.Stdout.WriteString(sb.String())
-}
-
-func getColumnFormats(titles []string) []string {
-	w := make([]string, len(titles))
-	for i, t := range titles {
-		w[i] = fmt.Sprintf("%%-%ds ", len(t))
-	}
-	return w
+	_, _ = os.Stdout.WriteString(sb.String())
 }
 
 func writeRow(sb *strings.Builder, indent, index int, values, formats []string) {
@@ -94,14 +86,14 @@ func writeRow(sb *strings.Builder, indent, index int, values, formats []string) 
 		// title line
 		sb.WriteString(strings.Repeat(" ", indent+4))
 	} else {
-		sb.WriteString(fmt.Sprintf("%s%-4d", strings.Repeat(" ", indent), index))
+		_, _ = fmt.Fprintf(sb, "%s%-4d", strings.Repeat(" ", indent), index)
 	}
 	for i, v := range values {
 		format := "%-14s"
 		if i < len(formats) {
 			format = formats[i]
 		}
-		sb.WriteString(fmt.Sprintf(format, v))
+		_, _ = fmt.Fprintf(sb, format, v)
 	}
 	sb.WriteByte('\n')
 }

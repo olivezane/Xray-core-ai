@@ -59,7 +59,8 @@ func NewClient(ctx context.Context, config *ClientConfig) (*Client, error) {
 
 	v := core.MustFromContext(ctx)
 	return &Client{
-		server:        server,
+		server: server,
+		//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
 		header:        config.Header,
 	}, nil
@@ -87,10 +88,10 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 	var conn stat.Connection
 
 	mbuf, _ := link.Reader.ReadMultiBuffer()
-	len := mbuf.Len()
-	firstPayload := bytespool.Alloc(len)
+	payloadLen := mbuf.Len()
+	firstPayload := bytespool.Alloc(payloadLen)
 	mbuf, _ = buf.SplitBytes(mbuf, firstPayload)
-	firstPayload = firstPayload[:len]
+	firstPayload = firstPayload[:payloadLen]
 
 	buf.ReleaseMulti(mbuf)
 	defer bytespool.Free(firstPayload)
@@ -196,7 +197,7 @@ func fillRequestHeader(ctx context.Context, header []*Header) ([]*Header, error)
 		}
 		var buf bytes.Buffer
 
-		if err = tmpl.Execute(&buf, data); err != nil {
+		if err := tmpl.Execute(&buf, data); err != nil {
 			return nil, err
 		}
 		filled[i] = &Header{Key: h.Key, Value: buf.String()}
@@ -215,6 +216,7 @@ func setUpHTTPTunnel(ctx context.Context, dest net.Destination, target string, u
 	}
 
 	if user != nil && user.Account != nil {
+		//nolint:forcetypeassert // the account is created by this package's own NewAccount
 		account := user.Account.(*Account)
 		auth := account.GetUsername() + ":" + account.GetPassword()
 		req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(auth)))
@@ -376,7 +378,7 @@ func (h *http2Conn) Close() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewClient(ctx, config.(*ClientConfig))
+	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config *ClientConfig) (any, error) {
+		return NewClient(ctx, config)
 	}))
 }

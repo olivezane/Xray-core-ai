@@ -44,6 +44,7 @@ func TestMipstackClosesUnderTraffic(t *testing.T) {
 	if err := stack.Start(); err != nil {
 		t.Fatalf("start the MIPS Stack: %v", err)
 	}
+	//nolint:forcetypeassert // the tun stack is constructed by this package as *stackMipstack
 	underTest := stack.(*stackMipstack)
 
 	peer := newBridgeMipstackPeer(t, device, netip.MustParsePrefix("10.0.0.2/24"))

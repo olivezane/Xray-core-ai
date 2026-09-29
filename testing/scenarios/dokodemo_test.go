@@ -1,6 +1,7 @@
 package scenarios
 
 import (
+	"os/exec"
 	"testing"
 	"time"
 
@@ -111,8 +112,8 @@ func TestDokodemoTCP(t *testing.T) {
 		}
 
 		server, _ := InitializeServerConfig(clientConfig)
-		if server != nil && WaitConnAvailableWithTest(t, testTCPConn(net.Port(clientPort), 1024, time.Second*2)) {
-			defer CloseServer(server)
+		if server != nil && WaitConnAvailableWithTest(t, testTCPConn(net.Port(clientPort), 1024, time.Second*2)) { //nolint:gosec // G115: the port comes from a bound socket address, so it is 0..65535
+			defer CloseServer(server) //nolint:gocritic // deferInLoop: the loop iterates over the test server table and the test function is short-lived
 			break
 		}
 		retry++
@@ -123,7 +124,7 @@ func TestDokodemoTCP(t *testing.T) {
 	}
 
 	for port := clientPort; port <= clientPort+clientPortRange; port++ {
-		if err := testTCPConn(net.Port(port), 1024, time.Second*2)(); err != nil {
+		if err := testTCPConn(net.Port(port), 1024, time.Second*2)(); err != nil { //nolint:gosec // G115: the port comes from a bound socket address, so it is 0..65535
 			t.Error(err)
 		}
 	}
@@ -135,7 +136,7 @@ func TestDokodemoUDP(t *testing.T) {
 	}
 	dest, err := udpServer.Start()
 	common.Must(err)
-	defer udpServer.Close()
+	defer func() { _ = udpServer.Close() }()
 
 	userID := protocol.NewID(uuid.New())
 	serverPort := tcp.PickPort()
@@ -172,6 +173,7 @@ func TestDokodemoUDP(t *testing.T) {
 	clientPortRange := uint32(3)
 	retry := 1
 	clientPort := uint32(udp.PickPort())
+	var started *exec.Cmd
 	for {
 		clientConfig := &core.Config{
 			Inbound: []*core.InboundHandlerConfig{
@@ -205,8 +207,8 @@ func TestDokodemoUDP(t *testing.T) {
 		}
 
 		server, _ := InitializeServerConfig(clientConfig)
-		if server != nil && WaitConnAvailableWithTest(t, testUDPConn(net.Port(clientPort), 1024, time.Second*2)) {
-			defer CloseServer(server)
+		if server != nil && WaitConnAvailableWithTest(t, testUDPConn(net.Port(clientPort), 1024, time.Second*2)) { //nolint:gosec // G115: the port comes from a bound socket address, so it is 0..65535
+			started = server
 			break
 		}
 		retry++
@@ -215,10 +217,13 @@ func TestDokodemoUDP(t *testing.T) {
 		}
 		clientPort = uint32(udp.PickPort())
 	}
+	if started != nil {
+		defer CloseServer(started)
+	}
 
 	var errg errgroup.Group
 	for port := clientPort; port <= clientPort+clientPortRange; port++ {
-		errg.Go(testUDPConn(net.Port(port), 1024, time.Second*5))
+		errg.Go(testUDPConn(net.Port(port), 1024, time.Second*5)) //nolint:gosec // G115: the port comes from a bound socket address, so it is 0..65535
 	}
 	if err := errg.Wait(); err != nil {
 		t.Error(err)

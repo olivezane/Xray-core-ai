@@ -85,7 +85,7 @@ func TestMphIndexMatcher(t *testing.T) {
 		common.Must(err)
 		matcherGroup.Add(matcher)
 	}
-	matcherGroup.Build()
+	_ = matcherGroup.Build()
 	for _, test := range cases {
 		if m := matcherGroup.Match(test.Input); !reflect.DeepEqual(m, test.Output) {
 			t.Error("unexpected output: ", m, " for test case ", test)

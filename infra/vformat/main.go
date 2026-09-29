@@ -51,7 +51,7 @@ func formatGoSource(src []byte, opts format.Options) ([]byte, error) {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage of vformat:\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage of vformat:\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -100,7 +100,7 @@ func main() {
 	var formatRequired atomic.Bool
 	var hasErrors atomic.Bool
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for range runtime.NumCPU() {
 		wg.Go(func() {
 			for path := range jobs {
 				src, err := os.ReadFile(path)
@@ -131,7 +131,7 @@ func main() {
 							hasErrors.Store(true)
 							continue
 						}
-						if writeErr := os.WriteFile(path, formatted, info.Mode().Perm()); writeErr != nil {
+						if writeErr := os.WriteFile(path, formatted, info.Mode().Perm()); writeErr != nil { //nolint:gosec // G703: paths come from the developer's own command-line arguments
 							fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", path, writeErr)
 							hasErrors.Store(true)
 							continue
@@ -202,12 +202,12 @@ func main() {
 // diff algorithm copied from mvdan.cc/gofumpt/internal/govendor/diff
 type pair struct{ x, y int }
 
-func diff(oldName string, old []byte, newName string, new []byte) []byte {
-	if bytes.Equal(old, new) {
+func diff(oldName string, old []byte, newName string, newContent []byte) []byte {
+	if bytes.Equal(old, newContent) {
 		return nil
 	}
 	x := diffLines(old)
-	y := diffLines(new)
+	y := diffLines(newContent)
 
 	var out bytes.Buffer
 	fmt.Fprintf(&out, "diff %s %s\n", oldName, newName)

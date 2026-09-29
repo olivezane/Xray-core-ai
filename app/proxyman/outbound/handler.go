@@ -32,8 +32,10 @@ func getStatCounter(v *core.Instance, tag string) (stats.Counter, stats.Counter)
 	var uplinkCounter stats.Counter
 	var downlinkCounter stats.Counter
 
+	//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 	policy := v.GetFeature(policy.ManagerType()).(policy.Manager)
 	if len(tag) > 0 && policy.ForSystem().Stats.OutboundUplink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := v.GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "outbound>>>" + tag + ">>>traffic>>>uplink"
 		c, _ := statsManager.GetOrRegisterCounter(name)
@@ -42,6 +44,7 @@ func getStatCounter(v *core.Instance, tag string) (stats.Counter, stats.Counter)
 		}
 	}
 	if len(tag) > 0 && policy.ForSystem().Stats.OutboundDownlink {
+		//nolint:forcetypeassert // feature registered under stats.ManagerType(); the stats app is mandatory
 		statsManager := v.GetFeature(stats.ManagerType()).(stats.Manager)
 		name := "outbound>>>" + tag + ">>>traffic>>>downlink"
 		c, _ := statsManager.GetOrRegisterCounter(name)

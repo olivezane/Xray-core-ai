@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/xtls/xray-core/common"
+	"github.com/xtls/xray-core/common/errors"
 )
 
 // utpPacket builds the fixed 20-byte header defined by BEP 29.
@@ -56,7 +57,7 @@ func TestSniffUTP(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			h, err := SniffUTP(c.payload)
-			if err != c.err {
+			if !errors.Is(err, c.err) {
 				t.Fatalf("expected error %v, got %v", c.err, err)
 			}
 			if err == nil && h == nil {

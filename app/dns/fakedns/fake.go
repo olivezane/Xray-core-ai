@@ -98,6 +98,7 @@ func (fkdns *Holder) GetFakeIPForDomain(domain string) []net.Address {
 	fkdns.mu.Lock()
 	defer fkdns.mu.Unlock()
 	if v, ok := fkdns.domainToIP.Get(domain); ok {
+		//nolint:forcetypeassert // the fake DNS holder only stores net.Address values
 		return []net.Address{v.(net.Address)}
 	}
 	currentTimeMillis := uint64(time.Now().UnixMilli())
@@ -132,6 +133,7 @@ func (fkdns *Holder) GetDomainFromFakeDNS(ip net.Address) string {
 		return ""
 	}
 	if k, ok := fkdns.domainToIP.GetKeyFromValue(ip); ok {
+		//nolint:forcetypeassert // the fake DNS holder only stores string keys
 		return k.(string)
 	}
 	errors.LogInfo(context.Background(), "A fake ip request to ", ip, ", however there is no matching domain name in fake DNS")
@@ -226,19 +228,19 @@ func NewFakeDNSHolderMulti(conf *FakeDnsPoolMulti) (*HolderMulti, error) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*FakeDnsPool)(nil), func(ctx context.Context, config any) (any, error) {
+	common.Must(common.RegisterConfig((*FakeDnsPool)(nil), func(ctx context.Context, config *FakeDnsPool) (any, error) {
 		var f *Holder
 		var err error
-		if f, err = NewFakeDNSHolderConfigOnly(config.(*FakeDnsPool)); err != nil {
+		if f, err = NewFakeDNSHolderConfigOnly(config); err != nil {
 			return nil, err
 		}
 		return f, nil
 	}))
 
-	common.Must(common.RegisterConfig((*FakeDnsPoolMulti)(nil), func(ctx context.Context, config any) (any, error) {
+	common.Must(common.RegisterConfig((*FakeDnsPoolMulti)(nil), func(ctx context.Context, config *FakeDnsPoolMulti) (any, error) {
 		var f *HolderMulti
 		var err error
-		if f, err = NewFakeDNSHolderMulti(config.(*FakeDnsPoolMulti)); err != nil {
+		if f, err = NewFakeDNSHolderMulti(config); err != nil {
 			return nil, err
 		}
 		return f, nil

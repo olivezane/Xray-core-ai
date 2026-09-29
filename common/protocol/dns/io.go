@@ -19,7 +19,7 @@ func PackMessage(msg *dnsmessage.Message) (*buf.Buffer, error) {
 		buffer.Release()
 		return nil, err
 	}
-	buffer.Resize(0, int32(len(packed)))
+	buffer.Resize(0, int32(len(packed))) //nolint:gosec // bounded by the buffer size / buf.Size
 	return buffer, nil
 }
 
@@ -138,7 +138,7 @@ func (w *TCPWriter) WriteMessage(b *buf.Buffer) error {
 	mb := make(buf.MultiBuffer, 0, 2)
 
 	size := buf.New()
-	binary.BigEndian.PutUint16(size.Extend(2), uint16(b.Len()))
+	binary.BigEndian.PutUint16(size.Extend(2), uint16(b.Len())) //nolint:gosec // DNS message length is bounded by the 8K buffer
 	mb = append(mb, size, b)
 	return w.WriteMultiBuffer(mb)
 }

@@ -45,7 +45,7 @@ func NewCacheController(name string, disableCache bool, serveStale bool, serveEx
 		name:            name,
 		disableCache:    disableCache,
 		serveStale:      serveStale,
-		serveExpiredTTL: -int32(serveExpiredTTL),
+		serveExpiredTTL: -int32(serveExpiredTTL), //nolint:gosec // serve-expired TTL is a small config value
 		ips:             make(map[string]*record),
 		pub:             pubsub.NewService(),
 	}
@@ -245,6 +245,7 @@ func (c *CacheController) flush(batch []migrationEntry) {
 func (c *CacheController) updateRecord(req *dnsRequest, rep *IPRecord) {
 	rtt := time.Since(req.start)
 
+	//nolint:exhaustive // only A and AAAA produce an IPRecord to publish
 	switch req.reqType {
 	case dnsmessage.TypeA:
 		c.pub.Publish(req.domain+"4", rep)
@@ -270,6 +271,7 @@ func (c *CacheController) updateRecord(req *dnsRequest, rep *IPRecord) {
 	var pubRecord *IPRecord
 	var pubSuffix string
 
+	//nolint:exhaustive // only A and AAAA produce an IPRecord to publish
 	switch req.reqType {
 	case dnsmessage.TypeA:
 		newRec.A = rep

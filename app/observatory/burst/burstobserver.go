@@ -2,7 +2,6 @@ package burst
 
 import (
 	"context"
-	"sync"
 
 	"github.com/xtls/xray-core/app/observatory"
 	"github.com/xtls/xray-core/common"
@@ -19,8 +18,7 @@ type Observer struct {
 	config *Config
 	ctx    context.Context
 
-	statusLock sync.Mutex
-	hp         *HealthPing
+	hp *HealthPing
 
 	finished *done.Instance
 
@@ -32,7 +30,7 @@ func (o *Observer) GetObservation(ctx context.Context) (proto.Message, error) {
 }
 
 func (o *Observer) Check(tag []string) {
-	o.hp.Check(tag)
+	_ = o.hp.Check(tag)
 }
 
 func (o *Observer) createResult() []*observatory.OutboundStatus {
@@ -109,7 +107,7 @@ func New(ctx context.Context, config *Config) (*Observer, error) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
+		return New(ctx, config)
 	}))
 }

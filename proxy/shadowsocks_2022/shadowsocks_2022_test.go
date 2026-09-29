@@ -15,6 +15,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
@@ -39,12 +40,12 @@ func generateRandomKey(size int) string {
 
 func TestKDF(t *testing.T) {
 	// Test ParseKey
-	if _, err := ParseKey("", 16); err != ErrBadKey {
+	if _, err := ParseKey("", 16); !errors.Is(err, ErrBadKey) {
 		t.Fatalf("expected ErrBadKey for empty key, got %v", err)
 	}
 
 	shortKey := base64.StdEncoding.EncodeToString([]byte("short"))
-	if _, err := ParseKey(shortKey, 16); err != ErrBadKey {
+	if _, err := ParseKey(shortKey, 16); !errors.Is(err, ErrBadKey) {
 		t.Fatalf("expected ErrBadKey for short key, got %v", err)
 	}
 
@@ -56,7 +57,7 @@ func TestKDF(t *testing.T) {
 	}
 
 	longKey := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef_longer_key_for_testing"))
-	if _, err := ParseKey(longKey, 16); err != ErrBadKey {
+	if _, err := ParseKey(longKey, 16); !errors.Is(err, ErrBadKey) {
 		t.Fatalf("expected ErrBadKey for long key, got %v", err)
 	}
 
@@ -183,7 +184,7 @@ func TestTCPStream(t *testing.T) {
 				IncreaseNonce(reader.Nonce())
 
 				vBuf := buf.New()
-				vBuf.Write(plainVar)
+				_, _ = vBuf.Write(plainVar)
 				receivedDest, err = ReadAddressPort(vBuf)
 				common.Must(err)
 
@@ -191,7 +192,7 @@ func TestTCPStream(t *testing.T) {
 				var padBytes [2]byte
 				_, _ = vBuf.Read(padBytes[:])
 				padLen := int(padBytes[0])<<8 | int(padBytes[1])
-				vBuf.Advance(int32(padLen))
+				vBuf.Advance(int32(padLen)) //nolint:gosec // G115: the value is bounded by the fixture built above
 
 				receivedPayload = make([]byte, vBuf.Len())
 				copy(receivedPayload, vBuf.Bytes())
@@ -208,7 +209,7 @@ func TestTCPStream(t *testing.T) {
 
 				fixedResp := make([]byte, 1+8+method.KeySaltLength+2)
 				fixedResp[0] = HeaderTypeServer
-				binary.BigEndian.PutUint64(fixedResp[1:9], uint64(time.Now().Unix()))
+				binary.BigEndian.PutUint64(fixedResp[1:9], uint64(time.Now().Unix())) //nolint:gosec // G115: Unix seconds are positive
 				copy(fixedResp[9:9+method.KeySaltLength], salt)
 				binary.BigEndian.PutUint16(fixedResp[9+method.KeySaltLength:11+method.KeySaltLength], 0)
 
@@ -300,7 +301,7 @@ func TestUDPCodec(t *testing.T) {
 
 			// Replay same packet wire bytes should fail with ErrPacketIdNotUnique
 			_, err = serverCodec.DecodePacket(rawCopy)
-			if err != ErrPacketIdNotUnique {
+			if !errors.Is(err, ErrPacketIdNotUnique) {
 				t.Fatalf("expected ErrPacketIdNotUnique on replay, got: %v", err)
 			}
 		})

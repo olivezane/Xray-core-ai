@@ -39,7 +39,7 @@ func TestDialAndListen(t *testing.T) {
 				for idx, b := range payload[:nBytes] {
 					payload[idx] = b ^ 'c'
 				}
-				c.Write(payload[:nBytes])
+				_, _ = c.Write(payload[:nBytes])
 			}
 			c.Close()
 		}(conn)
@@ -47,7 +47,7 @@ func TestDialAndListen(t *testing.T) {
 	common.Must(err)
 	defer listerner.Close()
 
-	port := net.Port(listerner.Addr().(*net.UDPAddr).Port)
+	port := net.Port(listerner.Addr().(*net.UDPAddr).Port) //nolint:gosec,forcetypeassert // G115: the port comes from a bound socket address, so it is 0..65535
 
 	var errg errgroup.Group
 	for range 10 {
@@ -70,7 +70,7 @@ func TestDialAndListen(t *testing.T) {
 
 			clientSend := make([]byte, 1024*1024)
 			rand.Read(clientSend)
-			go clientConn.Write(clientSend)
+			go func() { _, _ = clientConn.Write(clientSend) }()
 
 			clientReceived := make([]byte, 1024*1024)
 			common.Must2(io.ReadFull(clientConn, clientReceived))

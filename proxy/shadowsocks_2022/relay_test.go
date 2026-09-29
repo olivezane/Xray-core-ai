@@ -66,17 +66,17 @@ func encodeRelayClientUDPPacket(relayKey, destKey []byte, sessionID, packetID ui
 	// VarHeader: client type (1) + timestamp (8) + paddingLen (2) + padding + dest + payload
 	var hdr [1 + 8 + 2]byte
 	hdr[0] = HeaderTypeClient
-	binary.BigEndian.PutUint64(hdr[1:9], uint64(time.Now().Unix()))
+	binary.BigEndian.PutUint64(hdr[1:9], uint64(time.Now().Unix())) //nolint:gosec // G115: Unix seconds are positive
 	binary.BigEndian.PutUint16(hdr[9:11], 0)
-	outBuf.Write(hdr[:])
+	_, _ = outBuf.Write(hdr[:])
 
 	if err := WriteAddressPort(outBuf, dest); err != nil {
 		return nil, err
 	}
-	outBuf.Write(payload)
+	_, _ = outBuf.Write(payload)
 
 	plainBytes := outBuf.Bytes()
-	outBuf.Extend(int32(bodyAead.Overhead()))
+	outBuf.Extend(int32(bodyAead.Overhead())) //nolint:gosec // G115: the value is bounded by the fixture built above
 	bodyAead.Seal(plainBytes[:0], bodyNonce, plainBytes, nil)
 
 	// Full packet: encPacketHeader (16B) + encEIHeader (16B) + sealedBody

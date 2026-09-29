@@ -203,11 +203,11 @@ func NewClientWorker(stream transport.Link, s ClientStrategy) (*ClientWorker, er
 }
 
 func (m *ClientWorker) TotalConnections() uint32 {
-	return uint32(m.sessionManager.Count())
+	return uint32(m.sessionManager.Count()) //nolint:gosec // counts fit comfortably in uint32
 }
 
 func (m *ClientWorker) ActiveConnections() uint32 {
-	return uint32(m.sessionManager.Size())
+	return uint32(m.sessionManager.Size()) //nolint:gosec // sizes fit comfortably in uint32
 }
 
 // Closed returns true if this Client is closed.
@@ -245,7 +245,7 @@ func (m *ClientWorker) monitor() {
 
 func writeFirstPayload(reader buf.Reader, writer *Writer) error {
 	err := buf.CopyOnceTimeout(reader, writer, time.Millisecond*100)
-	if err == buf.ErrNotTimeoutReader || err == buf.ErrReadTimeout {
+	if errors.Is(err, buf.ErrNotTimeoutReader) || errors.Is(err, buf.ErrReadTimeout) {
 		return writer.WriteMultiBuffer(buf.MultiBuffer{})
 	}
 
@@ -269,7 +269,7 @@ func fetchInput(ctx context.Context, s *Session, output buf.Writer) {
 		inbound = session.InboundFromContext(ctx)
 	}
 	writer := NewWriter(s.ID, ob.Target, output, transferType, xudp.GetGlobalID(ctx), inbound)
-	defer s.Close(false)
+	defer func() { _ = s.Close(false) }()
 	defer writer.Close()
 
 	errors.LogInfo(ctx, "dispatching request to ", ob.Target)
@@ -362,7 +362,7 @@ func (m *ClientWorker) handleStatusKeep(meta *FrameMetadata, reader *buf.Buffere
 	err := buf.Copy(rr, s.output)
 	if err != nil && buf.IsWriteError(err) {
 		errors.LogInfoInner(context.Background(), err, "failed to write to downstream. closing session ", s.ID)
-		s.Close(false)
+		_ = s.Close(false)
 		return buf.Copy(rr, buf.Discard)
 	}
 
@@ -371,7 +371,7 @@ func (m *ClientWorker) handleStatusKeep(meta *FrameMetadata, reader *buf.Buffere
 
 func (m *ClientWorker) handleStatusEnd(meta *FrameMetadata, reader *buf.BufferedReader) error {
 	if s, found := m.sessionManager.Get(meta.SessionID); found {
-		s.Close(false)
+		_ = s.Close(false)
 	}
 	if meta.Option.Has(OptionData) {
 		return buf.Copy(NewStreamReader(reader), buf.Discard)
@@ -390,7 +390,7 @@ func (m *ClientWorker) fetchOutput() {
 	for {
 		err := meta.Unmarshal(reader, false)
 		if err != nil {
-			if errors.Cause(err) != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				errors.LogInfoInner(context.Background(), err, "failed to read metadata")
 			}
 			break

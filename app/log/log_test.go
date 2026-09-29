@@ -23,9 +23,11 @@ func TestCustomLogHandler(t *testing.T) {
 		loggedValue = append(loggedValue, msg.String())
 	})
 
-	log.RegisterHandlerCreator(log.LogType_Console, func(lt log.LogType, options log.HandlerCreatorOptions) (clog.Handler, error) {
+	if err := log.RegisterHandlerCreator(log.LogType_Console, func(lt log.LogType, options log.HandlerCreatorOptions) (clog.Handler, error) {
 		return mockHandler, nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	logger, err := log.New(context.Background(), &log.Config{
 		ErrorLogLevel: clog.Severity_Debug,

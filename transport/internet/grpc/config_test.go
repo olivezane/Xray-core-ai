@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -122,7 +123,7 @@ func TestConfig_GetTunMultiStreamName(t *testing.T) {
 func TestSetUserAgent(t *testing.T) {
 	ua := "Test/1.0"
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithUserAgent(ua))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer conn.Close()
 	setUserAgent(conn, ua)
 	assert.Equal(t, ua, reflect.ValueOf(conn).Elem().FieldByName("dopts").FieldByName("copts").FieldByName("UserAgent").String())

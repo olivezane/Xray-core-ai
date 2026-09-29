@@ -65,7 +65,7 @@ func (h HealthCheckSettings) Build() (proto.Message, error) {
 		Connectivity:  h.Connectivity,
 		Interval:      int64(h.Interval),
 		Timeout:       int64(h.Timeout),
-		SamplingCount: int32(h.SamplingCount),
+		SamplingCount: int32(h.SamplingCount), //nolint:gosec // config values are bounded by their declared field widths
 		HttpMethod:    httpMethod,
 	}, nil
 }

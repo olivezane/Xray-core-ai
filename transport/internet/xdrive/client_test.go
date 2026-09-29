@@ -17,7 +17,7 @@ import (
 func recordingTLSListener(t *testing.T, sni *string, mu *sync.Mutex) net.Listener {
 	t.Helper()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -36,11 +36,11 @@ func recordingTLSListener(t *testing.T, sni *string, mu *sync.Mutex) net.Listene
 				},
 			}
 			tconn := gotls.Server(conn, cfg)
-			tconn.HandshakeContext(context.Background())
+			_ = tconn.HandshakeContext(context.Background())
 			tconn.Close()
 		}
 	}()
-	t.Cleanup(func() { ln.Close() })
+	t.Cleanup(func() { _ = ln.Close() })
 	return ln
 }
 
@@ -52,13 +52,14 @@ func sniForSettings(t *testing.T, serverName string) string {
 		mu  sync.Mutex
 	)
 	ln := recordingTLSListener(t, &sni, &mu)
+	//nolint:forcetypeassert // the socket was created by this package as a TCP socket
 	addr := ln.Addr().(*net.TCPAddr)
 
 	settings := &internet.MemoryStreamConfig{
 		ProtocolName: protocolName,
 		Destination: &xnet.Destination{
 			Address: xnet.ParseAddress(addr.IP.String()),
-			Port:    xnet.Port(addr.Port),
+			Port:    xnet.Port(addr.Port), //nolint:gosec // G115: the port comes from a bound socket address, so it is 0..65535
 			Network: xnet.Network_TCP,
 		},
 		SecuritySettings: &tls.Config{ServerName: serverName},
@@ -69,11 +70,13 @@ func sniForSettings(t *testing.T, serverName string) string {
 	defer func() { driveFilesURL = prev }()
 
 	client := newServiceClient(settings, 5*time.Second, 8)
-	req, err := http.NewRequest(http.MethodGet, driveFilesURL, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, driveFilesURL, nil)
 	if err != nil {
 		t.Fatalf("request: %v", err)
 	}
-	client.Do(req)
+	if resp, err := client.Do(req); err == nil {
+		_ = resp.Body.Close()
+	}
 
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {

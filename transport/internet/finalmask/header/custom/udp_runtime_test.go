@@ -20,6 +20,7 @@ func TestDSLUDPServerMatchCapturesSavedValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	//nolint:forcetypeassert // the conn was created by this test as *udpCustomServerConn
 	server := conn.(*udpCustomServerConn)
 	if !server.header.Match([]byte{0x01, 0x02, 0x01, 0x02}, nil) {
 		t.Fatal("expected packet to match")
@@ -46,6 +47,7 @@ func TestDSLUDPServerRejectsMalformedVarReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	//nolint:forcetypeassert // the conn was created by this test as *udpCustomServerConn
 	server := conn.(*udpCustomServerConn)
 	if server.header.Match([]byte{0x01, 0x02, 0x03, 0x04}, nil) {
 		t.Fatal("expected packet mismatch")

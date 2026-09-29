@@ -22,8 +22,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type serviceHandler func(ctx context.Context, conn *grpc.ClientConn, cmd *base.Command, args []string) string
-
 var (
 	apiServerAddrPtr string
 	apiTimeout       int
@@ -38,13 +36,13 @@ func setSharedFlags(cmd *base.Command) {
 	cmd.Flag.BoolVar(&apiJSON, "json", false, "")
 }
 
-func dialAPIServer() (conn *grpc.ClientConn, ctx context.Context, close func()) {
+func dialAPIServer() (conn *grpc.ClientConn, ctx context.Context, closeFn func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(apiTimeout)*time.Second)
 	conn, err := grpc.DialContext(ctx, apiServerAddrPtr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()) //nolint:staticcheck // grpc.NewClient has no blocking-dial equivalent; migrating needs an explicit state-wait loop
 	if err != nil {
 		base.Fatalf("failed to dial %s", apiServerAddrPtr)
 	}
-	close = func() {
+	closeFn = func() {
 		cancel()
 		conn.Close()
 	}
@@ -87,7 +85,7 @@ func fetchHTTPContent(target string) ([]byte, error) {
 		Timeout: 30 * time.Second,
 	}
 	resp, err := client.Do(&http.Request{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    parsedTarget,
 		Close:  true,
 	})
@@ -96,7 +94,7 @@ func fetchHTTPContent(target string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected HTTP status code: %d", resp.StatusCode)
 	}
 
@@ -115,7 +113,7 @@ func showJSONResponse(m proto.Message) {
 	if j, ok := creflect.MarshalToJson(m, true); ok {
 		fmt.Println(j)
 	} else {
-		fmt.Fprintf(os.Stdout, "%v\n", m)
+		_, _ = fmt.Fprintf(os.Stdout, "%v\n", m)
 		base.Fatalf("error encode json")
 	}
 }

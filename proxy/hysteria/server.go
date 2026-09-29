@@ -29,8 +29,10 @@ type Server struct {
 
 func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	v := core.MustFromContext(ctx)
+	//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 	p := v.GetFeature(policy.ManagerType()).(policy.Manager)
 
+	//nolint:forcetypeassert // session.StreamSettingsFromContext only ever stores *internet.MemoryStreamConfig
 	streamSettings := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig)
 	if _, ok := streamSettings.ProtocolSettings.(*hysteria.Config); !ok {
 		return nil, errors.New("not hysteria transport")
@@ -95,6 +97,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 		user := v.User()
 		if user != nil {
 			inbound.User = user
+			//nolint:forcetypeassert // the account is created by proxy/hysteria's own NewAccount
 			inbound.VlessRoute = user.Account.(*account.MemoryAccount).VR
 		}
 	}
@@ -112,7 +115,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 			b.Release()
 			return err
 		}
-		b.Resize(0, int32(n))
+		b.Resize(0, int32(n)) //nolint:gosec // read length is bounded by the buffer size
 		b.UDP = addr
 
 		reader.firstBuf = b
@@ -172,7 +175,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewServer(ctx, config.(*ServerConfig))
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config *ServerConfig) (any, error) {
+		return NewServer(ctx, config)
 	}))
 }

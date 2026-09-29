@@ -3,7 +3,6 @@ package dokodemo
 import (
 	"context"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/xtls/xray-core/common"
@@ -22,10 +21,10 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config *Config) (any, error) {
 		d := new(DokodemoDoor)
 		err := core.RequireFeatures(ctx, func(pm policy.Manager) error {
-			return d.Init(config.(*Config), pm, session.SockoptFromContext(ctx))
+			return d.Init(config, pm, session.SockoptFromContext(ctx))
 		})
 		return d, err
 	}))
@@ -47,6 +46,9 @@ func (d *DokodemoDoor) Init(config *Config, pm policy.Manager, sockopt *session.
 	}
 	d.config = config
 	d.rewriteAddress = config.GetPredefinedAddress()
+	if config.RewritePort > 65535 {
+		return errors.New("invalid rewrite port: ", config.RewritePort)
+	}
 	d.rewritePort = net.Port(config.RewritePort)
 	d.portMap = config.PortMap
 	d.policyManager = pm
@@ -61,12 +63,6 @@ func (d *DokodemoDoor) Network() []net.Network {
 		return append(d.config.AllowedNetworks, net.Network_UNIX)
 	}
 	return d.config.AllowedNetworks
-}
-
-func (d *DokodemoDoor) policy() policy.Session {
-	config := d.config
-	p := d.policyManager.ForLevel(config.UserLevel)
-	return p
 }
 
 // Process implements proxy.Inbound.
@@ -96,7 +92,11 @@ func (d *DokodemoDoor) Process(ctx context.Context, network net.Network, conn st
 			}
 		}
 		if dest.Port == 0 && port != "" {
-			dest.Port = net.Port(common.Must2(strconv.Atoi(port)))
+			p, err := net.PortFromString(port)
+			if err != nil {
+				return err
+			}
+			dest.Port = p
 		}
 		if d.portMap != nil && d.portMap[port] != "" {
 			h, p, _ := net.SplitHostPort(d.portMap[port])
@@ -104,7 +104,11 @@ func (d *DokodemoDoor) Process(ctx context.Context, network net.Network, conn st
 				dest.Address = net.ParseAddress(h)
 			}
 			if len(p) > 0 {
-				dest.Port = net.Port(common.Must2(strconv.Atoi(p)))
+				dstPort, err := net.PortFromString(p)
+				if err != nil {
+					return err
+				}
+				dest.Port = dstPort
 			}
 		}
 	}
@@ -165,6 +169,7 @@ func (d *DokodemoDoor) Process(ctx context.Context, network net.Network, conn st
 		if !destinationOverridden {
 			writer = &buf.SequentialWriter{Writer: conn}
 		} else {
+			//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 			back := conn.RemoteAddr().(*net.UDPAddr)
 			if !dest.Address.Family().IsIP() {
 				if len(back.IP) == 4 {
@@ -186,7 +191,8 @@ func (d *DokodemoDoor) Process(ctx context.Context, network net.Network, conn st
 				return err
 			}
 			writer = NewPacketWriter(pConn, &dest, mark, back)
-			defer writer.(*PacketWriter).Close() // close fake UDP conns
+			//nolint:forcetypeassert // writer is the *PacketWriter assigned just above
+			defer func() { _ = writer.(*PacketWriter).Close() }() // close fake UDP conns
 		}
 	}
 

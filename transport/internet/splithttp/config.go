@@ -90,7 +90,7 @@ func (c *Config) GetRequestCookiesWithPayload(payload []byte) []*http.Cookie {
 		chunk := encodedData[:chunkSize]
 		encodedData = encodedData[chunkSize:]
 		cookieName := fmt.Sprintf("%s_%d", key, i)
-		cookies = append(cookies, &http.Cookie{Name: cookieName, Value: chunk})
+		cookies = append(cookies, &http.Cookie{Name: cookieName, Value: chunk}) //nolint:gosec // G124: protocol cookie sent in the request, browser cookie attributes do not apply
 	}
 
 	return cookies
@@ -278,7 +278,7 @@ func (c *Config) ApplyMetaToRequest(req *http.Request, sessionId string, seqStr 
 		case PlacementHeader:
 			req.Header.Set(sessionKey, sessionId)
 		case PlacementCookie:
-			req.AddCookie(&http.Cookie{Name: sessionKey, Value: sessionId})
+			req.AddCookie(&http.Cookie{Name: sessionKey, Value: sessionId}) //nolint:gosec // G124: protocol cookie sent in the request, browser cookie attributes do not apply
 		}
 	}
 
@@ -293,7 +293,7 @@ func (c *Config) ApplyMetaToRequest(req *http.Request, sessionId string, seqStr 
 		case PlacementHeader:
 			req.Header.Set(seqKey, seqStr)
 		case PlacementCookie:
-			req.AddCookie(&http.Cookie{Name: seqKey, Value: seqStr})
+			req.AddCookie(&http.Cookie{Name: seqKey, Value: seqStr}) //nolint:gosec // G124: protocol cookie sent in the request, browser cookie attributes do not apply
 		}
 	}
 }
@@ -491,7 +491,7 @@ func (c *RangeConfig) rand() int32 {
 	if c == nil {
 		return 0
 	}
-	return int32(crypto.RandBetween(int64(c.From), int64(c.To)))
+	return int32(crypto.RandBetween(int64(c.From), int64(c.To))) //nolint:gosec // padding lengths are bounded by the HTTP header size limit
 }
 
 // predefined

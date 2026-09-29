@@ -69,10 +69,10 @@ func executeHash(cmd *base.Command, args []string) {
 	for i, cert := range certs {
 		hash := xtls.GenerateCertHashHex(cert)
 		if i == 0 {
-			fmt.Fprintf(tabWriter, "Leaf SHA256:\t%s\n", hash)
+			_, _ = fmt.Fprintf(tabWriter, "Leaf SHA256:\t%s\n", hash)
 		} else {
-			fmt.Fprintf(tabWriter, "CA <%s> SHA256:\t%s\n", cert.Subject.CommonName, hash)
+			_, _ = fmt.Fprintf(tabWriter, "CA <%s> SHA256:\t%s\n", cert.Subject.CommonName, hash)
 		}
 	}
-	tabWriter.Flush()
+	_ = tabWriter.Flush()
 }

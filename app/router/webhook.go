@@ -18,9 +18,6 @@ import (
 	routing_session "github.com/xtls/xray-core/features/routing/session"
 )
 
-//go:fix inline
-func ptr[T any](v T) *T { return new(v) }
-
 type event struct {
 	Email          *string `json:"email"`
 	Level          *uint32 `json:"level"`
@@ -184,7 +181,7 @@ func (h *WebhookNotifier) post(ev *event) {
 		return
 	}
 	defer func() {
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}()
 	if resp.StatusCode >= 400 {
@@ -200,6 +197,7 @@ func (h *WebhookNotifier) isDuplicate(email string) bool {
 	now := time.Now()
 	h.maybeSweep(now, ttl)
 	if v, loaded := h.seen.LoadOrStore(email, now); loaded {
+		//nolint:forcetypeassert // the webhook cache only ever stores time.Time
 		if now.Sub(v.(time.Time)) < ttl {
 			return true
 		}
@@ -217,6 +215,7 @@ func (h *WebhookNotifier) maybeSweep(now time.Time, ttl time.Duration) {
 		return // another goroutine did the sweep
 	}
 	h.seen.Range(func(key, value any) bool {
+		//nolint:forcetypeassert // the webhook cache only ever stores time.Time
 		if now.Sub(value.(time.Time)) >= ttl {
 			h.seen.Delete(key)
 		}

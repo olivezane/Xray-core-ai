@@ -47,12 +47,12 @@ func (p Port) String() string {
 
 // FromPort returns the beginning port of this PortRange.
 func (p *PortRange) FromPort() Port {
-	return Port(p.From)
+	return Port(p.From) //nolint:gosec // the config layer rejects port ranges above 65535 (see infra/conf parseStringPort)
 }
 
 // ToPort returns the end port of this PortRange.
 func (p *PortRange) ToPort() Port {
-	return Port(p.To)
+	return Port(p.To) //nolint:gosec // the config layer rejects port ranges above 65535 (see infra/conf parseStringPort)
 }
 
 // Contains returns true if the given port is within the range of a PortRange.
@@ -82,7 +82,7 @@ type MemoryPortList []MemoryPortRange
 func PortListFromProto(l *PortList) MemoryPortList {
 	mpl := make(MemoryPortList, 0, len(l.Range))
 	for _, r := range l.Range {
-		mpl = append(mpl, MemoryPortRange{From: Port(r.From), To: Port(r.To)})
+		mpl = append(mpl, MemoryPortRange{From: Port(r.From), To: Port(r.To)}) //nolint:gosec // the config layer rejects port ranges above 65535 (see infra/conf parseStringPort)
 	}
 	return mpl
 }
@@ -90,7 +90,7 @@ func PortListFromProto(l *PortList) MemoryPortList {
 func (l *PortList) Ports() []uint32 {
 	var ports []uint32
 	for _, r := range l.Range {
-		for i := uint32(r.From); i <= uint32(r.To); i++ {
+		for i := r.From; i <= r.To; i++ {
 			ports = append(ports, i)
 		}
 	}

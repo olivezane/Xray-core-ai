@@ -102,7 +102,7 @@ func TestStatsChannelUnsubscribe(t *testing.T) {
 
 	a, err := c.Subscribe()
 	common.Must(err)
-	defer c.Unsubscribe(a)
+	defer func() { _ = c.Unsubscribe(a) }()
 
 	b, err := c.Subscribe()
 	common.Must(err)
@@ -146,7 +146,9 @@ func TestStatsChannelUnsubscribe(t *testing.T) {
 			errCh <- fmt.Sprint("unexpected receiving: ", v, ", wanted ", 1)
 		}
 		// Unsubscribe `b` while publishing is paused
-		c.Unsubscribe(b)
+		if err := c.Unsubscribe(b); err != nil {
+			errCh <- fmt.Sprint("unsubscribe failed: ", err)
+		}
 		{ // Test `b` is not in subscribers
 			var aSet, bSet bool
 			for _, s := range c.Subscribers() {
@@ -193,7 +195,7 @@ func TestStatsChannelBlocking(t *testing.T) {
 
 	a, err := c.Subscribe()
 	common.Must(err)
-	defer c.Unsubscribe(a)
+	defer func() { _ = c.Unsubscribe(a) }()
 
 	pauseCh := make(chan struct{})
 	stopCh := make(chan struct{})
@@ -267,7 +269,7 @@ func TestStatsChannelNonBlocking(t *testing.T) {
 
 	a, err := c.Subscribe()
 	common.Must(err)
-	defer c.Unsubscribe(a)
+	defer func() { _ = c.Unsubscribe(a) }()
 
 	pauseCh := make(chan struct{})
 	stopCh := make(chan struct{})
@@ -343,11 +345,11 @@ func TestStatsChannelConcurrency(t *testing.T) {
 
 	a, err := c.Subscribe()
 	common.Must(err)
-	defer c.Unsubscribe(a)
+	defer func() { _ = c.Unsubscribe(a) }()
 
 	b, err := c.Subscribe()
 	common.Must(err)
-	defer c.Unsubscribe(b)
+	defer func() { _ = c.Unsubscribe(b) }()
 
 	stopCh := make(chan struct{})
 	errCh := make(chan string)
@@ -370,7 +372,7 @@ func TestStatsChannelConcurrency(t *testing.T) {
 		// Block `b` for a time so as to ensure source channel is trying to send message to `b`.
 		<-time.After(25 * time.Millisecond)
 		// This causes concurrency scenario: unsubscribe `b` while trying to send message to it
-		c.Unsubscribe(b)
+		_ = c.Unsubscribe(b)
 		// Test `b` is not closed and can still receive data 1:
 		// Because unsubscribe won't affect the ongoing process of sending message.
 		select {

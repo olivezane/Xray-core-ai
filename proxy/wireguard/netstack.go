@@ -57,7 +57,7 @@ func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int, handleLocal 
 		HandleLocal:        handleLocal,
 	}
 	dev := &netTun{
-		ep:             channel.New(1024, uint32(mtu), ""),
+		ep:             channel.New(1024, uint32(mtu), ""), //nolint:gosec // the TUN MTU and header lengths are small config/read values
 		stack:          stack.New(opts),
 		events:         make(chan tun.Event, 10),
 		incomingPacket: make(chan *buffer.View),
@@ -276,7 +276,7 @@ func isDomainName(s string) bool {
 	last := byte('.')
 	nonNumeric := false
 	partlen := 0
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		switch {
 		default:
@@ -332,7 +332,7 @@ func newRequest(q dnsmessage.Question) (id uint16, udpReq, tcpReq []byte, err er
 	udpReq = tcpReq[2:]
 	l := len(tcpReq) - 2
 	tcpReq[0] = byte(l >> 8)
-	tcpReq[1] = byte(l)
+	tcpReq[1] = byte(l) //nolint:gosec // the TUN MTU and header lengths are small config/read values
 	return id, udpReq, tcpReq, err
 }
 
@@ -340,7 +340,7 @@ func equalASCIIName(x, y dnsmessage.Name) bool {
 	if x.Length != y.Length {
 		return false
 	}
-	for i := 0; i < int(x.Length); i++ {
+	for i := range int(x.Length) {
 		a := x.Data[i]
 		b := y.Data[i]
 		if 'A' <= a && a <= 'Z' {
@@ -432,7 +432,7 @@ func (tnet *Net) exchange(ctx context.Context, server netip.Addr, q dnsmessage.Q
 
 	for _, useUDP := range []bool{true, false} {
 		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(timeout))
-		defer cancel()
+		defer cancel() //nolint:gocritic // deferInLoop: the loop is over a literal []bool{true, false}, so there are exactly two cancels and both run at function exit
 
 		var c net.Conn
 		var err error
@@ -460,14 +460,14 @@ func (tnet *Net) exchange(ctx context.Context, server netip.Addr, q dnsmessage.Q
 		}
 		c.Close()
 		if err != nil {
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) {
 				err = errCanceled
-			} else if err == context.DeadlineExceeded {
+			} else if errors.Is(err, context.DeadlineExceeded) {
 				err = errTimeout
 			}
 			return dnsmessage.Parser{}, dnsmessage.Header{}, err
 		}
-		if err := p.SkipQuestion(); err != dnsmessage.ErrSectionDone {
+		if err := p.SkipQuestion(); !errors.Is(err, dnsmessage.ErrSectionDone) {
 			return dnsmessage.Parser{}, dnsmessage.Header{}, errInvalidDNSResponse
 		}
 		if h.Truncated {
@@ -483,10 +483,10 @@ func checkHeader(p *dnsmessage.Parser, h dnsmessage.Header) error {
 		return errNoSuchHost
 	}
 	_, err := p.AnswerHeader()
-	if err != nil && err != dnsmessage.ErrSectionDone {
+	if err != nil && !errors.Is(err, dnsmessage.ErrSectionDone) {
 		return errCannotUnmarshalDNSMessage
 	}
-	if h.RCode == dnsmessage.RCodeSuccess && !h.Authoritative && !h.RecursionAvailable && err == dnsmessage.ErrSectionDone {
+	if h.RCode == dnsmessage.RCodeSuccess && !h.Authoritative && !h.RecursionAvailable && errors.Is(err, dnsmessage.ErrSectionDone) {
 		return errLameReferral
 	}
 	if h.RCode != dnsmessage.RCodeSuccess && h.RCode != dnsmessage.RCodeNameError {
@@ -501,7 +501,7 @@ func checkHeader(p *dnsmessage.Parser, h dnsmessage.Header) error {
 func skipToAnswer(p *dnsmessage.Parser, qtype dnsmessage.Type) error {
 	for {
 		h, err := p.AnswerHeader()
-		if err == dnsmessage.ErrSectionDone {
+		if errors.Is(err, dnsmessage.ErrSectionDone) {
 			return errNoSuchHost
 		}
 		if err != nil {
@@ -538,10 +538,11 @@ func (tnet *Net) tryOneName(ctx context.Context, name string, qtype dnsmessage.T
 					Name:   name,
 					Server: server.String(),
 				}
-				if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+				var nerr net.Error
+				if errors.As(err, &nerr) && nerr.Timeout() {
 					dnsErr.IsTimeout = true
 				}
-				if _, ok := err.(*net.OpError); ok {
+				if _, ok := errors.AsType[*net.OpError](err); ok {
 					dnsErr.IsTemporary = true
 				}
 				lastErr = dnsErr
@@ -554,10 +555,10 @@ func (tnet *Net) tryOneName(ctx context.Context, name string, qtype dnsmessage.T
 					Name:   name,
 					Server: server.String(),
 				}
-				if err == errServerTemporarilyMisbehaving {
+				if errors.Is(err, errServerTemporarilyMisbehaving) {
 					dnsErr.IsTemporary = true
 				}
-				if err == errNoSuchHost {
+				if errors.Is(err, errNoSuchHost) {
 					dnsErr.IsNotFound = true
 					return p, server.String(), dnsErr
 				}
@@ -574,8 +575,10 @@ func (tnet *Net) tryOneName(ctx context.Context, name string, qtype dnsmessage.T
 				Name:   name,
 				Server: server.String(),
 			}
-			if err == errNoSuchHost {
-				lastErr.(*net.DNSError).IsNotFound = true
+			if errors.Is(err, errNoSuchHost) {
+				if dnsErr, ok := errors.AsType[*net.DNSError](lastErr); ok {
+					dnsErr.IsNotFound = true
+				}
 				return p, server.String(), lastErr
 			}
 		}
@@ -631,7 +634,7 @@ func (tnet *Net) LookupContextHost(ctx context.Context, host string) ([]string, 
 		}()
 	}
 	ttl := uint32(300)
-	for l := 0; l < lanes; l++ {
+	for range lanes {
 		result := <-lane
 		if result.error != nil {
 			if lastErr == nil {
@@ -643,7 +646,7 @@ func (tnet *Net) LookupContextHost(ctx context.Context, host string) ([]string, 
 	loop:
 		for {
 			h, err := result.p.AnswerHeader()
-			if err != nil && err != dnsmessage.ErrSectionDone {
+			if err != nil && !errors.Is(err, dnsmessage.ErrSectionDone) {
 				lastErr = &net.DNSError{
 					Err:    errCannotMarshalDNSMessage.Error(),
 					Name:   host,
@@ -696,9 +699,9 @@ func (tnet *Net) LookupContextHost(ctx context.Context, host string) ([]string, 
 	// We don't do RFC6724. Instead just put V6 addresses first if an IPv6 address is enabled
 	var addrs []netip.Addr
 	if tnet.hasV6 {
-		addrs = append(addrsV6, addrsV4...)
+		addrs = append(addrsV6, addrsV4...) //nolint:gocritic // appendAssign: addrsV4/addrsV6 are per-call locals, not read again after this point
 	} else {
-		addrs = append(addrsV4, addrsV6...)
+		addrs = append(addrsV4, addrsV6...) //nolint:gocritic // appendAssign: addrsV4/addrsV6 are per-call locals, not read again after this point
 	}
 
 	if len(addrs) == 0 && lastErr != nil {
@@ -802,7 +805,7 @@ func (tnet *Net) DialContext(ctx context.Context, network, address string) (net.
 			if partialDeadline.Before(deadline) {
 				var cancel context.CancelFunc
 				dialCtx, cancel = context.WithDeadline(ctx, partialDeadline)
-				defer cancel()
+				defer cancel() //nolint:gocritic // deferInLoop: bounded by the configured DNS server count; the timer is released at function exit
 			}
 		}
 

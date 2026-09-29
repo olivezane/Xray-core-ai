@@ -60,11 +60,12 @@ func DialKCP(ctx context.Context, dest net.Destination, streamSettings *internet
 		return nil, errors.New("failed to dial to dest: ", err).Base(err)
 	}
 
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	kcpSettings := streamSettings.ProtocolSettings.(*Config)
 
 	reader := &KCPPacketReader{}
 
-	conv := uint16(atomic.AddUint32(&globalConv, 1))
+	conv := uint16(atomic.AddUint32(&globalConv, 1)) //nolint:gosec // session IDs and segment sizes are bounded by the protocol
 	session := NewConnection(ConnMetadata{
 		LocalAddr:    conn.LocalAddr(),
 		RemoteAddr:   conn.RemoteAddr(),

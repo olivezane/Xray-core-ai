@@ -129,7 +129,7 @@ func (c *Commander) Close() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg any) (any, error) {
-		return NewCommander(ctx, cfg.(*Config))
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg *Config) (any, error) {
+		return NewCommander(ctx, cfg)
 	}))
 }

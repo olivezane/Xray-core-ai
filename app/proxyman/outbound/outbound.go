@@ -163,6 +163,7 @@ func (m *Manager) ListHandlers(ctx context.Context) []outbound.Handler {
 func (m *Manager) Select(selectors []string) []string {
 	key := strings.Join(selectors, ",")
 	if cache, ok := m.tagsCache.Load(key); ok {
+		//nolint:forcetypeassert // the DNS cache only stores []string
 		return cache.([]string)
 	}
 
@@ -187,10 +188,10 @@ func (m *Manager) Select(selectors []string) []string {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*proxyman.OutboundConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return New(ctx, config.(*proxyman.OutboundConfig))
+	common.Must(common.RegisterConfig((*proxyman.OutboundConfig)(nil), func(ctx context.Context, config *proxyman.OutboundConfig) (any, error) {
+		return New(ctx, config)
 	}))
-	common.Must(common.RegisterConfig((*core.OutboundHandlerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewHandler(ctx, config.(*core.OutboundHandlerConfig))
+	common.Must(common.RegisterConfig((*core.OutboundHandlerConfig)(nil), func(ctx context.Context, config *core.OutboundHandlerConfig) (any, error) {
+		return NewHandler(ctx, config)
 	}))
 }

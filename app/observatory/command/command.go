@@ -22,6 +22,7 @@ func (s *service) GetOutboundStatus(ctx context.Context, request *GetOutboundSta
 	if err != nil {
 		return nil, err
 	}
+	//nolint:forcetypeassert // the observatory RPC always returns *observatory.ObservationResult
 	retdata := resp.(*observatory.ObservationResult)
 	return &GetOutboundStatusResponse{
 		Status: retdata,
@@ -33,7 +34,7 @@ func (s *service) Register(server *grpc.Server) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg any) (any, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg *Config) (any, error) {
 		s := core.MustFromContext(ctx)
 		sv := &service{v: s}
 		err := s.RequireFeatures(func(Observatory extension.Observatory) {

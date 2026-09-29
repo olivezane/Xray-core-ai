@@ -112,7 +112,7 @@ func TestWireguard(t *testing.T) {
 
 	servers, err := InitializeServerConfigs(serverConfig, clientConfig)
 	common.Must(err)
-	defer CloseAllServers(servers)
+	CloseAllServers(servers)
 
 	// FIXME: for some reason wg server does not receive
 

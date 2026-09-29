@@ -31,6 +31,7 @@ func (b BurstObservatoryConfig) Build() (proto.Message, error) {
 		return nil, errors.New("BurstObservatory requires a valid pingConfig")
 	}
 	if result, err := b.HealthCheck.Build(); err == nil {
+		//nolint:forcetypeassert // the observatory conf builds the ping config itself
 		return &burst.Config{SubjectSelector: b.SubjectSelector, PingConfig: result.(*burst.HealthPingConfig)}, nil
 	} else {
 		return nil, err

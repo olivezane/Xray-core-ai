@@ -1,7 +1,6 @@
 package scenarios
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -210,8 +209,7 @@ func TestVMessGCMReadv(t *testing.T) {
 	}
 
 	const envName = "XRAY_BUF_READV"
-	common.Must(os.Setenv(envName, "enable"))
-	defer os.Unsetenv(envName)
+	t.Setenv(envName, "enable")
 
 	servers, err := InitializeServerConfigs(serverConfig, clientConfig)
 	if err != nil {
@@ -631,10 +629,8 @@ func TestVMessKCPLarge(t *testing.T) {
 		t.Error(err)
 	}
 
-	defer func() {
-		<-time.After(5 * time.Second)
-		CloseAllServers(servers)
-	}()
+	<-time.After(5 * time.Second)
+	CloseAllServers(servers)
 }
 
 func TestVMessGCMMux(t *testing.T) {
@@ -867,10 +863,8 @@ func TestVMessGCMMuxUDP(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	defer func() {
-		<-time.After(5 * time.Second)
-		CloseAllServers(servers)
-	}()
+	<-time.After(5 * time.Second)
+	CloseAllServers(servers)
 }
 
 func TestVMessGCMLengthAuth(t *testing.T) {

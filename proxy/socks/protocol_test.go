@@ -23,7 +23,7 @@ func TestUDPEncoding(t *testing.T) {
 
 	content := []byte{'a'}
 	payload := buf.New()
-	payload.Write(content)
+	_, _ = payload.Write(content)
 	common.Must(writer.WriteMultiBuffer(buf.MultiBuffer{payload}))
 
 	reader := &UDPReader{Reader: b}
@@ -111,12 +111,12 @@ func TestReadUntilNull(t *testing.T) {
 func BenchmarkReadUsernamePassword(b *testing.B) {
 	input := []byte{0x05, 0x01, 'a', 0x02, 'b', 'c'}
 	buffer := buf.New()
-	buffer.Write(input)
+	_, _ = buffer.Write(input)
 
 	for b.Loop() {
 		_, _, err := ReadUsernamePassword(buffer)
 		common.Must(err)
 		buffer.Clear()
-		buffer.Extend(int32(len(input)))
+		buffer.Extend(int32(len(input))) //nolint:gosec // G115: length of a buffer allocated in the same statement
 	}
 }

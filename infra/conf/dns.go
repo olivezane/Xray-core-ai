@@ -402,7 +402,7 @@ func readSystemHosts() ([]*dns.Config_HostMapping, error) {
 		hostsPath = "/etc/hosts"
 	}
 
-	file, err := os.Open(hostsPath)
+	file, err := os.Open(hostsPath) //nolint:gosec // hostsPath is the operator's own configured hosts file (defaults to /etc/hosts)
 	if err != nil {
 		return nil, err
 	}

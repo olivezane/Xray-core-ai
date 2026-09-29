@@ -316,7 +316,7 @@ func (c *Conn) queueWrite(w streamWrite) error {
 }
 
 func (c *Conn) queueFin() {
-	c.str.SetWriteDeadline(time.Now())
+	_ = c.str.SetWriteDeadline(time.Now())
 	c.queuedWrites = append(c.queuedWrites, streamWrite{Fin: true})
 	c.notifyWriter()
 }
@@ -522,14 +522,14 @@ func (c *Conn) handleIncomingProxiedPacket(data []byte) error {
 		return fmt.Errorf("connect-ip: unknown IP versions: %d", v)
 	case 4:
 		if len(data) < ipv4.HeaderLen {
-			return fmt.Errorf("connect-ip: malformed datagram: too short")
+			return errors.New("connect-ip: malformed datagram: too short")
 		}
 		src = netip.AddrFrom4([4]byte(data[12:16]))
 		dst = netip.AddrFrom4([4]byte(data[16:20]))
 		ipProto = data[9]
 	case 6:
 		if len(data) < ipv6.HeaderLen {
-			return fmt.Errorf("connect-ip: malformed datagram: too short")
+			return errors.New("connect-ip: malformed datagram: too short")
 		}
 		src = netip.AddrFrom16([16]byte(data[8:24]))
 		dst = netip.AddrFrom16([16]byte(data[24:40]))
@@ -621,7 +621,7 @@ func (c *Conn) composeDatagram(b []byte) ([]byte, error) {
 		return nil, fmt.Errorf("connect-ip: unknown IP versions: %d", v)
 	case 4:
 		if len(b) < ipv4.HeaderLen {
-			return nil, fmt.Errorf("connect-ip: IPv4 packet too short")
+			return nil, errors.New("connect-ip: IPv4 packet too short")
 		}
 		hdrLen := int(b[0]&0x0f) << 2
 		totalLen := int(binary.BigEndian.Uint16(b[2:4]))
@@ -636,7 +636,7 @@ func (c *Conn) composeDatagram(b []byte) ([]byte, error) {
 		binary.BigEndian.PutUint16(b[10:12], calculateIPv4Checksum(b[:hdrLen]))
 	case 6:
 		if len(b) < ipv6.HeaderLen {
-			return nil, fmt.Errorf("connect-ip: IPv6 packet too short")
+			return nil, errors.New("connect-ip: IPv6 packet too short")
 		}
 		hopLimit := b[7]
 		if hopLimit <= 1 {
@@ -659,7 +659,7 @@ func (c *Conn) composeDatagram(b []byte) ([]byte, error) {
 }
 
 func (c *Conn) datagramOverhead() int {
-	return quicvarint.Len(uint64(c.h3.StreamID()/4)) + len(contextIDZero)
+	return quicvarint.Len(uint64(c.h3.StreamID()/4)) + len(contextIDZero) //nolint:gosec // HTTP/2 flow-control windows are bounded by the connection window
 }
 
 func (c *Conn) MaxPacketSize() int {

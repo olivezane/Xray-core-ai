@@ -48,15 +48,15 @@ func executeOnlineStatsIpList(cmd *base.Command, args []string) {
 	all := cmd.Flag.Bool("all", false, "")
 	includeTraffic := cmd.Flag.Bool("include-traffic", false, "")
 	reset := cmd.Flag.Bool("reset", false, "")
-	cmd.Flag.Parse(args)
+	_ = cmd.Flag.Parse(args)
 	if *all && *email != "" {
 		base.Fatalf("-all and -email are mutually exclusive")
 	}
 	if !*all && *email == "" {
 		base.Fatalf("either -all or -email must be specified")
 	}
-	conn, ctx, close := dialAPIServer()
-	defer close()
+	conn, ctx, closeFn := dialAPIServer()
+	defer closeFn()
 
 	client := statsService.NewStatsServiceClient(conn)
 

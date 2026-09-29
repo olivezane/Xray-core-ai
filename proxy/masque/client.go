@@ -52,8 +52,10 @@ type Client struct {
 
 func NewClient(ctx context.Context, config *ClientConfig) (*Client, error) {
 	v := core.MustFromContext(ctx)
+	//nolint:forcetypeassert // feature registered under policy.ManagerType(); the policy app is mandatory
 	p := v.GetFeature(policy.ManagerType()).(policy.Manager)
 
+	//nolint:forcetypeassert // session.StreamSettingsFromContext only ever stores *internet.MemoryStreamConfig
 	streamSettings := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig)
 	if _, ok := streamSettings.ProtocolSettings.(*masque.Config); !ok {
 		return nil, errors.New("not masque transport")
@@ -150,9 +152,17 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 			return errors.New("failed to create UDP connection").Base(err)
 		}
 		defer conn.Close()
+		pc, ok := conn.(*internet.PacketConnWrapper)
+		if !ok {
+			return errors.New("unexpected UDP connection type: ", conn)
+		}
+		udpAddr, ok := conn.RemoteAddr().(*net.UDPAddr)
+		if !ok {
+			return errors.New("unexpected UDP remote address type: ", conn.RemoteAddr())
+		}
 		uc := &wireguard.UDPConnClient{
-			PacketConn: conn.(*internet.PacketConnWrapper).PacketConn,
-			Dest:       conn.RemoteAddr().(*net.UDPAddr),
+			PacketConn: pc.PacketConn,
+			Dest:       udpAddr,
 		}
 		reader = uc
 		writer = uc
@@ -293,7 +303,7 @@ func (t *tunnel) readFromTunnel() {
 			errors.LogInfoInner(context.Background(), err, "MASQUE: tunnel closed")
 			return
 		}
-		t.dev.Write([][]byte{b[:n]}, 0)
+		_, _ = t.dev.Write([][]byte{b[:n]}, 0)
 	}
 }
 
@@ -305,9 +315,8 @@ func (t *tunnel) writeToTunnel() {
 			return
 		}
 		if _, err := t.conn.Write(bufs[0][:sizes[0]]); err != nil {
-			var ptb *masque.PacketTooBigError
-			if go_errors.As(err, &ptb) {
-				go t.dev.Write([][]byte{ptb.ICMP}, 0)
+			if ptb, ok := go_errors.AsType[*masque.PacketTooBigError](err); ok {
+				go func() { _, _ = t.dev.Write([][]byte{ptb.ICMP}, 0) }()
 			}
 		}
 	}
@@ -322,7 +331,7 @@ func (t *tunnel) close() {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewClient(ctx, config.(*ClientConfig))
+	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config *ClientConfig) (any, error) {
+		return NewClient(ctx, config)
 	}))
 }

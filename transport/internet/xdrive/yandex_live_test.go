@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/xtls/xray-core/common"
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/transport/internet"
 )
 
@@ -21,7 +22,7 @@ const yandexBase = "https://webdav.yandex.ru"
 func envUint(name string, def uint32) uint32 {
 	if v := os.Getenv(name); v != "" {
 		var n uint32
-		fmt.Sscanf(v, "%d", &n)
+		_, _ = fmt.Sscanf(v, "%d", &n)
 		if n > 0 {
 			return n
 		}
@@ -40,7 +41,7 @@ func liveYandexSettings(t *testing.T) (*internet.MemoryStreamConfig, string, fun
 
 	folder := fmt.Sprintf("xdrive-live-%d", time.Now().UnixNano())
 	dav := func(method, path string) int {
-		req, _ := http.NewRequest(method, yandexBase+path, nil)
+		req, _ := http.NewRequestWithContext(context.Background(), method, yandexBase+path, nil)
 		req.SetBasicAuth(user, pass)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -89,6 +90,7 @@ func TestLiveYandexStorage(t *testing.T) {
 	settings, _, cleanup := liveYandexSettings(t)
 	defer cleanup()
 
+	//nolint:forcetypeassert // the test builds the stream settings itself
 	storage, err := newTemplateStorage(settings, settings.ProtocolSettings.(*Config))
 	if err != nil {
 		t.Fatalf("newTemplateStorage: %v", err)
@@ -124,7 +126,7 @@ func TestLiveYandexStorage(t *testing.T) {
 		t.Fatalf("Get returned %q", got)
 	}
 
-	if _, err := storage.Get(ctx, "streams/live/c2s/000000009.seg"); err != errNotFound {
+	if _, err := storage.Get(ctx, "streams/live/c2s/000000009.seg"); !errors.Is(err, errNotFound) {
 		t.Fatalf("Get of a missing object returned %v, want errNotFound", err)
 	}
 
@@ -149,13 +151,13 @@ func TestLiveYandexTransport(t *testing.T) {
 
 	size := 1000000
 	if raw := os.Getenv("XDRIVE_LIVE_BYTES"); raw != "" {
-		fmt.Sscanf(raw, "%d", &size)
+		_, _ = fmt.Sscanf(raw, "%d", &size)
 	}
 	payload := make([]byte, size)
 	rand.Read(payload)
 
 	start = time.Now()
-	go func() { client.Write(payload) }()
+	go func() { _, _ = client.Write(payload) }()
 	if err := server.SetReadDeadline(time.Now().Add(5 * time.Minute)); err != nil {
 		t.Fatalf("SetReadDeadline: %v", err)
 	}

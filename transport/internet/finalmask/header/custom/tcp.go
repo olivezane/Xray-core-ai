@@ -208,10 +208,6 @@ func (c *tcpCustomServerConn) Write(p []byte) (n int, err error) {
 	return c.Conn.Write(p)
 }
 
-func readSequence(r io.Reader, sequence *TCPSequence) bool {
-	return readSequenceWithContext(r, sequence, newEvalContext())
-}
-
 func readSequenceWithContext(r io.Reader, sequence *TCPSequence, ctx *evalContext) bool {
 	for _, item := range sequence.Sequence {
 		length, err := measureItem(item.Rand, item.Packet, item.Save, item.Var, item.Expr, sizeMapFromEvalContext(ctx))
@@ -252,10 +248,6 @@ func readSequenceWithContext(r io.Reader, sequence *TCPSequence, ctx *evalContex
 		}
 	}
 	return true
-}
-
-func writeSequence(w io.Writer, sequence *TCPSequence) bool {
-	return writeSequenceWithContext(w, sequence, newEvalContext())
 }
 
 func writeSequenceWithContext(w io.Writer, sequence *TCPSequence, ctx *evalContext) bool {

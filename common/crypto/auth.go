@@ -146,7 +146,7 @@ func (r *AuthenticationReader) readBuffer(size int32, padding int32) (*buf.Buffe
 		b.Release()
 		return nil, err
 	}
-	b.Resize(0, int32(len(rb)))
+	b.Resize(0, int32(len(rb))) //nolint:gosec // bounded by the buffer size / buf.Size
 	return b, nil
 }
 
@@ -164,7 +164,7 @@ func (r *AuthenticationReader) readInternal(soft bool, mb *buf.MultiBuffer) erro
 		return err
 	}
 
-	if size == uint16(r.auth.Overhead())+padding {
+	if size == uint16(r.auth.Overhead())+padding { //nolint:gosec // cipher overhead / nonce size is a small constant
 		r.done = true
 		return io.EOF
 	}
@@ -213,7 +213,7 @@ func (r *AuthenticationReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 
 	for i := 1; i < readSize; i++ {
 		err := r.readInternal(true, &mb)
-		if err == errSoft || err == io.EOF {
+		if errors.Is(err, errSoft) || errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -247,7 +247,7 @@ func NewAuthenticationWriter(auth Authenticator, sizeParser ChunkSizeEncoder, wr
 }
 
 func (w *AuthenticationWriter) seal(b []byte) (*buf.Buffer, error) {
-	encryptedSize := int32(len(b) + w.auth.Overhead())
+	encryptedSize := int32(len(b) + w.auth.Overhead()) //nolint:gosec // bounded by the buffer size / buf.Size
 	var paddingSize int32
 	if w.padding != nil {
 		paddingSize = int32(w.padding.NextPaddingLen())
@@ -260,7 +260,7 @@ func (w *AuthenticationWriter) seal(b []byte) (*buf.Buffer, error) {
 	}
 
 	eb := buf.New()
-	w.sizeParser.Encode(uint16(encryptedSize+paddingSize), eb.Extend(sizeBytes))
+	w.sizeParser.Encode(uint16(encryptedSize+paddingSize), eb.Extend(sizeBytes)) //nolint:gosec // cipher overhead and padding are small constants
 	if _, err := w.auth.Seal(eb.Extend(encryptedSize)[:0], b); err != nil {
 		eb.Release()
 		return nil, err
@@ -283,7 +283,7 @@ func (w *AuthenticationWriter) writeStream(mb buf.MultiBuffer) error {
 		maxPadding = int32(w.padding.MaxPaddingLen())
 	}
 
-	payloadSize := buf.Size - int32(w.auth.Overhead()) - w.sizeParser.SizeBytes() - maxPadding
+	payloadSize := buf.Size - int32(w.auth.Overhead()) - w.sizeParser.SizeBytes() - maxPadding //nolint:gosec // cipher overhead and size header are small constants
 	mb2Write := make(buf.MultiBuffer, 0, len(mb)+10)
 
 	temp := buf.New()

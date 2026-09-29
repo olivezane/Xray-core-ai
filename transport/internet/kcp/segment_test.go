@@ -25,13 +25,14 @@ func TestDataSegment(t *testing.T) {
 		Number:      4,
 		SendingNext: 5,
 	}
-	seg.Data().Write([]byte{'a', 'b', 'c', 'd'})
+	_, _ = seg.Data().Write([]byte{'a', 'b', 'c', 'd'})
 
 	nBytes := seg.ByteSize()
 	bytes := make([]byte, nBytes)
 	seg.Serialize(bytes)
 
 	iseg, _ := ReadSegment(bytes)
+	//nolint:forcetypeassert // the KCP retransmission queues only ever store *DataSegment
 	seg2 := iseg.(*DataSegment)
 	if r := cmp.Diff(seg2, seg, cmpopts.IgnoreUnexported(DataSegment{})); r != "" {
 		t.Error(r)
@@ -48,13 +49,14 @@ func Test1ByteDataSegment(t *testing.T) {
 		Number:      4,
 		SendingNext: 5,
 	}
-	seg.Data().WriteByte('a')
+	_ = seg.Data().WriteByte('a')
 
 	nBytes := seg.ByteSize()
 	bytes := make([]byte, nBytes)
 	seg.Serialize(bytes)
 
 	iseg, _ := ReadSegment(bytes)
+	//nolint:forcetypeassert // the KCP retransmission queues only ever store *DataSegment
 	seg2 := iseg.(*DataSegment)
 	if r := cmp.Diff(seg2, seg, cmpopts.IgnoreUnexported(DataSegment{})); r != "" {
 		t.Error(r)
@@ -79,6 +81,7 @@ func TestACKSegment(t *testing.T) {
 	seg.Serialize(bytes)
 
 	iseg, _ := ReadSegment(bytes)
+	//nolint:forcetypeassert // the KCP receive queue only ever stores *AckSegment
 	seg2 := iseg.(*AckSegment)
 	if r := cmp.Diff(seg2, seg); r != "" {
 		t.Error(r)
@@ -100,6 +103,7 @@ func TestCmdSegment(t *testing.T) {
 	seg.Serialize(bytes)
 
 	iseg, _ := ReadSegment(bytes)
+	//nolint:forcetypeassert // the KCP segment parser only produces *CmdOnlySegment here
 	seg2 := iseg.(*CmdOnlySegment)
 	if r := cmp.Diff(seg2, seg); r != "" {
 		t.Error(r)

@@ -175,7 +175,7 @@ func (l *Listener) keepAccepting() {
 	for {
 		conn, err := l.listener.Accept(context.Background())
 		if err != nil {
-			if err != quic.ErrServerClosed {
+			if !errors.Is(err, quic.ErrServerClosed) {
 				errors.LogErrorInner(context.Background(), err, "failed to serve hysteria")
 			}
 			break
@@ -203,6 +203,7 @@ func Listen(ctx context.Context, address net.Address, port net.Port, streamSetti
 	}
 
 	validator := ValidatorFromContext(ctx)
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	config := streamSettings.ProtocolSettings.(*Config)
 
 	if validator == nil && config.Auth == "" {
@@ -220,6 +221,7 @@ func Listen(ctx context.Context, address net.Address, port net.Port, streamSetti
 		if err != nil {
 			return nil, err
 		}
+		//nolint:forcetypeassert // http.DefaultTransport is documented to be *http.Transport
 		transport := http.DefaultTransport.(*http.Transport)
 		switch u.Scheme {
 		case "http", "https":
@@ -384,6 +386,7 @@ func newMasqueradeProxyBufferPool() *masqueradeProxyBufferPool {
 }
 
 func (p *masqueradeProxyBufferPool) Get() []byte {
+	//nolint:forcetypeassert // the pool only ever stores []byte
 	return p.pool.Get().([]byte)
 }
 
@@ -391,5 +394,5 @@ func (p *masqueradeProxyBufferPool) Put(buf []byte) {
 	if cap(buf) < masqueradeProxyBufferSize {
 		return
 	}
-	p.pool.Put(buf[:masqueradeProxyBufferSize])
+	p.pool.Put(buf[:masqueradeProxyBufferSize]) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
 }

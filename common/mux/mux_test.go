@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
+	"github.com/xtls/xray-core/common/errors"
 	. "github.com/xtls/xray-core/common/mux"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
@@ -18,7 +19,7 @@ func readAll(reader buf.Reader) (buf.MultiBuffer, error) {
 	var mb buf.MultiBuffer
 	for {
 		b, err := reader.ReadMultiBuffer()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -43,7 +44,9 @@ func TestReaderWriter(t *testing.T) {
 
 	writePayload := func(writer *Writer, payload ...byte) error {
 		b := buf.New()
-		b.Write(payload)
+		if _, err := b.Write(payload); err != nil {
+			return err
+		}
 		return writer.WriteMultiBuffer(buf.MultiBuffer{b})
 	}
 

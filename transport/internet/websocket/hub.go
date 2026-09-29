@@ -87,6 +87,7 @@ func ListenWS(ctx context.Context, address net.Address, port net.Port, streamSet
 	l := &Listener{
 		addConn: addConn,
 	}
+	//nolint:forcetypeassert // streamSettings.ProtocolSettings is built by this transport's own conf builder
 	wsSettings := streamSettings.ProtocolSettings.(*Config)
 	l.config = wsSettings
 	if l.config != nil {

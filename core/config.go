@@ -95,11 +95,11 @@ func GetFormatByExtension(ext string) string {
 }
 
 func getExtension(filename string) string {
-	idx := strings.LastIndexByte(filename, '.')
-	if idx == -1 {
+	_, ext, ok := strings.CutLast(filename, ".")
+	if !ok {
 		return ""
 	}
-	return filename[idx+1:]
+	return ext
 }
 
 func GetFormat(filename string) string {

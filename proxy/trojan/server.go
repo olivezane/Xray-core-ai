@@ -28,8 +28,8 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
-		return NewServer(ctx, config.(*ServerConfig))
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config *ServerConfig) (any, error) {
+		return NewServer(ctx, config)
 	}))
 }
 
@@ -56,8 +56,13 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	}
 
 	v := core.MustFromContext(ctx)
+	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
+	if !ok {
+		return nil, errors.New("policy.Manager is not registered in Xray core")
+	}
+	//nolint:forcetypeassert // session.ConeKey is only ever set to a bool
 	server := &Server{
-		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
+		policyManager: pm,
 		validator:     validator,
 		cone:          ctx.Value(session.ConeKey).(bool),
 	}
@@ -277,7 +282,7 @@ func (s *Server) handleUDPPayload(ctx context.Context, sessionPolicy policy.Sess
 			default:
 				mb, err := clientReader.ReadMultiBuffer()
 				if err != nil {
-					if errors.Cause(err) != io.EOF {
+					if !errors.Is(err, io.EOF) {
 						return errors.New("unexpected EOF").Base(err)
 					}
 					return nil
@@ -479,7 +484,7 @@ func (s *Server) fallback(ctx context.Context, err error, sessionPolicy policy.S
 				ipType = 0
 			}
 			if ipType == 4 {
-				for i := 0; i < len(remoteAddr); i++ {
+				for i := range len(remoteAddr) {
 					if remoteAddr[i] == ':' {
 						ipType = 6
 						break
@@ -491,32 +496,32 @@ func (s *Server) fallback(ctx context.Context, err error, sessionPolicy policy.S
 			switch fb.Xver {
 			case 1:
 				if ipType == 0 {
-					common.Must2(pro.Write([]byte("PROXY UNKNOWN\r\n")))
+					common.Must2(pro.WriteString("PROXY UNKNOWN\r\n"))
 					break
 				}
 				if ipType == 4 {
-					common.Must2(pro.Write([]byte("PROXY TCP4 " + remoteAddr + " " + localAddr + " " + remotePort + " " + localPort + "\r\n")))
+					common.Must2(pro.WriteString("PROXY TCP4 " + remoteAddr + " " + localAddr + " " + remotePort + " " + localPort + "\r\n"))
 				} else {
-					common.Must2(pro.Write([]byte("PROXY TCP6 " + remoteAddr + " " + localAddr + " " + remotePort + " " + localPort + "\r\n")))
+					common.Must2(pro.WriteString("PROXY TCP6 " + remoteAddr + " " + localAddr + " " + remotePort + " " + localPort + "\r\n"))
 				}
 			case 2:
-				common.Must2(pro.Write([]byte("\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A"))) // signature
+				common.Must2(pro.WriteString("\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A")) // signature
 				if ipType == 0 {
-					common.Must2(pro.Write([]byte("\x20\x00\x00\x00"))) // v2 + LOCAL + UNSPEC + UNSPEC + 0 bytes
+					common.Must2(pro.WriteString("\x20\x00\x00\x00")) // v2 + LOCAL + UNSPEC + UNSPEC + 0 bytes
 					break
 				}
 				if ipType == 4 {
-					common.Must2(pro.Write([]byte("\x21\x11\x00\x0C"))) // v2 + PROXY + AF_INET + STREAM + 12 bytes
+					common.Must2(pro.WriteString("\x21\x11\x00\x0C")) // v2 + PROXY + AF_INET + STREAM + 12 bytes
 					common.Must2(pro.Write(net.ParseIP(remoteAddr).To4()))
 					common.Must2(pro.Write(net.ParseIP(localAddr).To4()))
 				} else {
-					common.Must2(pro.Write([]byte("\x21\x21\x00\x24"))) // v2 + PROXY + AF_INET6 + STREAM + 36 bytes
+					common.Must2(pro.WriteString("\x21\x21\x00\x24")) // v2 + PROXY + AF_INET6 + STREAM + 36 bytes
 					common.Must2(pro.Write(net.ParseIP(remoteAddr).To16()))
 					common.Must2(pro.Write(net.ParseIP(localAddr).To16()))
 				}
 				p1, _ := strconv.ParseUint(remotePort, 10, 16)
 				p2, _ := strconv.ParseUint(localPort, 10, 16)
-				common.Must2(pro.Write([]byte{byte(p1 >> 8), byte(p1), byte(p2 >> 8), byte(p2)}))
+				common.Must2(pro.Write([]byte{byte(p1 >> 8), byte(p1), byte(p2 >> 8), byte(p2)})) //nolint:gosec // explicit byte extraction from a shift
 			}
 			if err := serverWriter.WriteMultiBuffer(buf.MultiBuffer{pro}); err != nil {
 				return errors.New("failed to set PROXY protocol v", fb.Xver).Base(err)

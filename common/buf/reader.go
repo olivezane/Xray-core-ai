@@ -132,7 +132,7 @@ func (r *BufferedReader) writeToInternal(writer io.Writer) (int64, error) {
 // WriteTo implements io.WriterTo.
 func (r *BufferedReader) WriteTo(writer io.Writer) (int64, error) {
 	nBytes, err := r.writeToInternal(writer)
-	if errors.Cause(err) == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return nBytes, nil
 	}
 	return nBytes, err

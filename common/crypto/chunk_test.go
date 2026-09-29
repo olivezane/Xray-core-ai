@@ -8,6 +8,7 @@ import (
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	. "github.com/xtls/xray-core/common/crypto"
+	"github.com/xtls/xray-core/common/errors"
 )
 
 func TestChunkStreamIO(t *testing.T) {
@@ -17,11 +18,11 @@ func TestChunkStreamIO(t *testing.T) {
 	reader := NewChunkStreamReader(PlainChunkSizeParser{}, cache)
 
 	b := buf.New()
-	b.WriteString("abcd")
+	_, _ = b.WriteString("abcd")
 	common.Must(writer.WriteMultiBuffer(buf.MultiBuffer{b}))
 
 	b = buf.New()
-	b.WriteString("efg")
+	_, _ = b.WriteString("efg")
 	common.Must(writer.WriteMultiBuffer(buf.MultiBuffer{b}))
 
 	common.Must(writer.WriteMultiBuffer(buf.MultiBuffer{}))
@@ -45,7 +46,7 @@ func TestChunkStreamIO(t *testing.T) {
 	}
 
 	_, err = reader.ReadMultiBuffer()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Error("error: ", err)
 	}
 }

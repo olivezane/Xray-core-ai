@@ -213,7 +213,7 @@ func (l *Listener) acceptPending(logCtx context.Context) (bool, error) {
 }
 
 func (l *Listener) drop(name string) {
-	l.storage.Delete(l.ctx, name)
+	_ = l.storage.Delete(l.ctx, name)
 }
 
 func (l *Listener) claim(session string) bool {
