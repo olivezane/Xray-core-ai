@@ -286,7 +286,7 @@ func TestMphMatcherGroupRandom(t *testing.T) {
 			inputs = append(inputs, inputs[i]+c)
 		}
 	}
-	for seed := int64(0); seed < 300; seed++ {
+	for seed := range int64(300) {
 		r := rand.New(rand.NewSource(seed))
 		g := NewMphMatcherGroup()
 		full, domain := map[string][]uint32{}, map[string][]uint32{} // Stored pattern -> values

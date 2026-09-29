@@ -42,7 +42,7 @@ func GenerateIncreasingNonce(nonce []byte) BytesGenerator {
 
 func GenerateAEADNonceWithSize(nonceSize int) BytesGenerator {
 	c := make([]byte, nonceSize)
-	for i := 0; i < nonceSize; i++ {
+	for i := range nonceSize {
 		c[i] = 0xFF
 	}
 	return GenerateIncreasingNonce(c)

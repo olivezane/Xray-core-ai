@@ -37,7 +37,7 @@ func (fkdns *Holder) GetFakeIPForDomain3(domain string, ipv4, ipv6 bool) []net.A
 	return []net.Address{}
 }
 
-func (*Holder) Type() interface{} {
+func (*Holder) Type() any {
 	return (*dns.FakeDNSEngine)(nil)
 }
 
@@ -181,7 +181,7 @@ func (h *HolderMulti) GetDomainFromFakeDNS(ip net.Address) string {
 	return ""
 }
 
-func (h *HolderMulti) Type() interface{} {
+func (h *HolderMulti) Type() any {
 	return (*dns.FakeDNSEngine)(nil)
 }
 
@@ -226,7 +226,7 @@ func NewFakeDNSHolderMulti(conf *FakeDnsPoolMulti) (*HolderMulti, error) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*FakeDnsPool)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*FakeDnsPool)(nil), func(ctx context.Context, config any) (any, error) {
 		var f *Holder
 		var err error
 		if f, err = NewFakeDNSHolderConfigOnly(config.(*FakeDnsPool)); err != nil {
@@ -235,7 +235,7 @@ func init() {
 		return f, nil
 	}))
 
-	common.Must(common.RegisterConfig((*FakeDnsPoolMulti)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*FakeDnsPoolMulti)(nil), func(ctx context.Context, config any) (any, error) {
 		var f *HolderMulti
 		var err error
 		if f, err = NewFakeDNSHolderMulti(config.(*FakeDnsPoolMulti)); err != nil {

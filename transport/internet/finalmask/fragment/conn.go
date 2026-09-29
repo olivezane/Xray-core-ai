@@ -37,10 +37,7 @@ func (c *fragmentConn) RawConn() net.Conn {
 }
 
 func (c *fragmentConn) Splice() bool {
-	if c.server {
-		return false
-	}
-	return true
+	return !c.server
 }
 
 // lengthForSegment returns the length range (min, max) for the given segment index (0-based).

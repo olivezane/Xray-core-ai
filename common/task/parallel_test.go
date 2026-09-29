@@ -29,7 +29,7 @@ func TestParallelForN_AllIndicesCovered(t *testing.T) {
 		return nil
 	})
 	common.Must(err)
-	for i := 0; i < N; i++ {
+	for i := range N {
 		if seen[i] != 1 {
 			t.Fatalf("index %d called %d times, expected 1", i, seen[i])
 		}

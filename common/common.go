@@ -32,7 +32,7 @@ func Must2[T any](v T, err error) T {
 }
 
 // Error2 returns the err from the 2nd parameter.
-func Error2(v interface{}, err error) error {
+func Error2(v any, err error) error {
 	return err
 }
 
@@ -71,8 +71,8 @@ func GetRuntimeEnv(key string) (string, error) {
 	if readErr != nil {
 		return "", readErr
 	}
-	envStrings := strings.Split(string(data), "\n")
-	for _, envItem := range envStrings {
+	envStrings := strings.SplitSeq(string(data), "\n")
+	for envItem := range envStrings {
 		envItem = strings.TrimSuffix(envItem, "\r")
 		envKeyValue := strings.Split(envItem, "=")
 		if strings.EqualFold(strings.TrimSpace(envKeyValue[0]), key) {

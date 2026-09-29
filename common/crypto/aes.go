@@ -10,13 +10,13 @@ import (
 // NewAesDecryptionStream creates a new AES encryption stream based on given key and IV.
 // Caller must ensure the length of key and IV is either 16, 24 or 32 bytes.
 func NewAesDecryptionStream(key []byte, iv []byte) cipher.Stream {
-	return NewAesStreamMethod(key, iv, cipher.NewCFBDecrypter)
+	return NewAesStreamMethod(key, iv, cipher.NewCFBDecrypter) //nolint:staticcheck // wire-format compatibility, cannot be changed without breaking existing peers
 }
 
 // NewAesEncryptionStream creates a new AES description stream based on given key and IV.
 // Caller must ensure the length of key and IV is either 16, 24 or 32 bytes.
 func NewAesEncryptionStream(key []byte, iv []byte) cipher.Stream {
-	return NewAesStreamMethod(key, iv, cipher.NewCFBEncrypter)
+	return NewAesStreamMethod(key, iv, cipher.NewCFBEncrypter) //nolint:staticcheck // wire-format compatibility, cannot be changed without breaking existing peers
 }
 
 func NewAesStreamMethod(key []byte, iv []byte, f func(cipher.Block, []byte) cipher.Stream) cipher.Stream {

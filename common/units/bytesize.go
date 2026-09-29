@@ -13,12 +13,11 @@ var (
 )
 
 // ByteSize is the size of bytes
-type ByteSize uint64
+type ByteSize uint64 //nolint:recvcheck // read-only methods use value receivers, mutating ones need pointers
 
 const (
-	_ = iota
 	// KB = 1KB
-	KB ByteSize = 1 << (10 * iota)
+	KB ByteSize = 1 << (10 * (iota + 1))
 	// MB = 1MB
 	MB
 	// GB = 1GB
@@ -32,8 +31,8 @@ const (
 )
 
 func (b ByteSize) String() string {
-	unit := ""
-	value := float64(0)
+	var unit string
+	var value float64
 	switch {
 	case b == 0:
 		return "0"

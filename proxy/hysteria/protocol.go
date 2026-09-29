@@ -261,10 +261,7 @@ func FragUDPMessage(m *UDPMessage, maxSize int) []UDPMessage {
 	fragCount := uint8((len(fullPayload) + maxPayloadSize - 1) / maxPayloadSize) // round up
 	frags := make([]UDPMessage, fragCount)
 	for off < len(fullPayload) {
-		payloadSize := len(fullPayload) - off
-		if payloadSize > maxPayloadSize {
-			payloadSize = maxPayloadSize
-		}
+		payloadSize := min(len(fullPayload)-off, maxPayloadSize)
 		frag := *m
 		frag.FragID = fragID
 		frag.FragCount = fragCount

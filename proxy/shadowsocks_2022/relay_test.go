@@ -46,7 +46,7 @@ func encodeRelayClientUDPPacket(relayKey, destKey []byte, sessionID, packetID ui
 	copy(destHash[:], hash512[:16])
 
 	var eiHeader [16]byte
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		eiHeader[i] = destHash[i] ^ rawHeader[i]
 	}
 	var encEIHeader [16]byte
@@ -246,9 +246,9 @@ func (d *dummyDispatcher) DispatchLink(ctx context.Context, dest net.Destination
 	return nil
 }
 
-func (d *dummyDispatcher) Start() error      { return nil }
-func (d *dummyDispatcher) Close() error      { return nil }
-func (d *dummyDispatcher) Type() interface{} { return routing.DispatcherType() }
+func (d *dummyDispatcher) Start() error { return nil }
+func (d *dummyDispatcher) Close() error { return nil }
+func (d *dummyDispatcher) Type() any    { return routing.DispatcherType() }
 
 type dummyStatConn struct {
 	gonet.Conn

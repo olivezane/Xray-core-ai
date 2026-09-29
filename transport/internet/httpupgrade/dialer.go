@@ -28,7 +28,7 @@ func (c *ConnRF) Read(b []byte) (int, error) {
 		// create reader capped to size of `b`, so it can be fully drained into
 		// `b` later with a single Read call
 		reader := bufio.NewReaderSize(c.Conn, len(b))
-		resp, err := http.ReadResponse(reader, c.Req) // nolint:bodyclose
+		resp, err := http.ReadResponse(reader, c.Req) //nolint:bodyclose
 		if err != nil {
 			return 0, err
 		}

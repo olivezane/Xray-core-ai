@@ -176,10 +176,7 @@ func (r *LengthPacketReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	// fmt.Println("Read", length)
 	mb := make(buf.MultiBuffer, 0, length/buf.Size+1)
 	for length > 0 {
-		size := length
-		if size > buf.Size {
-			size = buf.Size
-		}
+		size := min(length, buf.Size)
 		length -= size
 		b := buf.New()
 		if _, err := b.ReadFullFrom(r.Reader, size); err != nil {

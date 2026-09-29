@@ -23,6 +23,6 @@ type Dispatcher interface {
 // DispatcherType returns the type of Dispatcher interface. Can be used to implement common.HasType.
 //
 // xray:api:stable
-func DispatcherType() interface{} {
+func DispatcherType() any {
 	return (*Dispatcher)(nil)
 }

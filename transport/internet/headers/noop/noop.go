@@ -16,7 +16,7 @@ func (NoOpHeader) Size() int32 {
 // Serialize implements PacketHeader.
 func (NoOpHeader) Serialize([]byte) {}
 
-func NewNoOpHeader(context.Context, interface{}) (interface{}, error) {
+func NewNoOpHeader(context.Context, any) (any, error) {
 	return NoOpHeader{}, nil
 }
 
@@ -30,7 +30,7 @@ func (NoOpConnectionHeader) Server(conn net.Conn) net.Conn {
 	return conn
 }
 
-func NewNoOpConnectionHeader(context.Context, interface{}) (interface{}, error) {
+func NewNoOpConnectionHeader(context.Context, any) (any, error) {
 	return NoOpConnectionHeader{}, nil
 }
 

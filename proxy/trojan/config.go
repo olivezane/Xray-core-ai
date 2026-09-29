@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 
@@ -50,9 +51,9 @@ func hexSha224(password string) []byte {
 }
 
 func hexString(data []byte) string {
-	str := ""
+	var str strings.Builder
 	for _, v := range data {
-		str += fmt.Sprintf("%02x", v)
+		str.WriteString(fmt.Sprintf("%02x", v))
 	}
-	return str
+	return str.String()
 }

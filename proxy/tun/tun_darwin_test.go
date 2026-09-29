@@ -193,11 +193,9 @@ func TestWaitKqueueConcurrentCloseIsSafe(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 20 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			kq.close()
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -225,7 +223,7 @@ func TestWaitKqueueReportsPersistentFailure(t *testing.T) {
 	// path in the process closing it, or the kernel invalidating it.
 	_ = unix.Close(kq.fd)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if kq.wait(50 * time.Millisecond) {
 			t.Fatalf("wait() call %d returned true against a closed underlying fd -- should report failure, not spin", i)
 		}

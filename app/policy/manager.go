@@ -31,7 +31,7 @@ func New(ctx context.Context, config *Config) (*Instance, error) {
 }
 
 // Type implements common.HasType.
-func (*Instance) Type() interface{} {
+func (*Instance) Type() any {
 	return policy.ManagerType()
 }
 
@@ -62,7 +62,7 @@ func (m *Instance) Close() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		return New(ctx, config.(*Config))
 	}))
 }

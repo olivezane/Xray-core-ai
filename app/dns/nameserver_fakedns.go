@@ -8,7 +8,7 @@ import (
 	"github.com/xtls/xray-core/features/dns"
 )
 
-type FakeDNSServer struct {
+type FakeDNSServer struct { //nolint:recvcheck // read-only methods use value receivers, mutating ones need pointers
 	fakeDNSEngine dns.FakeDNSEngine
 }
 

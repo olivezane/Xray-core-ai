@@ -62,7 +62,7 @@ func TestLongRequestHeader(t *testing.T) {
 	payload := make([]byte, buf.Size+2)
 	common.Must2(rand.Read(payload[:buf.Size-2]))
 	copy(payload[buf.Size-2:], ENDING)
-	payload = append(payload, []byte("abcd")...)
+	payload = append(payload, []byte("abcd")...) //nolint:makezero // payload is fully written, the extra bytes are appended after it
 
 	reader := HeaderReader{}
 	_, err := reader.Read(bytes.NewReader(payload))

@@ -56,7 +56,7 @@ func NewCommander(ctx context.Context, config *Config) (*Commander, error) {
 }
 
 // Type implements common.HasType.
-func (c *Commander) Type() interface{} {
+func (c *Commander) Type() any {
 	return (*Commander)(nil)
 }
 
@@ -129,7 +129,7 @@ func (c *Commander) Close() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg any) (any, error) {
 		return NewCommander(ctx, cfg.(*Config))
 	}))
 }

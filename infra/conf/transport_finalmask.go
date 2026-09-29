@@ -69,22 +69,22 @@ var (
 	customVarNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 	tcpmaskLoader = NewJSONConfigLoader(ConfigCreatorCache{
-		"header-custom": func() interface{} { return new(HeaderCustomTCP) },
-		"fragment":      func() interface{} { return new(FragmentMask) },
-		"sudoku":        func() interface{} { return new(Sudoku) },
-		"xmc":           func() interface{} { return new(XMC) },
+		"header-custom": func() any { return new(HeaderCustomTCP) },
+		"fragment":      func() any { return new(FragmentMask) },
+		"sudoku":        func() any { return new(Sudoku) },
+		"xmc":           func() any { return new(XMC) },
 	}, "type", "settings")
 
 	udpmaskLoader = NewJSONConfigLoader(ConfigCreatorCache{
-		"header-custom": func() interface{} { return new(HeaderCustomUDP) },
-		"mkcp-legacy":   func() interface{} { return new(MkcpLegacy) },
-		"noise":         func() interface{} { return new(NoiseMask) },
-		"salamander":    func() interface{} { return new(Salamander) },
-		"sudoku":        func() interface{} { return new(Sudoku) },
-		"xdns":          func() interface{} { return new(Xdns) },
-		"xicmp":         func() interface{} { return new(Xicmp) },
-		"realm":         func() interface{} { return new(Realm) },
-		"udphop":        func() interface{} { return new(UDPHop) },
+		"header-custom": func() any { return new(HeaderCustomUDP) },
+		"mkcp-legacy":   func() any { return new(MkcpLegacy) },
+		"noise":         func() any { return new(NoiseMask) },
+		"salamander":    func() any { return new(Salamander) },
+		"sudoku":        func() any { return new(Sudoku) },
+		"xdns":          func() any { return new(Xdns) },
+		"xicmp":         func() any { return new(Xicmp) },
+		"realm":         func() any { return new(Realm) },
+		"udphop":        func() any { return new(UDPHop) },
 	}, "type", "settings")
 )
 
@@ -916,7 +916,7 @@ type UDPHop struct {
 
 func (c *UDPHop) Build() (proto.Message, error) {
 	var local, remote, remoteOnce bool
-	for _, mode := range strings.Split(c.Mode, ",") {
+	for mode := range strings.SplitSeq(c.Mode, ",") {
 		switch strings.ToLower(mode) {
 		case "intervallocal":
 			local = true

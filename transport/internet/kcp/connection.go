@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,12 +28,7 @@ type State int32
 
 // Is returns true if current State is one of the candidates.
 func (s State) Is(states ...State) bool {
-	for _, state := range states {
-		if s == state {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(states, s)
 }
 
 const (
@@ -87,10 +83,7 @@ func (info *RoundTripInfo) Update(rtt uint32, current uint32) {
 			delta = info.srtt - rtt
 		}
 		info.variation = (3*info.variation + delta) / 4
-		info.srtt = (7*info.srtt + rtt) / 8
-		if info.srtt < info.minRtt {
-			info.srtt = info.minRtt
-		}
+		info.srtt = max((7*info.srtt+rtt)/8, info.minRtt)
 	}
 	var rto uint32
 	if info.minRtt < 4*info.variation {
@@ -187,9 +180,9 @@ type Connection struct {
 	Config     *Config
 
 	state            State
-	stateBeginTime   uint32
-	lastIncomingTime uint32
-	lastPingTime     uint32
+	stateBeginTime   atomic.Uint32
+	lastIncomingTime atomic.Uint32
+	lastPingTime     atomic.Uint32
 
 	mss       uint32
 	roundTrip *RoundTripInfo
@@ -281,7 +274,7 @@ func (c *Connection) ReadMultiBuffer() (buf.MultiBuffer, error) {
 }
 
 func (c *Connection) waitForDataInput() error {
-	for i := 0; i < 16; i++ {
+	for range 16 {
 		select {
 		case <-c.dataInput.Wait():
 			return nil
@@ -335,7 +328,7 @@ func (c *Connection) Read(b []byte) (int, error) {
 }
 
 func (c *Connection) waitForDataOutput() error {
-	for i := 0; i < 16; i++ {
+	for range 16 {
 		select {
 		case <-c.dataOutput.Wait():
 			return nil
@@ -431,7 +424,7 @@ func (c *Connection) writeMultiBufferInternal(reader io.Reader) error {
 func (c *Connection) SetState(state State) {
 	current := c.Elapsed()
 	atomic.StoreInt32((*int32)(&c.state), int32(state))
-	atomic.StoreUint32(&c.stateBeginTime, current)
+	c.stateBeginTime.Store(current)
 	errors.LogDebug(context.Background(), "#", c.meta.Conversation, " entering state ", state, " at ", current)
 
 	switch state {
@@ -561,7 +554,7 @@ func (c *Connection) OnPeerClosed() {
 // Input when you received a low level packet (eg. UDP packet), call it
 func (c *Connection) Input(segments []Segment) {
 	current := c.Elapsed()
-	atomic.StoreUint32(&c.lastIncomingTime, current)
+	c.lastIncomingTime.Store(current)
 
 	for _, seg := range segments {
 		if seg.Conversation() != c.meta.Conversation {
@@ -612,7 +605,7 @@ func (c *Connection) flush() {
 	if c.State() == StateTerminated {
 		return
 	}
-	if c.State() == StateActive && current-atomic.LoadUint32(&c.lastIncomingTime) >= 30000 {
+	if c.State() == StateActive && current-c.lastIncomingTime.Load() >= 30000 {
 		c.Close()
 	}
 	if c.State() == StateReadyToClose && c.sendingWorker.IsEmpty() {
@@ -623,16 +616,16 @@ func (c *Connection) flush() {
 		errors.LogDebug(context.Background(), "#", c.meta.Conversation, " sending terminating cmd.")
 		c.Ping(current, CommandTerminate)
 
-		if current-atomic.LoadUint32(&c.stateBeginTime) > 8000 {
+		if current-c.stateBeginTime.Load() > 8000 {
 			c.SetState(StateTerminated)
 		}
 		return
 	}
-	if c.State() == StatePeerTerminating && current-atomic.LoadUint32(&c.stateBeginTime) > 4000 {
+	if c.State() == StatePeerTerminating && current-c.stateBeginTime.Load() > 4000 {
 		c.SetState(StateTerminating)
 	}
 
-	if c.State() == StateReadyToClose && current-atomic.LoadUint32(&c.stateBeginTime) > 15000 {
+	if c.State() == StateReadyToClose && current-c.stateBeginTime.Load() > 15000 {
 		c.SetState(StateTerminating)
 	}
 
@@ -640,7 +633,7 @@ func (c *Connection) flush() {
 	c.receivingWorker.Flush(current)
 	c.sendingWorker.Flush(current)
 
-	if current-atomic.LoadUint32(&c.lastPingTime) >= 3000 {
+	if current-c.lastPingTime.Load() >= 3000 {
 		c.Ping(current, CommandPing)
 	}
 }
@@ -660,6 +653,6 @@ func (c *Connection) Ping(current uint32, cmd Command) {
 		seg.Option = SegmentOptionClose
 	}
 	c.output.Write(seg)
-	atomic.StoreUint32(&c.lastPingTime, current)
+	c.lastPingTime.Store(current)
 	seg.Release()
 }

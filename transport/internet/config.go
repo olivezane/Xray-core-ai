@@ -6,7 +6,7 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 )
 
-type ConfigCreator func() interface{}
+type ConfigCreator func() any
 
 var globalTransportConfigCreatorCache = make(map[string]ConfigCreator)
 
@@ -35,7 +35,7 @@ func RegisterProtocolConfigCreator(name string, creator ConfigCreator) error {
 
 // Note: Each new transport needs to add init() func in transport/internet/xxx/config.go
 // Otherwise, it will cause #3244
-func CreateTransportConfig(name string) (interface{}, error) {
+func CreateTransportConfig(name string) (any, error) {
 	creator, ok := globalTransportConfigCreatorCache[name]
 	if !ok {
 		return nil, errors.New("unknown transport protocol: ", name)
@@ -43,7 +43,7 @@ func CreateTransportConfig(name string) (interface{}, error) {
 	return creator(), nil
 }
 
-func (c *TransportConfig) GetTypedSettings() (interface{}, error) {
+func (c *TransportConfig) GetTypedSettings() (any, error) {
 	return c.Settings.GetInstance()
 }
 
@@ -59,12 +59,12 @@ func (c *StreamConfig) GetEffectiveProtocol() string {
 	return c.ProtocolName
 }
 
-func (c *StreamConfig) GetEffectiveTransportSettings() (interface{}, error) {
+func (c *StreamConfig) GetEffectiveTransportSettings() (any, error) {
 	protocol := c.GetEffectiveProtocol()
 	return c.GetTransportSettingsFor(protocol)
 }
 
-func (c *StreamConfig) GetTransportSettingsFor(protocol string) (interface{}, error) {
+func (c *StreamConfig) GetTransportSettingsFor(protocol string) (any, error) {
 	if c != nil {
 		for _, settings := range c.TransportSettings {
 			if settings.GetUnifiedProtocolName() == protocol {
@@ -76,7 +76,7 @@ func (c *StreamConfig) GetTransportSettingsFor(protocol string) (interface{}, er
 	return CreateTransportConfig(protocol)
 }
 
-func (c *StreamConfig) GetEffectiveSecuritySettings() (interface{}, error) {
+func (c *StreamConfig) GetEffectiveSecuritySettings() (any, error) {
 	for _, settings := range c.SecuritySettings {
 		if settings.Type == c.SecurityType {
 			return settings.GetInstance()

@@ -7,10 +7,10 @@ import (
 
 // Lru simple, fast lru cache implementation
 type Lru interface {
-	Get(key interface{}) (value interface{}, ok bool)
-	GetKeyFromValue(value interface{}) (key interface{}, ok bool)
-	PeekKeyFromValue(value interface{}) (key interface{}, ok bool) // Peek means check but NOT bring to top
-	Put(key, value interface{})
+	Get(key any) (value any, ok bool)
+	GetKeyFromValue(value any) (key any, ok bool)
+	PeekKeyFromValue(value any) (key any, ok bool) // Peek means check but NOT bring to top
+	Put(key, value any)
 }
 
 type lru struct {
@@ -22,8 +22,8 @@ type lru struct {
 }
 
 type lruElement struct {
-	key   interface{}
-	value interface{}
+	key   any
+	value any
 }
 
 // NewLru initializes a lru cache
@@ -37,7 +37,7 @@ func NewLru(cap int) Lru {
 	}
 }
 
-func (l *lru) Get(key interface{}) (value interface{}, ok bool) {
+func (l *lru) Get(key any) (value any, ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if v, ok := l.keyToElement.Load(key); ok {
@@ -48,7 +48,7 @@ func (l *lru) Get(key interface{}) (value interface{}, ok bool) {
 	return nil, false
 }
 
-func (l *lru) GetKeyFromValue(value interface{}) (key interface{}, ok bool) {
+func (l *lru) GetKeyFromValue(value any) (key any, ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if k, ok := l.valueToElement.Load(value); ok {
@@ -59,7 +59,7 @@ func (l *lru) GetKeyFromValue(value interface{}) (key interface{}, ok bool) {
 	return nil, false
 }
 
-func (l *lru) PeekKeyFromValue(value interface{}) (key interface{}, ok bool) {
+func (l *lru) PeekKeyFromValue(value any) (key any, ok bool) {
 	if k, ok := l.valueToElement.Load(value); ok {
 		element := k.(*list.Element)
 		return element.Value.(*lruElement).key, true
@@ -67,7 +67,7 @@ func (l *lru) PeekKeyFromValue(value interface{}) (key interface{}, ok bool) {
 	return nil, false
 }
 
-func (l *lru) Put(key, value interface{}) {
+func (l *lru) Put(key, value any) {
 	l.mu.Lock()
 	e := &lruElement{key, value}
 	if v, ok := l.keyToElement.Load(key); ok {

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
+	"strings"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
@@ -17,15 +18,16 @@ type UUID [16]byte
 // String returns the string representation of this UUID.
 func (u *UUID) String() string {
 	bytes := u.Bytes()
-	result := hex.EncodeToString(bytes[0 : byteGroups[0]/2])
+	var result strings.Builder
+	result.WriteString(hex.EncodeToString(bytes[0 : byteGroups[0]/2]))
 	start := byteGroups[0] / 2
 	for i := 1; i < len(byteGroups); i++ {
 		nBytes := byteGroups[i] / 2
-		result += "-"
-		result += hex.EncodeToString(bytes[start : start+nBytes])
+		result.WriteString("-")
+		result.WriteString(hex.EncodeToString(bytes[start : start+nBytes]))
 		start += nBytes
 	}
-	return result
+	return result.String()
 }
 
 // Bytes returns the bytes representation of this UUID.

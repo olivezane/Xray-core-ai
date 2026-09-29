@@ -105,10 +105,7 @@ func find(r io.Reader, code []byte, readBody bool) ([]byte, error) {
 			return nil, errors.New("invalid body length: ", bodyL)
 		}
 
-		prefixL := bodyL
-		if prefixL > need {
-			prefixL = need
-		}
+		prefixL := min(bodyL, need)
 		prefix := prefixBuf[:prefixL]
 		if _, err := io.ReadFull(br, prefix); err != nil {
 			return nil, err
@@ -179,7 +176,7 @@ func NewAllAttrsMatcher(attrs string) AttributeMatcher {
 		return nil
 	}
 	m := new(AllAttrsMatcher)
-	for _, attr := range strings.Split(attrs, "@") {
+	for attr := range strings.SplitSeq(attrs, "@") {
 		m.matchers = append(m.matchers, HasAttrMatcher(attr))
 	}
 	return m

@@ -171,7 +171,7 @@ func (s *AckSegment) parse(conv uint16, cmd Command, opt SegmentOption, buf []by
 	if len(buf) < count*4 {
 		return false, nil
 	}
-	for i := 0; i < count; i++ {
+	for range count {
 		s.PutNumber(binary.BigEndian.Uint32(buf))
 		buf = buf[4:]
 	}

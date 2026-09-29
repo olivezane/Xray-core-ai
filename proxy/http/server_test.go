@@ -23,7 +23,10 @@ func TestReadResponseAndHandle100ContinueDoesNotPanicOnEarlyNewline(t *testing.T
 	}
 
 	// Must not panic; a parse error for the garbage trailing bytes is fine.
-	_, _ = readResponseAndHandle100Continue(r, req, io.Discard)
+	resp, _ := readResponseAndHandle100Continue(r, req, io.Discard)
+	if resp != nil {
+		resp.Body.Close()
+	}
 }
 
 func TestReadResponseAndHandle100ContinueForwardsAndParsesFinalResponse(t *testing.T) {
@@ -40,6 +43,7 @@ func TestReadResponseAndHandle100ContinueForwardsAndParsesFinalResponse(t *testi
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}

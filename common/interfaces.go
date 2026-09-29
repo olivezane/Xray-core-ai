@@ -20,7 +20,7 @@ type Interruptible interface {
 // Close closes the obj if it is a Closable.
 //
 // xray:api:beta
-func Close(obj interface{}) error {
+func Close(obj any) error {
 	if c, ok := obj.(Closable); ok {
 		return c.Close()
 	}
@@ -30,7 +30,7 @@ func Close(obj interface{}) error {
 // Interrupt calls Interrupt() if object implements Interruptible interface, or Close() if the object implements Closable interface.
 //
 // xray:api:beta
-func Interrupt(obj interface{}) error {
+func Interrupt(obj any) error {
 	if c, ok := obj.(Interruptible); ok {
 		c.Interrupt()
 		return nil
@@ -50,7 +50,7 @@ type Runnable interface {
 type HasType interface {
 	// Type returns the type of the object.
 	// Usually it returns (*Type)(nil) of the object.
-	Type() interface{}
+	Type() any
 }
 
 // ChainedClosable is a Closable that consists of multiple Closable objects.

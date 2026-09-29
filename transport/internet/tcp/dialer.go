@@ -41,7 +41,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		}
 
 		isFromMitmVerify := false
-		if r, ok := tlsConfig.Rand.(*tls.RandCarrier); ok && len(r.VerifyPeerCertByName) > 0 {
+		if r, ok := tlsConfig.Rand.(*tls.RandCarrier); ok && len(r.VerifyPeerCertByName) > 0 { //nolint:staticcheck // Rand carries the RandCarrier metadata channel, not random bytes
 			for i, name := range r.VerifyPeerCertByName {
 				if tls.IsFromMitm(name) {
 					isFromMitmVerify = true

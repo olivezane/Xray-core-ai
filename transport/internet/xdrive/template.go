@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -146,10 +147,8 @@ func (s *templateStorage) storedName(name string) string {
 }
 
 func (s *templateStorage) retryable(status int, payload []byte) bool {
-	for _, code := range s.tmpl.Retry.Status {
-		if status == code {
-			return true
-		}
+	if slices.Contains(s.tmpl.Retry.Status, status) {
+		return true
 	}
 	if status == http.StatusForbidden && s.tmpl.Retry.RateReason != "" {
 		if reason := jsonString(payload, s.tmpl.Retry.RateReason); reason != "" {
@@ -262,7 +261,7 @@ func (s *templateStorage) do(ctx context.Context, op *opTemplate, vars map[strin
 	backoff := driveInitialBackoff
 	var lastErr error
 
-	for attempt := 0; attempt < driveMaxAttempts; attempt++ {
+	for attempt := range driveMaxAttempts {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():

@@ -53,8 +53,8 @@ func GetRuntimeEnv(key string) (string, error) {
 	if readErr != nil {
 		return "", readErr
 	}
-	envStrings := strings.Split(string(data), "\n")
-	for _, envItem := range envStrings {
+	envStrings := strings.SplitSeq(string(data), "\n")
+	for envItem := range envStrings {
 		envItem = strings.TrimSuffix(envItem, "\r")
 		envKeyValue := strings.Split(envItem, "=")
 		if strings.EqualFold(strings.TrimSpace(envKeyValue[0]), key) {
@@ -89,11 +89,9 @@ func whichProtoc(suffix, targetedVersion string) (string, error) {
 
 	path, err := exec.LookPath(protoc)
 	if err != nil {
-		return "", fmt.Errorf(`
-Command "%s" not found.
+		return "", fmt.Errorf(`command "%s" not found.
 Make sure that %s is in your system path or current path.
-Download %s v%s or later from https://github.com/protocolbuffers/protobuf/releases
-`, protoc, protoc, protoc, targetedVersion)
+Download %s v%s or later from https://github.com/protocolbuffers/protobuf/releases`, protoc, protoc, protoc, targetedVersion)
 	}
 	return path, nil
 }

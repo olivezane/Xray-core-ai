@@ -136,7 +136,7 @@ func TestTagsCache(t *testing.T) {
 		defer wg_add_rm.Done()
 		for !stop_add_rm {
 			time.Sleep(delay)
-			tags.Range(func(key interface{}, value interface{}) bool {
+			tags.Range(func(key any, value any) bool {
 				if _, ok := tags.LoadAndDelete(key); ok {
 					// t.Log("remove handler:", key)
 					ohm.RemoveHandler(ctx, key.(string))
@@ -159,7 +159,7 @@ func TestTagsCache(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < threads_num; i++ {
+	for range threads_num {
 		wg_add_rm.Add(2)
 		go rmHandlers()
 		go addHandlers()

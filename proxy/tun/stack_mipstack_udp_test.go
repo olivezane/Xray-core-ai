@@ -24,7 +24,7 @@ func readDatagrams(t *testing.T, reader buf.Reader, count int) []datagram {
 	received := make(chan datagram, count)
 	failures := make(chan error, 1)
 	go func() {
-		for read := 0; read < count; read++ {
+		for range count {
 			buffers, err := reader.ReadMultiBuffer()
 			if err != nil {
 				failures <- err
@@ -226,7 +226,7 @@ func TestMipstackReusesAndReleasesUDPResponders(t *testing.T) {
 	defer client.Close()
 
 	server := stdnet.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.10:10000"))
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if _, err := client.WriteTo([]byte("ping"), server); err != nil {
 			t.Fatalf("send datagram %d: %v", i, err)
 		}

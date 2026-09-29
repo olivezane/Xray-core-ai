@@ -87,7 +87,7 @@ func (c *connection) WriteMultiBuffer(mb buf.MultiBuffer) error {
 }
 
 func (c *connection) Close() error {
-	var errs []interface{}
+	var errs []any
 	if err := c.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second*5)); err != nil {
 		errs = append(errs, err)
 	}

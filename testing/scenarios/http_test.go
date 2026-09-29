@@ -71,6 +71,7 @@ func TestHttpConformance(t *testing.T) {
 
 		resp, err := client.Get("http://127.0.0.1:" + httpServerPort.String())
 		common.Must(err)
+		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
 			t.Fatal("status: ", resp.StatusCode)
 		}
@@ -133,6 +134,9 @@ func TestHttpError(t *testing.T) {
 		}
 
 		resp, err := client.Get("http://127.0.0.1:" + dest.Port.String())
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 		if resp != nil && resp.StatusCode != 503 || err != nil && !strings.Contains(err.Error(), "malformed HTTP status code") {
 			t.Error("should not receive http response", err)
 		}
@@ -193,6 +197,7 @@ func TestHTTPConnectMethod(t *testing.T) {
 
 		resp, err := client.Do(req)
 		common.Must(err)
+		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
 			t.Fatal("status: ", resp.StatusCode)
 		}
@@ -269,6 +274,7 @@ func TestHttpPost(t *testing.T) {
 
 		resp, err := client.Post("http://127.0.0.1:"+httpServerPort.String()+"/testpost", "application/x-www-form-urlencoded", bytes.NewReader(payload))
 		common.Must(err)
+		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
 			t.Fatal("status: ", resp.StatusCode)
 		}
@@ -339,6 +345,7 @@ func TestHttpBasicAuth(t *testing.T) {
 		{
 			resp, err := client.Get("http://127.0.0.1:" + httpServerPort.String())
 			common.Must(err)
+			defer resp.Body.Close()
 			if resp.StatusCode != 407 {
 				t.Fatal("status: ", resp.StatusCode)
 			}
@@ -352,6 +359,7 @@ func TestHttpBasicAuth(t *testing.T) {
 			setProxyBasicAuth(req, "a", "c")
 			resp, err := client.Do(req)
 			common.Must(err)
+			defer resp.Body.Close()
 			if resp.StatusCode != 407 {
 				t.Fatal("status: ", resp.StatusCode)
 			}
@@ -365,6 +373,7 @@ func TestHttpBasicAuth(t *testing.T) {
 			setProxyBasicAuth(req, "a", "b")
 			resp, err := client.Do(req)
 			common.Must(err)
+			defer resp.Body.Close()
 			if resp.StatusCode != 200 {
 				t.Fatal("status: ", resp.StatusCode)
 			}

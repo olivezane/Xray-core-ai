@@ -91,7 +91,7 @@ func (ac *ACAutomatonMatcherGroup) addMatchEntry() uint32 {
 func (ac *ACAutomatonMatcherGroup) Build() error {
 	fail := make([]uint32, len(ac.nodes))
 	queue := list.New()
-	for edgeIdx := 0; edgeIdx < acValidCharCount; edgeIdx++ {
+	for edgeIdx := range acValidCharCount {
 		if nextIdx := ac.nodes[0].next[edgeIdx]; nextIdx != 0 {
 			queue.PushBack(nextIdx)
 		}
@@ -105,7 +105,7 @@ func (ac *ACAutomatonMatcherGroup) Build() error {
 		nodeIdx := front.Value.(uint32)
 		node := &ac.nodes[nodeIdx]           // Current node
 		failNode := &ac.nodes[fail[nodeIdx]] // Fail node of currrent node
-		for edgeIdx := 0; edgeIdx < acValidCharCount; edgeIdx++ {
+		for edgeIdx := range acValidCharCount {
 			nodeIdx := node.next[edgeIdx]     // Next node through trie edge
 			failIdx := failNode.next[edgeIdx] // Next node through fail edge
 			if nodeIdx != 0 {

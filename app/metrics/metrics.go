@@ -45,7 +45,7 @@ func NewMetricsHandler(ctx context.Context, config *Config) (*MetricsHandler, er
 	return c, nil
 }
 
-func (p *MetricsHandler) Type() interface{} {
+func (p *MetricsHandler) Type() any {
 	return (*MetricsHandler)(nil)
 }
 
@@ -164,7 +164,7 @@ func (p *MetricsHandler) handleDebugVars(w http.ResponseWriter, r *http.Request)
 	w.Write(payload)
 }
 
-func marshalJSON(value interface{}) json.RawMessage {
+func marshalJSON(value any) json.RawMessage {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return json.RawMessage("null")
@@ -201,7 +201,7 @@ func (p *MetricsHandler) stats() map[string]map[string]map[string]int64 {
 	return resp
 }
 
-func (p *MetricsHandler) observatoryStatus() interface{} {
+func (p *MetricsHandler) observatoryStatus() any {
 	feature := core.MustFromContext(p.ctx).GetFeature(extension.ObservatoryType())
 	if feature == nil {
 		return nil
@@ -219,7 +219,7 @@ func (p *MetricsHandler) observatoryStatus() interface{} {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg any) (any, error) {
 		return NewMetricsHandler(ctx, cfg.(*Config))
 	}))
 }

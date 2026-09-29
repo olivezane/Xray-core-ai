@@ -89,7 +89,7 @@ func (d *fakeDrive) handleToken(w http.ResponseWriter, r *http.Request) {
 	d.mu.Lock()
 	d.tokens++
 	d.mu.Unlock()
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"access_token": "fake-token",
 		"expires_in":   3600,
 	})
@@ -300,16 +300,16 @@ func parseFakeQuery(query string) (exact, prefix string) {
 }
 
 func cutQuoted(query, marker string) (string, bool) {
-	start := strings.Index(query, marker)
-	if start < 0 {
+	_, after, ok := strings.Cut(query, marker)
+	if !ok {
 		return "", false
 	}
-	rest := query[start+len(marker):]
-	end := strings.Index(rest, "'")
-	if end < 0 {
+	rest := after
+	before0, _, ok0 := strings.Cut(rest, "'")
+	if !ok0 {
 		return "", false
 	}
-	return rest[:end], true
+	return before0, true
 }
 
 func driveSettings() *internet.MemoryStreamConfig {
@@ -455,7 +455,7 @@ func TestDriveTokenCache(t *testing.T) {
 	storage := newDriveBackend(t)
 	ctx := context.Background()
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if err := storage.Put(ctx, fmt.Sprintf("sessions/s%d", i), nil); err != nil {
 			t.Fatalf("Put: %v", err)
 		}

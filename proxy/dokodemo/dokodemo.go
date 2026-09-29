@@ -22,7 +22,7 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		d := new(DokodemoDoor)
 		err := core.RequireFeatures(ctx, func(pm policy.Manager) error {
 			return d.Init(config.(*Config), pm, session.SockoptFromContext(ctx))

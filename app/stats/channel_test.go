@@ -75,7 +75,7 @@ func TestStatsChannel(t *testing.T) {
 	}()
 
 	timeout := time.After(2 * time.Second)
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		select {
 		case <-timeout:
 			t.Fatal("Test timeout after 2s")

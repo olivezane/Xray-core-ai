@@ -99,7 +99,7 @@ func TestToDomain(t *testing.T) {
 		}
 	}
 	{ // Test internationalized domain, which should be translated to ASCII punycode
-		input := "example.公益"
+		input := "example.公益" //nolint:gosmopolitan // intentional IDN test vector
 		domain, err := ToDomain(input)
 		if err != nil {
 			t.Error("unexpected error: ", err)
@@ -109,7 +109,7 @@ func TestToDomain(t *testing.T) {
 		}
 	}
 	{ // Test internationalized domain containing upper case letter
-		input := "eXAMPLE.公益"
+		input := "eXAMPLE.公益" //nolint:gosmopolitan // intentional IDN test vector
 		domain, err := ToDomain(input)
 		if err != nil {
 			t.Error("unexpected error: ", err)
@@ -140,7 +140,7 @@ func TestToDomain(t *testing.T) {
 		}
 	}
 	{ // Test internationalized domain containing invalid character
-		input := "Mijia Cloud.公司"
+		input := "Mijia Cloud.公司" //nolint:gosmopolitan // intentional IDN test vector
 		_, err := ToDomain(input)
 		if err == nil {
 			t.Error("unexpected non error for test case ", input)

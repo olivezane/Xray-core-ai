@@ -55,7 +55,7 @@ n bytes - address
 
 */
 
-type FrameMetadata struct {
+type FrameMetadata struct { //nolint:recvcheck // read-only methods use value receivers, mutating ones need pointers
 	Target        net.Destination
 	SessionID     uint16
 	Option        bitmask.Byte

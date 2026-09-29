@@ -165,7 +165,7 @@ func GeneraticUClient(c net.Conn, config *tls.Config) *utls.UConn {
 
 func copyConfig(c *tls.Config) *utls.Config {
 	config := &utls.Config{
-		Rand:                           c.Rand,
+		Rand:                           c.Rand, //nolint:staticcheck // Rand carries the RandCarrier metadata channel, not random bytes
 		RootCAs:                        c.RootCAs,
 		ServerName:                     c.ServerName,
 		InsecureSkipVerify:             c.InsecureSkipVerify,

@@ -18,7 +18,7 @@ type Client struct {
 }
 
 // Type implements common.HasType.
-func (*Client) Type() interface{} {
+func (*Client) Type() any {
 	return dns.ClientType()
 }
 

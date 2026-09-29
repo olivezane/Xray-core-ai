@@ -26,7 +26,7 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*RelayServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*RelayServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
 		return NewRelayServer(ctx, config.(*RelayServerConfig))
 	}))
 }
@@ -240,7 +240,7 @@ func (i *RelayInbound) processUDP(ctx context.Context, conn stat.Connection, dis
 
 			var eiHeader [AESBlockSize]byte
 			i.relayBlock.Decrypt(eiHeader[:], data[AESBlockSize:2*AESBlockSize])
-			for idx := 0; idx < AESBlockSize; idx++ {
+			for idx := range AESBlockSize {
 				eiHeader[idx] ^= packetHeader[idx]
 			}
 

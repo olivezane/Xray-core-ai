@@ -70,11 +70,11 @@ func parseBasicAuth(auth string) (username, password string, ok bool) {
 		return
 	}
 	cs := string(c)
-	s := strings.IndexByte(cs, ':')
-	if s < 0 {
+	before, after, ok := strings.Cut(cs, ":")
+	if !ok {
 		return
 	}
-	return cs[:s], cs[s+1:], true
+	return before, after, true
 }
 
 type readerOnly struct {
@@ -182,7 +182,6 @@ func (s *Server) handleConnect(ctx context.Context, _ *http.Request, buffer *buf
 			return err
 		}
 		reader = &buf.BufferedReader{Reader: reader, Buffer: payload}
-		buffer = nil
 	}
 
 	if inbound.CanSpliceCopy == 2 {
@@ -316,7 +315,7 @@ func readResponseAndHandle100Continue(r *bufio.Reader, req *http.Request, writer
 	peekBytes, err := r.Peek(56)
 	if err == nil || err == bufio.ErrBufferFull {
 		str := string(peekBytes)
-		ResponseLine := strings.Split(str, "\r\n")[0]
+		ResponseLine, _, _ := strings.Cut(str, "\r\n")
 		_, status, _ := strings.Cut(ResponseLine, " ")
 		// only handle 1xx response
 		if strings.HasPrefix(status, "1") {
@@ -342,7 +341,7 @@ func readResponseAndHandle100Continue(r *bufio.Reader, req *http.Request, writer
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
 		return NewServer(ctx, config.(*ServerConfig))
 	}))
 }

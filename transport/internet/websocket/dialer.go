@@ -153,6 +153,7 @@ func dialWebSocket(ctx context.Context, dest net.Destination, streamSettings *in
 		}
 		return nil, errors.New("failed to dial to (", uri, "): ", reason).Base(err)
 	}
+	defer resp.Body.Close()
 
 	return NewConnection(conn, conn.RemoteAddr(), nil, wsSettings.HeartbeatPeriod), nil
 }

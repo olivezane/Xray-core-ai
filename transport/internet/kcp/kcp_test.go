@@ -50,7 +50,7 @@ func TestDialAndListen(t *testing.T) {
 	port := net.Port(listerner.Addr().(*net.UDPAddr).Port)
 
 	var errg errgroup.Group
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		errg.Go(func() error {
 			clientConn, err := DialKCP(context.Background(), net.UDPDestination(net.LocalHostIP, port), &internet.MemoryStreamConfig{
 				ProtocolName: "mkcp",

@@ -2,6 +2,7 @@ package custom
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -483,7 +484,7 @@ func TestEvaluatorRejectsInvalidShapingAndArithmetic(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected evaluator error")
 			}
-			if !bytes.Contains([]byte(err.Error()), []byte(tt.match)) {
+			if !strings.Contains(err.Error(), tt.match) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})

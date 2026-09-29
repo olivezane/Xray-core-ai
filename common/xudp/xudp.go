@@ -63,7 +63,7 @@ func init() {
 }
 
 func GetGlobalID(ctx context.Context) (globalID [8]byte) {
-	if cone := ctx.Value("cone"); cone == nil || !cone.(bool) { // cone is nil only in some unit tests
+	if cone := ctx.Value(session.ConeKey); cone == nil || !cone.(bool) { // cone is nil only in some unit tests
 		return
 	}
 	if inbound := session.InboundFromContext(ctx); inbound != nil && inbound.Source.Network == net.Network_UDP &&

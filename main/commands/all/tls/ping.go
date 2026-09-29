@@ -14,7 +14,7 @@ import (
 
 	"github.com/xtls/xray-core/common/utils"
 	"github.com/xtls/xray-core/main/commands/base"
-	. "github.com/xtls/xray-core/transport/internet/tls"
+	xtls "github.com/xtls/xray-core/transport/internet/tls"
 )
 
 // cmdPing is the tls ping command
@@ -76,7 +76,7 @@ func executePing(cmd *base.Command, args []string) {
 		if err != nil {
 			base.Fatalf("Failed to dial tcp: %s", err)
 		}
-		tlsConn := GeneraticUClient(tcpConn, &gotls.Config{
+		tlsConn := xtls.GeneraticUClient(tcpConn, &gotls.Config{
 			InsecureSkipVerify: true,
 			NextProtos:         []string{"h2", "http/1.1"},
 			MaxVersion:         gotls.VersionTLS13,
@@ -101,7 +101,7 @@ func executePing(cmd *base.Command, args []string) {
 		if err != nil {
 			base.Fatalf("Failed to dial tcp: %s", err)
 		}
-		tlsConn := GeneraticUClient(tcpConn, &gotls.Config{
+		tlsConn := xtls.GeneraticUClient(tcpConn, &gotls.Config{
 			ServerName: domain,
 			NextProtos: []string{"h2", "http/1.1"},
 			MaxVersion: gotls.VersionTLS13,
@@ -139,9 +139,9 @@ func printCertificates(tabWriter *tabwriter.Writer, certs []*x509.Certificate) {
 	if leaf != nil {
 		fmt.Fprintf(tabWriter, "Cert's signature algorithm:\t%s\n", leaf.SignatureAlgorithm.String())
 		fmt.Fprintf(tabWriter, "Cert's publicKey algorithm:\t%s\n", leaf.PublicKeyAlgorithm.String())
-		fmt.Fprintf(tabWriter, "Cert's leaf SHA256:\t%s\n", hex.EncodeToString(GenerateCertHash(leaf)))
+		fmt.Fprintf(tabWriter, "Cert's leaf SHA256:\t%s\n", hex.EncodeToString(xtls.GenerateCertHash(leaf)))
 		for _, ca := range CAs {
-			fmt.Fprintf(tabWriter, "Cert's CA <%s> SHA256:\t%s\n", ca.Subject.CommonName, hex.EncodeToString(GenerateCertHash(ca)))
+			fmt.Fprintf(tabWriter, "Cert's CA <%s> SHA256:\t%s\n", ca.Subject.CommonName, hex.EncodeToString(xtls.GenerateCertHash(ca)))
 		}
 		fmt.Fprintf(tabWriter, "Cert's allowed domains:\t%v\n", leaf.DNSNames)
 	}

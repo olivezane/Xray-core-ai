@@ -30,7 +30,7 @@ func NewManager(ctx context.Context, config *Config) (*Manager, error) {
 }
 
 // Type implements common.HasType.
-func (*Manager) Type() interface{} {
+func (*Manager) Type() any {
 	return stats.ManagerType()
 }
 
@@ -277,7 +277,7 @@ func (m *Manager) Close() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		return NewManager(ctx, config.(*Config))
 	}))
 }

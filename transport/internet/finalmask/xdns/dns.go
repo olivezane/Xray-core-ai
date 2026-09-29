@@ -148,7 +148,7 @@ func (name Name) TrimSuffix(suffix Name) (Name, bool) {
 	}
 	split := len(name) - len(suffix)
 	fore, aft := name[:split], name[split:]
-	for i := 0; i < len(aft); i++ {
+	for i := range aft {
 		if !bytes.Equal(bytes.ToLower(aft[i]), bytes.ToLower(suffix[i])) {
 			return nil, false
 		}

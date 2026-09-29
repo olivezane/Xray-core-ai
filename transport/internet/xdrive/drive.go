@@ -190,7 +190,7 @@ func (s *driveStorage) do(ctx context.Context, method, target, contentType strin
 	backoff := s.backoff
 	var lastErr error
 
-	for attempt := 0; attempt < driveMaxAttempts; attempt++ {
+	for attempt := range driveMaxAttempts {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():
@@ -374,7 +374,7 @@ func (s *driveStorage) Put(ctx context.Context, name string, data []byte) error 
 func (s *driveStorage) putInline(ctx context.Context, name string, data []byte) error {
 	flat := flatten(name)
 
-	body, err := json.Marshal(map[string]interface{}{
+	body, err := json.Marshal(map[string]any{
 		"name":        flat,
 		"parents":     []string{s.folder},
 		"description": base64.StdEncoding.EncodeToString(data),
@@ -408,7 +408,7 @@ func (s *driveStorage) putInline(ctx context.Context, name string, data []byte) 
 func (s *driveStorage) putMedia(ctx context.Context, name string, data []byte) error {
 	flat := flatten(name)
 
-	metadata, err := json.Marshal(map[string]interface{}{
+	metadata, err := json.Marshal(map[string]any{
 		"name":    flat,
 		"parents": []string{s.folder},
 	})

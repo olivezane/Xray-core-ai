@@ -2,8 +2,8 @@ package bytespool
 
 import "sync"
 
-func createAllocFunc(size int32) func() interface{} {
-	return func() interface{} {
+func createAllocFunc(size int32) func() any {
+	return func() any {
 		return make([]byte, size)
 	}
 }
@@ -24,7 +24,7 @@ var (
 
 func init() {
 	size := int32(2048)
-	for i := 0; i < numPools; i++ {
+	for i := range numPools {
 		pool[i] = sync.Pool{
 			New: createAllocFunc(size),
 		}

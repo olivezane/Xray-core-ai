@@ -168,7 +168,7 @@ func (c *udpConn) Write(p []byte) (int, error) {
 	// sending packets back mean sending payload with source/destination reversed
 	err := c.handler.writePacket(p, c.dst, c.src)
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 
 	return len(p), nil

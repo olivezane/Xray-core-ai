@@ -44,7 +44,7 @@ func (h *HappyEyeballsConfig) UnmarshalJSON(data []byte) error {
 
 type SocketConfig struct {
 	Mark                  int32                  `json:"mark"`
-	TFO                   interface{}            `json:"tcpFastOpen"`
+	TFO                   any                    `json:"tcpFastOpen"`
 	TProxy                string                 `json:"tproxy"`
 	AcceptProxyProtocol   bool                   `json:"acceptProxyProtocol"`
 	DomainStrategy        string                 `json:"domainStrategy"`
@@ -92,7 +92,7 @@ func (c *SocketConfig) Build() (*internet.SocketConfig, error) {
 		tproxy = internet.SocketConfig_Off
 	}
 
-	dStrategy := internet.DomainStrategy_AS_IS
+	var dStrategy internet.DomainStrategy
 	switch strings.ToLower(c.DomainStrategy) {
 	case "asis", "":
 		dStrategy = internet.DomainStrategy_AS_IS
@@ -134,7 +134,7 @@ func (c *SocketConfig) Build() (*internet.SocketConfig, error) {
 		customSockopts = append(customSockopts, customSockopt)
 	}
 
-	addressPortStrategy := internet.AddressPortStrategy_None
+	var addressPortStrategy internet.AddressPortStrategy
 	switch strings.ToLower(c.AddressPortStrategy) {
 	case "none", "":
 		addressPortStrategy = internet.AddressPortStrategy_None

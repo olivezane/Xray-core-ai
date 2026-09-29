@@ -177,7 +177,7 @@ func getGetCertificateFunc(c *tls.Config, ca []*Certificate) func(hello *tls.Cli
 		certExpired := false
 
 		access.RLock()
-		certificate, found := c.NameToCertificate[domain]
+		certificate, found := c.NameToCertificate[domain] //nolint:staticcheck // deprecated but still functional; replacing it means reimplementing SNI cert selection
 		access.RUnlock()
 
 		if found {
@@ -236,7 +236,7 @@ func getGetCertificateFunc(c *tls.Config, ca []*Certificate) func(hello *tls.Cli
 		}
 
 		access.Lock()
-		c.BuildNameToCertificate()
+		c.BuildNameToCertificate() //nolint:staticcheck // deprecated but still functional; see above
 		access.Unlock()
 
 		return issuedCertificate, nil
@@ -384,7 +384,7 @@ func (c *Config) GetTLSConfig(opts ...Option) *tls.Config {
 		PinnedPeerCertSha256: c.PinnedPeerCertSha256,
 	}
 	config := &tls.Config{
-		Rand:                   randCarrier,
+		Rand:                   randCarrier, //nolint:staticcheck // Rand carries the RandCarrier metadata channel, not random bytes
 		ClientSessionCache:     globalSessionCache,
 		RootCAs:                root,
 		NextProtos:             slices.Clone(c.NextProtocol),

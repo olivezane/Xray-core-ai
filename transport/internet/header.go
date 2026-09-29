@@ -13,7 +13,7 @@ type PacketHeader interface {
 	Serialize([]byte)
 }
 
-func CreatePacketHeader(config interface{}) (PacketHeader, error) {
+func CreatePacketHeader(config any) (PacketHeader, error) {
 	header, err := common.CreateObject(context.Background(), config)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ type ConnectionAuthenticator interface {
 	Server(net.Conn) net.Conn
 }
 
-func CreateConnectionAuthenticator(config interface{}) (ConnectionAuthenticator, error) {
+func CreateConnectionAuthenticator(config any) (ConnectionAuthenticator, error) {
 	auth, err := common.CreateObject(context.Background(), config)
 	if err != nil {
 		return nil, err

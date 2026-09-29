@@ -57,7 +57,7 @@ func RemoveHopByHopHeaders(header http.Header) {
 	if connections == "" {
 		return
 	}
-	for _, h := range strings.Split(connections, ",") {
+	for h := range strings.SplitSeq(connections, ",") {
 		header.Del(strings.TrimSpace(h))
 	}
 }

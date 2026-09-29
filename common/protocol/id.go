@@ -12,7 +12,7 @@ const (
 )
 
 // The ID of en entity, in the form of a UUID.
-type ID struct {
+type ID struct { //nolint:recvcheck // read-only methods use value receivers, mutating ones need pointers
 	uuid   uuid.UUID
 	cmdKey [IDBytesLen]byte
 }

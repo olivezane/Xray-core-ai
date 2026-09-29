@@ -209,6 +209,7 @@ func establish(ctx context.Context, client tunnelClient, hconn httpConn, abort f
 		header.Del("User-Agent")
 	}
 
+	//nolint:bodyclose // the response body is owned by ipConn and closed by it
 	ipConn, _, err := client.Dial(req)
 	if err != nil {
 		if ctx.Err() != nil {

@@ -69,9 +69,8 @@ func (c *tcpCustomClientConn) Write(p []byte) (n int, err error) {
 		if vars, ok := c.header.state.get(tcpStateKey(c.LocalAddr(), c.RemoteAddr())); ok {
 			ctx.vars = cloneVars(vars)
 		}
-		i := 0
 		j := 0
-		for i = range c.header.clients {
+		for i := range c.header.clients {
 			if !writeSequenceWithContext(c.Conn, c.header.clients[i], ctx) {
 				c.wg.Done()
 				return
@@ -158,9 +157,8 @@ func (c *tcpCustomServerConn) Read(p []byte) (n int, err error) {
 		if vars, ok := c.header.state.get(tcpStateKey(c.LocalAddr(), c.RemoteAddr())); ok {
 			ctx.vars = cloneVars(vars)
 		}
-		i := 0
 		j := 0
-		for i = range c.header.clients {
+		for i := range c.header.clients {
 			if !readSequenceWithContext(c.Conn, c.header.clients[i], ctx) {
 				if i < len(c.header.errors) {
 					writeSequenceWithContext(c.Conn, c.header.errors[i], ctx)
@@ -284,7 +282,6 @@ func writeSequenceWithContext(w io.Writer, sequence *TCPSequence, ctx *evalConte
 		if err != nil {
 			return false
 		}
-		merged = nil
 	}
 	return true
 }

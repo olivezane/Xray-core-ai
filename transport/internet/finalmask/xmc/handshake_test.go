@@ -126,9 +126,7 @@ func TestHandshakePasswordMismatch(t *testing.T) {
 	serverPrivateKey, serverPublicKey := deriveTestRSAKey(t, serverPassword)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 
 		rawConn, err := ln.Accept()
 		if err != nil {
@@ -150,7 +148,7 @@ func TestHandshakePasswordMismatch(t *testing.T) {
 		} else {
 			t.Logf("server read failed as expected: %v", err)
 		}
-	}()
+	})
 
 	clientRaw, err := net.Dial("tcp", ln.Addr().String())
 	if err != nil {

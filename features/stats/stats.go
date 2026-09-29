@@ -43,17 +43,17 @@ type Channel interface {
 	// Runnable implies that Channel is a runnable unit.
 	common.Runnable
 	// Publish broadcasts a message through the channel with a controlling context.
-	Publish(context.Context, interface{})
+	Publish(context.Context, any)
 	// Subscribers returns all subscribers.
-	Subscribers() []chan interface{}
+	Subscribers() []chan any
 	// Subscribe registers for listening to channel stream and returns a new listener channel.
-	Subscribe() (chan interface{}, error)
+	Subscribe() (chan any, error)
 	// Unsubscribe unregisters a listener channel from current Channel object.
-	Unsubscribe(chan interface{}) error
+	Unsubscribe(chan any) error
 }
 
 // SubscribeRunnableChannel subscribes the channel and starts it if there is first subscriber coming.
-func SubscribeRunnableChannel(c Channel) (chan interface{}, error) {
+func SubscribeRunnableChannel(c Channel) (chan any, error) {
 	if len(c.Subscribers()) == 0 {
 		if err := c.Start(); err != nil {
 			return nil, err
@@ -63,7 +63,7 @@ func SubscribeRunnableChannel(c Channel) (chan interface{}, error) {
 }
 
 // UnsubscribeClosableChannel unsubscribes the channel and close it if there is no more subscriber.
-func UnsubscribeClosableChannel(c Channel, sub chan interface{}) error {
+func UnsubscribeClosableChannel(c Channel, sub chan any) error {
 	if err := c.Unsubscribe(sub); err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ type Manager interface {
 // ManagerType returns the type of Manager interface. Can be used to implement common.HasType.
 //
 // xray:api:stable
-func ManagerType() interface{} {
+func ManagerType() any {
 	return (*Manager)(nil)
 }
 
@@ -127,7 +127,7 @@ func ManagerType() interface{} {
 type NoopManager struct{}
 
 // Type implements common.HasType.
-func (NoopManager) Type() interface{} {
+func (NoopManager) Type() any {
 	return ManagerType()
 }
 

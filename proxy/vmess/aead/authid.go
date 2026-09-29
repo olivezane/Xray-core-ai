@@ -78,17 +78,17 @@ type AuthIDDecoderHolder struct {
 
 type AuthIDDecoderItem struct {
 	dec    *AuthIDDecoder
-	ticket interface{}
+	ticket any
 }
 
-func NewAuthIDDecoderItem(key [16]byte, ticket interface{}) *AuthIDDecoderItem {
+func NewAuthIDDecoderItem(key [16]byte, ticket any) *AuthIDDecoderItem {
 	return &AuthIDDecoderItem{
 		dec:    NewAuthIDDecoder(key[:]),
 		ticket: ticket,
 	}
 }
 
-func (a *AuthIDDecoderHolder) AddUser(key [16]byte, ticket interface{}) {
+func (a *AuthIDDecoderHolder) AddUser(key [16]byte, ticket any) {
 	a.decoders[string(key[:])] = NewAuthIDDecoderItem(key, ticket)
 }
 
@@ -96,7 +96,7 @@ func (a *AuthIDDecoderHolder) RemoveUser(key [16]byte) {
 	delete(a.decoders, string(key[:]))
 }
 
-func (a *AuthIDDecoderHolder) Match(authID [16]byte) (interface{}, error) {
+func (a *AuthIDDecoderHolder) Match(authID [16]byte) (any, error) {
 	for _, v := range a.decoders {
 		t, z, _, d := v.dec.Decode(authID)
 		if z != crc32.ChecksumIEEE(d[:12]) {

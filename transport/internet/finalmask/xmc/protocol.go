@@ -111,7 +111,7 @@ func (v *Varint) readFrom(r io.Reader) error {
 
 func readVarintWithLength(r io.Reader) (Varint, int, error) {
 	var value int32
-	for index := 0; index < 5; index++ {
+	for index := range 5 {
 		currentByte, err := readByte(r)
 		if err != nil {
 			return 0, 0, fmt.Errorf("read varint: %w", err)

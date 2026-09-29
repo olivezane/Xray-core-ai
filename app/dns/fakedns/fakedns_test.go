@@ -73,11 +73,11 @@ func TestGetFakeIPForDomainConcurrently(t *testing.T) {
 	total := 200
 	addr := make([][]net.Address, total)
 	var errg errgroup.Group
-	for i := 0; i < total; i++ {
+	for i := range total {
 		errg.Go(testGetFakeIP(i, addr, fkdns))
 	}
 	errg.Wait()
-	for i := 0; i < total; i++ {
+	for i := range total {
 		for j := i + 1; j < total; j++ {
 			assert.NotEqual(t, addr[i][0].IP().String(), addr[j][0].IP().String())
 		}

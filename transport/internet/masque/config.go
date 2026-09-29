@@ -10,7 +10,7 @@ const protocolName = "masque"
 const DefaultPath = "/.well-known/masque/ip/*/*/"
 
 func init() {
-	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() interface{} {
+	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() any {
 		return &Config{
 			Path: DefaultPath,
 		}

@@ -11,7 +11,7 @@ import (
 // Channel is an implementation of stats.Channel.
 type Channel struct {
 	channel     chan channelMessage
-	subscribers []chan interface{}
+	subscribers []chan any
 
 	// Synchronization components
 	access sync.RWMutex
@@ -34,32 +34,32 @@ func NewChannel(config *ChannelConfig) *Channel {
 }
 
 // Subscribers implements stats.Channel.
-func (c *Channel) Subscribers() []chan interface{} {
+func (c *Channel) Subscribers() []chan any {
 	c.access.RLock()
 	defer c.access.RUnlock()
 	return c.subscribers
 }
 
 // Subscribe implements stats.Channel.
-func (c *Channel) Subscribe() (chan interface{}, error) {
+func (c *Channel) Subscribe() (chan any, error) {
 	c.access.Lock()
 	defer c.access.Unlock()
 	if c.subsLimit > 0 && len(c.subscribers) >= c.subsLimit {
 		return nil, errors.New("Number of subscribers has reached limit")
 	}
-	subscriber := make(chan interface{}, c.bufferSize)
+	subscriber := make(chan any, c.bufferSize)
 	c.subscribers = append(c.subscribers, subscriber)
 	return subscriber, nil
 }
 
 // Unsubscribe implements stats.Channel.
-func (c *Channel) Unsubscribe(subscriber chan interface{}) error {
+func (c *Channel) Unsubscribe(subscriber chan any) error {
 	c.access.Lock()
 	defer c.access.Unlock()
 	for i, s := range c.subscribers {
 		if s == subscriber {
 			// Copy to new memory block to prevent modifying original data
-			subscribers := make([]chan interface{}, len(c.subscribers)-1)
+			subscribers := make([]chan any, len(c.subscribers)-1)
 			copy(subscribers[:i], c.subscribers[:i])
 			copy(subscribers[i:], c.subscribers[i+1:])
 			c.subscribers = subscribers
@@ -69,7 +69,7 @@ func (c *Channel) Unsubscribe(subscriber chan interface{}) error {
 }
 
 // Publish implements stats.Channel.
-func (c *Channel) Publish(ctx context.Context, msg interface{}) {
+func (c *Channel) Publish(ctx context.Context, msg any) {
 	select { // Early exit if channel closed
 	case <-c.closed:
 		return
@@ -139,7 +139,7 @@ func (c *Channel) Close() error {
 // message is discarded only when the context is early cancelled.
 type channelMessage struct {
 	context context.Context
-	message interface{}
+	message any
 }
 
 func (c channelMessage) publish(publisher chan channelMessage) {
@@ -157,14 +157,14 @@ func (c channelMessage) publishNonBlocking(publisher chan channelMessage) {
 	}
 }
 
-func (c channelMessage) broadcast(subscriber chan interface{}) {
+func (c channelMessage) broadcast(subscriber chan any) {
 	select {
 	case subscriber <- c.message:
 	case <-c.context.Done():
 	}
 }
 
-func (c channelMessage) broadcastNonBlocking(subscriber chan interface{}) {
+func (c channelMessage) broadcastNonBlocking(subscriber chan any) {
 	select {
 	case subscriber <- c.message:
 	default: // Create another goroutine to keep sending message

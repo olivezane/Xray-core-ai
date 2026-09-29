@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/netip"
 	"os/exec"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -504,8 +505,8 @@ func (t *LinuxTun) setInterfaceAddresses() error {
 
 func (t *LinuxTun) unsetInterfaceAddresses() error {
 	var errs []error
-	for i := len(t.interfaceAddresses) - 1; i >= 0; i-- {
-		address := t.interfaceAddresses[i]
+	for _, address := range slices.Backward(t.interfaceAddresses) {
+
 		if err := netlink.AddrDel(t.tunLink, &address); err != nil {
 			errs = append(errs, errors.New("failed to delete interface address ", address.String()).Base(err))
 		}
@@ -542,8 +543,8 @@ func (t *LinuxTun) setSystemRoutes() error {
 
 func (t *LinuxTun) unsetSystemRoutes() error {
 	var errs []error
-	for i := len(t.systemRoutes) - 1; i >= 0; i-- {
-		route := t.systemRoutes[i]
+	for _, route := range slices.Backward(t.systemRoutes) {
+
 		if err := netlink.RouteDel(&route); err != nil {
 			errs = append(errs, errors.New("failed to delete system route").Base(err))
 		}

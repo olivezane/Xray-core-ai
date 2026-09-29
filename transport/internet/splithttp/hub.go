@@ -183,7 +183,7 @@ func (h *requestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		currentSession = h.upsertSession(sessionId)
 	}
 	scMaxEachPostBytes := int(h.ln.config.GetNormalizedScMaxEachPostBytes().To)
-	isUplinkRequest := false
+	var isUplinkRequest bool
 
 	switch request.Method {
 	case "GET":

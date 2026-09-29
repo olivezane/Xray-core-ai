@@ -5,14 +5,14 @@ import (
 	"strings"
 )
 
-func jsonWalk(payload []byte, path string) interface{} {
-	var root interface{}
+func jsonWalk(payload []byte, path string) any {
+	var root any
 	if json.Unmarshal(payload, &root) != nil {
 		return nil
 	}
 	node := root
-	for _, key := range strings.Split(path, ".") {
-		obj, ok := node.(map[string]interface{})
+	for key := range strings.SplitSeq(path, ".") {
+		obj, ok := node.(map[string]any)
 		if !ok {
 			return nil
 		}

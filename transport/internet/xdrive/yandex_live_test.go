@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/transport/internet"
 )
 
@@ -52,19 +53,19 @@ func liveYandexSettings(t *testing.T) (*internet.MemoryStreamConfig, string, fun
 		t.Fatalf("MKCOL answered %d", code)
 	}
 
-	tmpl := map[string]interface{}{
+	tmpl := map[string]any{
 		"flatten": true,
-		"auth":    map[string]interface{}{"type": "basic", "username": "{secret0}", "password": "{secret1}"},
-		"put":     map[string]interface{}{"method": "PUT", "url": yandexBase + "/{folder}/{name}"},
-		"get":     map[string]interface{}{"method": "GET", "url": yandexBase + "/{folder}/{name}"},
-		"delete":  map[string]interface{}{"method": "DELETE", "url": yandexBase + "/{folder}/{name}"},
-		"list": map[string]interface{}{
+		"auth":    map[string]any{"type": "basic", "username": "{secret0}", "password": "{secret1}"},
+		"put":     map[string]any{"method": "PUT", "url": yandexBase + "/{folder}/{name}"},
+		"get":     map[string]any{"method": "GET", "url": yandexBase + "/{folder}/{name}"},
+		"delete":  map[string]any{"method": "DELETE", "url": yandexBase + "/{folder}/{name}"},
+		"list": map[string]any{
 			"method": "PROPFIND", "url": yandexBase + "/{folder}/",
-			"headers": map[string]interface{}{"Depth": "1"}, "namesRegex": `<d:href>[^<]*/([^/<]+)</d:href>`,
+			"headers": map[string]any{"Depth": "1"}, "namesRegex": `<d:href>[^<]*/([^/<]+)</d:href>`,
 		},
-		"retry": map[string]interface{}{"status": []int{429, 500, 502, 503}},
+		"retry": map[string]any{"status": []int{429, 500, 502, 503}},
 	}
-	raw, _ := json.Marshal(tmpl)
+	raw := common.Must2(json.Marshal(tmpl))
 	settings := &internet.MemoryStreamConfig{
 		ProtocolName: protocolName,
 		ProtocolSettings: &Config{

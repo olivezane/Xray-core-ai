@@ -186,7 +186,7 @@ func (c *serverConn) handshake() error {
 			return fmt.Errorf("read encrypt response: %w", err)
 		}
 
-		sharedSecret, err = rsa.DecryptPKCS1v15(rand.Reader, c.rsaPrivateKey, encryptedSharedSecret)
+		sharedSecret, err = rsa.DecryptPKCS1v15(rand.Reader, c.rsaPrivateKey, encryptedSharedSecret) //nolint:staticcheck // wire-format compatibility, cannot be changed without breaking existing peers
 		if err != nil {
 			return fmt.Errorf("decrypt shared secret: %w", err)
 		}
@@ -194,7 +194,7 @@ func (c *serverConn) handshake() error {
 			return fmt.Errorf("bad shared secret length: %d", len(sharedSecret))
 		}
 
-		decryptedVerifyToken, err = rsa.DecryptPKCS1v15(rand.Reader, c.rsaPrivateKey, encryptedVerifyToken)
+		decryptedVerifyToken, err = rsa.DecryptPKCS1v15(rand.Reader, c.rsaPrivateKey, encryptedVerifyToken) //nolint:staticcheck // wire-format compatibility, cannot be changed without breaking existing peers
 		if err != nil {
 			return fmt.Errorf("decrypt verify token: %w", err)
 		}

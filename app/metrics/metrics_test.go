@@ -19,7 +19,7 @@ import (
 )
 
 func TestMetricsCanRestartInSameProcess(t *testing.T) {
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		server := startMetricsTestServer(t)
 		readMetricsVars(t, server)
 		readMetricsPprof(t, server)
@@ -123,7 +123,7 @@ func readMetricsVars(t *testing.T, server *core.Instance) {
 		t.Fatalf("unexpected metrics vars status: %d", recorder.Code)
 	}
 
-	var payload map[string]interface{}
+	var payload map[string]any
 	if err := json.NewDecoder(recorder.Body).Decode(&payload); err != nil {
 		t.Fatalf("failed to decode metrics vars: %v", err)
 	}

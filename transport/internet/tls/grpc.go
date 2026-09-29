@@ -38,7 +38,7 @@ func (t grpcUtlsInfo) GetSecurityValue() credentials.ChannelzSecurityValue {
 }
 
 // grpcUtls is the credentials required for authenticating a connection using TLS.
-type grpcUtls struct {
+type grpcUtls struct { //nolint:recvcheck // read-only methods use value receivers, mutating ones need pointers
 	config      *gotls.Config
 	fingerprint *utls.ClientHelloID
 }
@@ -46,8 +46,6 @@ type grpcUtls struct {
 func (c grpcUtls) Info() credentials.ProtocolInfo {
 	return credentials.ProtocolInfo{
 		SecurityProtocol: "tls",
-		SecurityVersion:  "1.2",
-		ServerName:       c.config.ServerName,
 	}
 }
 
@@ -79,10 +77,8 @@ func (c *grpcUtls) ClientHandshake(ctx context.Context, authority string, rawCon
 		return nil, nil, ctx.Err()
 	}
 	tlsInfo := grpcUtlsInfo{
-		State: conn.ConnectionState(),
-		CommonAuthInfo: credentials.CommonAuthInfo{
-			SecurityLevel: credentials.PrivacyAndIntegrity,
-		},
+		State:         conn.ConnectionState(),
+		SecurityLevel: credentials.PrivacyAndIntegrity,
 	}
 	return conn, tlsInfo, nil
 }

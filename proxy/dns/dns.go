@@ -4,6 +4,7 @@ import (
 	"context"
 	go_errors "errors"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -27,7 +28,7 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		h := new(Handler)
 		if err := core.RequireFeatures(ctx, func(dnsClient dns.Client, policyManager policy.Manager) error {
 			core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
@@ -52,12 +53,7 @@ func (r *DNSRule) matchQType(qType uint16) bool {
 	if len(r.qTypes) == 0 {
 		return true
 	}
-	for _, t := range r.qTypes {
-		if t == qType {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(r.qTypes, qType)
 }
 
 func (r *DNSRule) Apply(qType uint16, domain string) bool {

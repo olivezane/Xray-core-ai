@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	gonet "net"
+	"slices"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
@@ -194,7 +195,6 @@ func (s *ServerSession) handshake5(nMethod byte, reader io.Reader, writer net.Co
 	responseAddress := s.address
 	responsePort := s.port
 	var tempUDPConn *TempUDPConn
-	//nolint:gocritic // Use if else chain for clarity
 	if request.Command == protocol.RequestCommandUDP {
 		if s.config.Address != nil {
 			// Use configured IP as remote address in the response to UDP Associate
@@ -305,12 +305,7 @@ func ReadUntilNull(reader io.Reader) (string, error) {
 }
 
 func hasAuthMethod(expectedAuth byte, authCandidates []byte) bool {
-	for _, a := range authCandidates {
-		if a == expectedAuth {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(authCandidates, expectedAuth)
 }
 
 func writeSocks5AuthenticationResponse(writer io.Writer, version byte, auth byte) error {

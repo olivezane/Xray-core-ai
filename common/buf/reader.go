@@ -9,7 +9,7 @@ import (
 
 func readOneUDP(r io.Reader) (*Buffer, error) {
 	b := New()
-	for i := 0; i < 64; i++ {
+	for range 64 {
 		_, err := b.ReadFrom(r)
 		if !b.IsEmpty() {
 			return b, nil

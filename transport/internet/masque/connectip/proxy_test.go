@@ -80,7 +80,7 @@ func setupConns(t *testing.T) (client, server *Conn) {
 	req, err := NewRequest(ctx, proxyURL)
 	require.NoError(t, err)
 	req.Header().Set("Authorization", "Bearer token")
-	client, rsp, err := NewClientConn(dialHTTP3(t, conn.LocalAddr().String())).Dial(req)
+	client, rsp, err := NewClientConn(dialHTTP3(t, conn.LocalAddr().String())).Dial(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.NoError(t, err)
 	t.Cleanup(func() { client.Close() })
 	require.Equal(t, http.StatusOK, rsp.StatusCode)

@@ -412,7 +412,6 @@ func (c *Config) ExtractMetaFromRequest(req *http.Request, path string) (session
 	case PlacementPath:
 		if len(subpath) > pathPart {
 			seqStr = subpath[pathPart]
-			pathPart += 1
 		}
 	case PlacementQuery:
 		seqStr = req.URL.Query().Get(seqKey)
@@ -483,7 +482,7 @@ func (m *XmuxConfig) GetNormalizedHMaxReusableSecs() *RangeConfig {
 }
 
 func init() {
-	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() interface{} {
+	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() any {
 		return new(Config)
 	}))
 }

@@ -82,7 +82,7 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		return New(ctx, config.(*Config))
 	}))
 }

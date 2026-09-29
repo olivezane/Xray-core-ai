@@ -75,7 +75,7 @@ func TestOpenVMessAEADHeader4(t *testing.T) {
 }
 
 func TestOpenVMessAEADHeader4Massive(t *testing.T) {
-	for j := 0; j < 1000; j++ {
+	for range 1000 {
 		for i := 0; i <= 60; i++ {
 			TestHeader := []byte("Test Header")
 			key := KDF16([]byte("Demo Key for Auth ID Test"), "Demo Path for Auth ID Test")

@@ -27,7 +27,7 @@ func NewChaCha20Stream(key []byte, nonce []byte, rounds int) *ChaCha20Stream {
 	s.state[2] = 0x79622d32
 	s.state[3] = 0x6b206574
 
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		s.state[i+4] = binary.LittleEndian.Uint32(key[i*4 : i*4+4])
 	}
 
@@ -57,10 +57,7 @@ func (s *ChaCha20Stream) XORKeyStream(dst, src []byte) {
 	for i < max {
 		gap := blockSize - s.offset
 
-		limit := i + gap
-		if limit > max {
-			limit = max
-		}
+		limit := min(i+gap, max)
 
 		o := s.offset
 		for j := i; j < limit; j++ {

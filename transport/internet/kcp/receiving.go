@@ -103,10 +103,7 @@ func (l *AckList) Flush(current uint32, rto uint32) {
 		}
 		seg.PutNumber(l.numbers[i])
 		seg.PutTimestamp(l.timestamps[i])
-		timeout := rto / 2
-		if timeout < 20 {
-			timeout = 20
-		}
+		timeout := max(rto/2, 20)
 		l.nextFlush[i] = current + timeout
 
 		if seg.IsFull() {

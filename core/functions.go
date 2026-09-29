@@ -13,7 +13,7 @@ import (
 )
 
 // CreateObject creates a new object based on the given Xray instance and config. The Xray instance may be nil.
-func CreateObject(v *Instance, config interface{}) (interface{}, error) {
+func CreateObject(v *Instance, config any) (any, error) {
 	ctx := v.ctx
 	if v != nil {
 		ctx = toContext(v.ctx, v)

@@ -91,7 +91,7 @@ func BenchmarkCertificateIssuing(b *testing.B) {
 		_, _ = tlsConfig.GetCertificate(&gotls.ClientHelloInfo{
 			ServerName: "www.example.com",
 		})
-		delete(tlsConfig.NameToCertificate, "www.example.com")
+		delete(tlsConfig.NameToCertificate, "www.example.com") //nolint:staticcheck // exercises the deprecated map that GetCertificate still populates
 		tlsConfig.Certificates = tlsConfig.Certificates[:lenCerts]
 	}
 }

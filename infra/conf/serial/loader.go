@@ -111,7 +111,7 @@ func DecodeTOMLConfig(reader io.Reader) (*conf.Config, error) {
 		return nil, errors.New("failed to read config file").Base(err)
 	}
 
-	configMap := make(map[string]interface{})
+	configMap := make(map[string]any)
 	if err := toml.Unmarshal(tomlFile, &configMap); err != nil {
 		return nil, errors.New("failed to convert toml to map").Base(err)
 	}

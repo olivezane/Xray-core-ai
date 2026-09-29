@@ -1,7 +1,7 @@
 package bitmask
 
 // Byte is a bitmask in byte.
-type Byte byte
+type Byte byte //nolint:recvcheck // read-only methods use value receivers, mutating ones need pointers
 
 // Has returns true if this bitmask contains another bitmask.
 func (b Byte) Has(bb Byte) bool {

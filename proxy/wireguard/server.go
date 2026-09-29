@@ -215,7 +215,7 @@ func (s *Server) GetUserByAddr(ctx context.Context, addr netip.Addr) (user *prot
 }
 
 func (s *Server) GetUsers(ctx context.Context) (users []*protocol.MemoryUser) {
-	s.users.Range(func(key, value interface{}) bool {
+	s.users.Range(func(key, value any) bool {
 		users = append(users, value.(*protocol.MemoryUser))
 		return true
 	})
@@ -223,7 +223,7 @@ func (s *Server) GetUsers(ctx context.Context) (users []*protocol.MemoryUser) {
 }
 
 func (s *Server) GetUsersCount(context.Context) (count int64) {
-	s.users.Range(func(key, value interface{}) bool {
+	s.users.Range(func(key, value any) bool {
 		count++
 		return true
 	})

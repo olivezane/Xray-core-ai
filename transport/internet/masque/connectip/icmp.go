@@ -77,8 +77,8 @@ func composeICMPTooLargePacket(b []byte, mtu int) ([]byte, error) {
 		binary.BigEndian.PutUint16(header[2:4], uint16(ipLen))
 		header[8] = 64
 		header[9] = 1
-		copy(header[12:16], b[16:20])
-		copy(header[16:20], b[12:16])
+		copy(header[12:16], b[16:20]) //nolint:gosec // len(b) >= ipv4.HeaderLen is checked above
+		copy(header[16:20], b[12:16]) //nolint:gosec // len(b) >= ipv4.HeaderLen is checked above
 		binary.BigEndian.PutUint16(header[10:12], calculateIPv4Checksum(header[:]))
 		return append(header[:], icmp...), nil
 	}
@@ -88,7 +88,7 @@ func composeICMPTooLargePacket(b []byte, mtu int) ([]byte, error) {
 	binary.BigEndian.PutUint16(header[4:6], uint16(len(icmp)))
 	header[6] = 58
 	header[7] = 64
-	copy(header[8:24], b[24:40])
-	copy(header[24:40], b[8:24])
+	copy(header[8:24], b[24:40]) //nolint:gosec // len(b) >= ipv6.HeaderLen is checked above
+	copy(header[24:40], b[8:24]) //nolint:gosec // len(b) >= ipv6.HeaderLen is checked above
 	return append(header[:], icmp...), nil
 }

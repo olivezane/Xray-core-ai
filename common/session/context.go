@@ -28,6 +28,9 @@ const (
 	mitmServerNameKey         ctx.SessionKey = 12 // used by TLS dialer
 
 	streamSettingsKey ctx.SessionKey = 13
+
+	// ConeKey carries the "cone" (full-cone NAT) flag set by core.Server.
+	ConeKey ctx.SessionKey = 14
 )
 
 func ContextWithInbound(ctx context.Context, inbound *Inbound) context.Context {

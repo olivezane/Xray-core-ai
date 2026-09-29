@@ -109,10 +109,7 @@ func (s *packetStream) Write(p []byte) (int, error) {
 
 	written := 0
 	for written < len(p) {
-		end := written + maxPacketData
-		if end > len(p) {
-			end = len(p)
-		}
+		end := min(written+maxPacketData, len(p))
 		channel := String(packetChannel)
 		payload := RestBytes(p[written:end])
 		if err := writePacket(s.writer, s.localCustomPayloadID(), &channel, &payload); err != nil {

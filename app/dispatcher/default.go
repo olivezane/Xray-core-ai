@@ -101,7 +101,7 @@ type DefaultDispatcher struct {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		d := new(DefaultDispatcher)
 		if err := core.RequireFeatures(ctx, func(om outbound.Manager, router routing.Router, pm policy.Manager, sm stats.Manager, dc dns.Client) error {
 			core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
@@ -125,7 +125,7 @@ func (d *DefaultDispatcher) Init(config *Config, om outbound.Manager, router rou
 }
 
 // Type implements common.HasType.
-func (*DefaultDispatcher) Type() interface{} {
+func (*DefaultDispatcher) Type() any {
 	return routing.DispatcherType()
 }
 

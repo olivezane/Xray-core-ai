@@ -18,7 +18,7 @@ func utpPacket(packetType, extension byte, tsDiff uint32, payload ...byte) []byt
 	binary.BigEndian.PutUint32(b[12:16], 0x00100000) // wnd_size
 	binary.BigEndian.PutUint16(b[16:18], 0x71ee)     // seq_nr, random in libutp/libtorrent
 	binary.BigEndian.PutUint16(b[18:20], 0x0000)     // ack_nr
-	return append(b, payload...)
+	return append(b, payload...)                     //nolint:makezero // b is a fully-written 20-byte header, the payload is appended after it
 }
 
 func TestSniffUTP(t *testing.T) {

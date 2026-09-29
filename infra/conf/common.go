@@ -212,7 +212,7 @@ func (v *PortRange) UnmarshalJSON(data []byte) error {
 	return errors.New("invalid port range: ", string(data))
 }
 
-type PortList struct {
+type PortList struct { //nolint:recvcheck // read-only methods use value receivers, mutating ones need pointers
 	Range []PortRange
 }
 
@@ -252,8 +252,8 @@ func (list *PortList) UnmarshalJSON(data []byte) error {
 			return errors.New("invalid port: ", string(data)).Base(err2)
 		}
 	}
-	rangelist := strings.Split(listStr, ",")
-	for _, rangeStr := range rangelist {
+	rangelist := strings.SplitSeq(listStr, ",")
+	for rangeStr := range rangelist {
 		trimmed := strings.TrimSpace(rangeStr)
 		if len(trimmed) > 0 {
 			if strings.Contains(trimmed, "-") || strings.Contains(trimmed, "env:") {
@@ -292,7 +292,7 @@ func (v *User) Build() *protocol.User {
 // Int32Range deserializes from "1-2" or 1, so can deserialize from both int and number.
 // Negative integers can be passed as sentinel values, but do not parse as ranges.
 // Value will be exchanged if From > To, use .Left and .Right to get original value if need.
-type Int32Range struct {
+type Int32Range struct { //nolint:recvcheck // read-only methods use value receivers, mutating ones need pointers
 	Left  int32
 	Right int32
 	From  int32

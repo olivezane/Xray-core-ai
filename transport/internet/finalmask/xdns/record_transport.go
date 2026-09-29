@@ -71,13 +71,7 @@ func ipAnswersForPayload(question Question, ttl uint32, payload []byte) ([]RR, e
 	answers := make([]RR, 0, numRecords)
 	for i := 0; i < numRecords; i++ {
 		offset := i * chunkSize
-		n := len(payload) - offset
-		if n < 0 {
-			n = 0
-		}
-		if n > chunkSize {
-			n = chunkSize
-		}
+		n := min(max(len(payload)-offset, 0), chunkSize)
 
 		data := make([]byte, rrDataSize)
 		data[0] = byte(i)

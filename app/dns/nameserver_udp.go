@@ -27,7 +27,7 @@ type ClassicNameServer struct {
 	requests        map[uint16]*udpDnsRequest
 	udpServer       *udp.Dispatcher
 	requestsCleanup *task.Periodic
-	reqID           uint32
+	reqID           atomic.Uint32
 	clientIP        net.IP
 }
 
@@ -140,7 +140,7 @@ func (s *ClassicNameServer) HandleResponse(ctx context.Context, packet *udp_prot
 }
 
 func (s *ClassicNameServer) newReqID() uint16 {
-	return uint16(atomic.AddUint32(&s.reqID, 1))
+	return uint16(s.reqID.Add(1))
 }
 
 func (s *ClassicNameServer) addPendingRequest(req *udpDnsRequest) {

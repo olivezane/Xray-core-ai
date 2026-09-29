@@ -33,7 +33,7 @@ func New(ctx context.Context, config *proxyman.OutboundConfig) (*Manager, error)
 }
 
 // Type implements common.HasType.
-func (m *Manager) Type() interface{} {
+func (m *Manager) Type() any {
 	return outbound.ManagerType()
 }
 
@@ -150,9 +150,8 @@ func (m *Manager) ListHandlers(ctx context.Context) []outbound.Handler {
 	m.access.RLock()
 	defer m.access.RUnlock()
 
-	response := make([]outbound.Handler, len(m.untaggedHandlers))
-	copy(response, m.untaggedHandlers)
-
+	response := make([]outbound.Handler, 0, len(m.untaggedHandlers)+len(m.taggedHandler))
+	response = append(response, m.untaggedHandlers...)
 	for _, v := range m.taggedHandler {
 		response = append(response, v)
 	}
@@ -188,10 +187,10 @@ func (m *Manager) Select(selectors []string) []string {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*proxyman.OutboundConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*proxyman.OutboundConfig)(nil), func(ctx context.Context, config any) (any, error) {
 		return New(ctx, config.(*proxyman.OutboundConfig))
 	}))
-	common.Must(common.RegisterConfig((*core.OutboundHandlerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*core.OutboundHandlerConfig)(nil), func(ctx context.Context, config any) (any, error) {
 		return NewHandler(ctx, config.(*core.OutboundHandlerConfig))
 	}))
 }

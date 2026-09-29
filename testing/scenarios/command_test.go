@@ -84,7 +84,7 @@ func TestCommanderListenConfigurationItem(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()) //nolint:staticcheck // grpc.NewClient has no blocking-dial equivalent; migrating needs an explicit state-wait loop
 	common.Must(err)
 	defer cmdConn.Close()
 
@@ -179,7 +179,7 @@ func TestCommanderRemoveHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()) //nolint:staticcheck // grpc.NewClient has no blocking-dial equivalent; migrating needs an explicit state-wait loop
 	common.Must(err)
 	defer cmdConn.Close()
 
@@ -275,7 +275,7 @@ func TestCommanderListHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()) //nolint:staticcheck // grpc.NewClient has no blocking-dial equivalent; migrating needs an explicit state-wait loop
 	common.Must(err)
 	defer cmdConn.Close()
 
@@ -454,7 +454,7 @@ func TestCommanderAddRemoveUser(t *testing.T) {
 		t.Fatal("expected error: ", err)
 	}
 
-	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()) //nolint:staticcheck // grpc.NewClient has no blocking-dial equivalent; migrating needs an explicit state-wait loop
 	common.Must(err)
 	defer cmdConn.Close()
 
@@ -630,7 +630,7 @@ func TestCommanderStats(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	cmdConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", cmdPort), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()) //nolint:staticcheck // grpc.NewClient has no blocking-dial equivalent; migrating needs an explicit state-wait loop
 	common.Must(err)
 	defer cmdConn.Close()
 

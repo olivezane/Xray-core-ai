@@ -148,7 +148,7 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 
 	var keepAlivePeriod time.Duration
 	if streamSettings.ProtocolSettings.(*Config).Xmux != nil {
-		keepAlivePeriod = time.Duration(streamSettings.ProtocolSettings.(*Config).Xmux.HKeepAlivePeriod) * time.Second
+		keepAlivePeriod = time.Duration(streamSettings.ProtocolSettings.(*Config).Xmux.HKeepAlivePeriod) * time.Second //nolint:durationcheck // HKeepAlivePeriod is a scalar count of seconds
 	}
 
 	var transport http.RoundTripper
@@ -252,12 +252,12 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 		if keepAlivePeriod < 0 {
 			keepAlivePeriod = 0
 		}
-		transport = &http2.Transport{
-			DialTLSContext: func(ctxInner context.Context, network string, addr string, cfg *gotls.Config) (net.Conn, error) {
+		transport = &http2.Transport{ //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+			DialTLSContext: func(ctxInner context.Context, network string, addr string, cfg *gotls.Config) (net.Conn, error) { //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 				return dialContext(ctxInner)
 			},
-			IdleConnTimeout: net.ConnIdleTimeout,
-			ReadIdleTimeout: keepAlivePeriod,
+			IdleConnTimeout: net.ConnIdleTimeout, //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+			ReadIdleTimeout: keepAlivePeriod,     //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 		}
 	} else {
 		httpDialContext := func(ctxInner context.Context, network string, addr string) (net.Conn, error) {

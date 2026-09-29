@@ -102,11 +102,11 @@ func genEDNS0Options(clientIP net.IP, padding int) *dnsmessage.Resource {
 		case 1:
 			ip := clientIP.To4().Mask(net.CIDRMask(netmask, net.IPv4len*8))
 			needLength := (netmask + 8 - 1) / 8 // division rounding up
-			b = append(b, ip[:needLength]...)
+			b = append(b, ip[:needLength]...)   //nolint:makezero // b is a fully-written 4-byte EDNS0 header prefix, the address bytes are appended after it
 		case 2:
 			ip := clientIP.Mask(net.CIDRMask(netmask, net.IPv6len*8))
 			needLength := (netmask + 8 - 1) / 8 // division rounding up
-			b = append(b, ip[:needLength]...)
+			b = append(b, ip[:needLength]...)   //nolint:makezero // b is a fully-written 4-byte EDNS0 header prefix, the address bytes are appended after it
 		}
 
 		body.Options = append(body.Options,

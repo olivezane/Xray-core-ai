@@ -529,7 +529,7 @@ func (tnet *Net) tryOneName(ctx context.Context, name string, qtype dnsmessage.T
 		Class: dnsmessage.ClassINET,
 	}
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		for _, server := range tnet.dnsServers {
 			p, h, err := tnet.exchange(ctx, server, q, time.Second*5)
 			if err != nil {
@@ -723,11 +723,7 @@ func partialDeadline(now, deadline time.Time, addrsRemaining int) (time.Time, er
 	timeout := timeRemaining / time.Duration(addrsRemaining)
 	const saneMinimum = 2 * time.Second
 	if timeout < saneMinimum {
-		if timeRemaining < saneMinimum {
-			timeout = timeRemaining
-		} else {
-			timeout = saneMinimum
-		}
+		timeout = min(timeRemaining, saneMinimum)
 	}
 	return now.Add(timeout), nil
 }

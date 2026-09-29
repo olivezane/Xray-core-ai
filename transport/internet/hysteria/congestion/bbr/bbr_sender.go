@@ -1047,13 +1047,8 @@ func (b *bbrSender) shouldExitStartupDueToLoss(lastPacketSendState *sendTimeStat
 
 	inflightAtSend := lastPacketSendState.bytesInFlight
 
-	if inflightAtSend > 0 && b.bytesLostInRound > 0 {
-		if b.bytesLostInRound > congestion.ByteCount(float64(inflightAtSend)*quicBbr2DefaultLossThreshold) {
-			return true
-		}
-		return false
-	}
-	return false
+	return inflightAtSend > 0 && b.bytesLostInRound > 0 &&
+		b.bytesLostInRound > congestion.ByteCount(float64(inflightAtSend)*quicBbr2DefaultLossThreshold)
 }
 
 func (b *bbrSender) debugPrint(format string, a ...any) {

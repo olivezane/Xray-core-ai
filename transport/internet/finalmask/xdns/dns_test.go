@@ -13,7 +13,7 @@ func namesEqual(a, b Name) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	for i := 0; i < len(a); i++ {
+	for i := range a {
 		if !bytes.Equal(a[i], b[i]) {
 			return false
 		}
@@ -392,7 +392,7 @@ func unescapeString(s string) ([][]byte, error) {
 	}
 
 	var result [][]byte
-	for _, label := range strings.Split(s, ".") {
+	for label := range strings.SplitSeq(s, ".") {
 		var buf bytes.Buffer
 		i := 0
 		for i < len(label) {

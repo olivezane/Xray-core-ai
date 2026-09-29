@@ -11,7 +11,7 @@ import (
 func TestToString(t *testing.T) {
 	s := "a"
 	data := []struct {
-		Value  interface{}
+		Value  any
 		String string
 	}{
 		{Value: s, String: s},
@@ -29,11 +29,11 @@ func TestToString(t *testing.T) {
 
 func TestConcat(t *testing.T) {
 	testCases := []struct {
-		Input  []interface{}
+		Input  []any
 		Output string
 	}{
 		{
-			Input: []interface{}{
+			Input: []any{
 				"a", "b",
 			},
 			Output: "ab",
@@ -49,7 +49,7 @@ func TestConcat(t *testing.T) {
 }
 
 func BenchmarkConcat(b *testing.B) {
-	input := []interface{}{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}
+	input := []any{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}
 
 	b.ReportAllocs()
 	for b.Loop() {

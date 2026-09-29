@@ -125,7 +125,7 @@ func newBridgeMipstackPeer(t *testing.T, device *bridgeDevice, local ...netip.Pr
 			if err != nil {
 				return
 			}
-			for i := 0; i < count; i++ {
+			for i := range count {
 				if !device.inject(packets[i][:sizes[i]]) {
 					return
 				}

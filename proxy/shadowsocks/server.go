@@ -47,7 +47,7 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 		config:        config,
 		validator:     validator,
 		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
-		cone:          ctx.Value("cone").(bool),
+		cone:          ctx.Value(session.ConeKey).(bool),
 	}
 
 	return s, nil
@@ -293,7 +293,7 @@ func (s *Server) handleConnection(ctx context.Context, conn stat.Connection, dis
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
 		return NewServer(ctx, config.(*ServerConfig))
 	}))
 }

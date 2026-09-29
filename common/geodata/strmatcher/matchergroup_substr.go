@@ -1,7 +1,7 @@
 package strmatcher
 
 import (
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -42,7 +42,7 @@ func (g *SubstrMatcherGroup) Match(input string) []uint32 {
 		// Sort the match results in dictionary order, so that:
 		//   1. Pattern matched at smaller position (meaning matched further) takes precedence.
 		//   2. When patterns matched at same position, pattern with smaller index (meaning inserted early) takes precedence.
-		sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+		slices.Sort(result)
 	}
 	for i, entry := range result {
 		result[i] = g.values[entry&0xffff] // Get pattern value from its index (the lower 16 bit)

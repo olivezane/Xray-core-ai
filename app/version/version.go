@@ -72,7 +72,7 @@ func compareVersions(v1, v2 string) (int, error) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		return New(ctx, config.(*Config))
 	}))
 }

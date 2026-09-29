@@ -138,7 +138,7 @@ func NewBridgeWorker(domain string, tag string, d routing.Dispatcher) (*BridgeWo
 	return w, nil
 }
 
-func (w *BridgeWorker) Type() interface{} {
+func (w *BridgeWorker) Type() any {
 	return routing.DispatcherType()
 }
 

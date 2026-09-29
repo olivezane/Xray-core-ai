@@ -119,7 +119,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *httpHandler) StreamDispatcher(ft http3.FrameType, stream *quic.Stream, err error) (bool, error) {
 	if err != nil || !h.auth {
-		return false, nil
+		return false, nil //nolint:nilerr // the stream is already broken; the dispatcher has nothing to report
 	}
 
 	switch ft {

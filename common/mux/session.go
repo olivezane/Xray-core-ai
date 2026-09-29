@@ -90,7 +90,6 @@ func (m *SessionManager) Remove(locked bool, id uint16) {
 		m.Lock()
 		defer m.Unlock()
 	}
-	locked = true
 
 	if m.closed {
 		return

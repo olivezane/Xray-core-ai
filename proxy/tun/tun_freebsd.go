@@ -487,8 +487,8 @@ func (t *FreeBSDTun) setSystemRoutes() error {
 
 func (t *FreeBSDTun) unsetSystemRoutes() error {
 	var errs []error
-	for i := len(t.systemRoutes) - 1; i >= 0; i-- {
-		destination := t.systemRoutes[i]
+	for _, destination := range slices.Backward(t.systemRoutes) {
+
 		if err := execRoute(-1, unix.RTM_DELETE, t.tunIndex, destination, netip.Addr{}); err != nil && !errors.Is(err, unix.ESRCH) {
 			errs = append(errs, xerrors.New("failed to delete system route ", destination).Base(err))
 		}
@@ -532,7 +532,7 @@ func buildSystemRoutes(configured []string) ([]netip.Prefix, error) {
 // route stays in place for outbound interface discovery (darwin parity).
 func protectedDefaultRoutes(ipv4 bool) []netip.Prefix {
 	routes := make([]netip.Prefix, 0, 8)
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		if ipv4 {
 			var address [4]byte
 			address[0] = 1 << i
@@ -822,8 +822,8 @@ func (t *FreeBSDTun) unsetEscapeFib() {
 }
 
 func (t *FreeBSDTun) unsetEscapeFibLocked() {
-	for i := len(t.escapeRoutes) - 1; i >= 0; i-- {
-		entry := t.escapeRoutes[i]
+	for _, entry := range slices.Backward(t.escapeRoutes) {
+
 		err := execRoute(escapeFib, unix.RTM_DELETE, entry.ifIndex, entry.prefix, entry.gateway)
 		if err != nil && !errors.Is(err, unix.ESRCH) {
 			xerrors.LogInfoInner(context.Background(), err, "[tun] failed to delete escape route ", entry.prefix)

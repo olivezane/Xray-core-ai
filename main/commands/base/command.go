@@ -94,13 +94,13 @@ func Exit() {
 }
 
 // Fatalf logs error and exit with code 1
-func Fatalf(format string, args ...interface{}) {
+func Fatalf(format string, args ...any) {
 	Errorf(format, args...)
 	Exit()
 }
 
 // Errorf logs error and set exit status to 1, but not exit
-func Errorf(format string, args ...interface{}) {
+func Errorf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, format, args...)
 	fmt.Fprintln(os.Stderr)
 	SetExitStatus(1)

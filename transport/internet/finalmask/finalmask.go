@@ -202,8 +202,6 @@ func (fm *FinalMask) DialUDP(ctx context.Context, dest net.Destination) (net.Con
 	}
 	if len(conns) > 0 {
 		conn = &headerManagerConn{PacketConn: conn, sizes: sizes, conns: conns}
-		sizes = nil
-		conns = nil
 	}
 	if addr == nil {
 		addr = &net.UDPAddr{IP: []byte{0, 0, 0, 0}}
@@ -262,8 +260,6 @@ func (fm *FinalMask) ListenPacket(ctx context.Context, addr net.Addr) (net.Packe
 	}
 	if len(conns) > 0 {
 		conn = &headerManagerConn{PacketConn: conn, sizes: sizes, conns: conns}
-		sizes = nil
-		conns = nil
 	}
 	return conn, nil
 }
@@ -358,8 +354,8 @@ func (c *headerManagerConn) WriteTo(p []byte, addr net.Addr) (n int, err error) 
 
 	n = copy(b[sum:], p)
 
-	for i := len(c.conns) - 1; i >= 0; i-- {
-		n, err = c.conns[i].WriteTo(b[sum-c.sizes[i]:n+sum], nil)
+	for i, v := range slices.Backward(c.conns) {
+		n, err = v.WriteTo(b[sum-c.sizes[i]:n+sum], nil)
 		if err != nil {
 			errors.LogErrorInner(context.Background(), err, "[mask] drop packet to ", addr, " with size ", len(p))
 			return 0, nil

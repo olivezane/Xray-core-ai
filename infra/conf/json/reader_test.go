@@ -11,6 +11,7 @@ import (
 )
 
 func TestReader(t *testing.T) {
+	//nolint:dupword // the fixtures intentionally repeat words to exercise comment stripping
 	data := []struct {
 		input  string
 		output string

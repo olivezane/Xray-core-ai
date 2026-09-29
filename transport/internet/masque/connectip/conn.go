@@ -168,7 +168,7 @@ func (c *Conn) AdvertiseRoute(routes []IPRoute) error {
 	for i, route := range routes {
 		err := route.validate()
 		if err == nil && i > 0 {
-			err = checkRouteOrder(routes[i-1], route)
+			err = checkRouteOrder(routes[i-1], route) //nolint:gosec // guarded by i > 0
 		}
 		if err != nil {
 			return fmt.Errorf("connect-ip: invalid route %d: %w", i, err)

@@ -86,7 +86,7 @@ func TestInvalidRequest(t *testing.T) {
 	Validator := new(vless.MemoryValidator)
 	Validator.Add(user)
 
-	_, _, _, _, err := DecodeRequestHeader(false, nil, &buffer, Validator)
+	_, _, _, _, err := DecodeRequestHeader(false, nil, &buffer, Validator) //nolint:dogsled // the test only cares about the error
 	if err == nil {
 		t.Error("nil error")
 	}

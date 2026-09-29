@@ -18,6 +18,6 @@ type BurstObservatory interface {
 	Check(tag []string)
 }
 
-func ObservatoryType() interface{} {
+func ObservatoryType() any {
 	return (*Observatory)(nil)
 }

@@ -61,7 +61,7 @@ func (o *Observer) createResult() []*observatory.OutboundStatus {
 	return result
 }
 
-func (o *Observer) Type() interface{} {
+func (o *Observer) Type() any {
 	return extension.ObservatoryType()
 }
 
@@ -109,7 +109,7 @@ func New(ctx context.Context, config *Config) (*Observer, error) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		return New(ctx, config.(*Config))
 	}))
 }

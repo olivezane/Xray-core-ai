@@ -14,7 +14,7 @@ import (
 // testLink returns a minimal netlink.Link whose Attrs().Name is name, so the
 // DNS helpers can be exercised without a real TUN device.
 func testLink(name string) netlink.Link {
-	return &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: name}}
+	return &netlink.Dummy{Name: name}
 }
 
 type probeCall struct {

@@ -90,7 +90,7 @@ func (w *errWriter) Write(b []byte) (int, error) {
 }
 
 // tmpl executes the given template text on data, writing the result to w.
-func tmpl(w io.Writer, text string, data interface{}) {
+func tmpl(w io.Writer, text string, data any) {
 	t := template.New("top")
 	t.Funcs(template.FuncMap{"trim": strings.TrimSpace, "capitalize": capitalize, "width": width})
 	template.Must(t.Parse(text))
@@ -141,7 +141,7 @@ func buildCommandText(cmd *Command) {
 	cmd.Long = buildText(cmd.Long, data)
 }
 
-func buildText(text string, data interface{}) string {
+func buildText(text string, data any) string {
 	buf := bytes.NewBuffer([]byte{})
 	tmpl(buf, text, data)
 	return buf.String()

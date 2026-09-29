@@ -8,12 +8,12 @@ import (
 )
 
 // ConfigCreator is a function to create an object by a config.
-type ConfigCreator func(ctx context.Context, config interface{}) (interface{}, error)
+type ConfigCreator func(ctx context.Context, config any) (any, error)
 
 var typeCreatorRegistry = make(map[reflect.Type]ConfigCreator)
 
 // RegisterConfig registers a global config creator. The config can be nil but must have a type.
-func RegisterConfig(config interface{}, configCreator ConfigCreator) error {
+func RegisterConfig(config any, configCreator ConfigCreator) error {
 	configType := reflect.TypeOf(config)
 	if _, found := typeCreatorRegistry[configType]; found {
 		return errors.New(configType.Name() + " is already registered")
@@ -23,7 +23,7 @@ func RegisterConfig(config interface{}, configCreator ConfigCreator) error {
 }
 
 // CreateObject creates an object by its config. The config type must be registered through RegisterConfig().
-func CreateObject(ctx context.Context, config interface{}) (interface{}, error) {
+func CreateObject(ctx context.Context, config any) (any, error) {
 	configType := reflect.TypeOf(config)
 	creator, found := typeCreatorRegistry[configType]
 	if !found {

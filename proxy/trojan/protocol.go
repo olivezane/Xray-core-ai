@@ -241,10 +241,7 @@ func (r *PacketReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	dest := net.UDPDestination(addr, port)
 	var mb buf.MultiBuffer
 	for remain > 0 {
-		length := buf.Size
-		if remain < length {
-			length = remain
-		}
+		length := min(remain, buf.Size)
 
 		b := buf.New()
 		b.UDP = &dest

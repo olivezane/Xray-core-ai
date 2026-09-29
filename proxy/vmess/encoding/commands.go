@@ -16,7 +16,7 @@ var (
 	ErrUnknownCommand      = errors.New("Unknown command.")
 )
 
-func MarshalCommand(command interface{}, writer io.Writer) error {
+func MarshalCommand(command any, writer io.Writer) error {
 	return ErrUnknownCommand
 }
 
@@ -33,6 +33,6 @@ func UnmarshalCommand(cmdID byte, data []byte) (protocol.ResponseCommand, error)
 }
 
 type CommandFactory interface {
-	Marshal(command interface{}, writer io.Writer) error
-	Unmarshal(data []byte) (interface{}, error)
+	Marshal(command any, writer io.Writer) error
+	Unmarshal(data []byte) (any, error)
 }

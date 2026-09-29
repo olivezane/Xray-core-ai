@@ -8,7 +8,7 @@ import (
 	"math/bits"
 	"math/rand"
 	rand_v2 "math/rand/v2"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -33,7 +33,7 @@ var (
 
 	basePatternsOnce sync.Once
 	basePatterns     [][][4]byte
-	basePatternsErr  error
+	errBasePatterns  error
 )
 
 type byteLayout struct {
@@ -214,7 +214,7 @@ func resolveLayout(mode, customTable string) (*byteLayout, error) {
 
 func asciiLayout() *byteLayout {
 	padding := make([]byte, 0, 32)
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		padding = append(padding, byte(0x20+i))
 	}
 
@@ -247,7 +247,7 @@ func asciiLayout() *byteLayout {
 
 func entropyLayout() *byteLayout {
 	padding := make([]byte, 0, 16)
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		padding = append(padding, byte(0x80+i), byte(0x10+i))
 	}
 
@@ -323,8 +323,8 @@ func customLayout(pattern string) (*byteLayout, error) {
 	paddingSet := make(map[byte]struct{}, 64)
 	padding := make([]byte, 0, 64)
 	for drop := range xBits {
-		for val := byte(0); val < 4; val++ {
-			for pos := byte(0); pos < 16; pos++ {
+		for val := range byte(4) {
+			for pos := range byte(16) {
 				group := (val << 4) | pos
 				b := encodeGroupWithDropX(group, drop)
 				if bits.OnesCount8(b) >= 5 {
@@ -336,7 +336,7 @@ func customLayout(pattern string) (*byteLayout, error) {
 			}
 		}
 	}
-	sort.Slice(padding, func(i, j int) bool { return padding[i] < padding[j] })
+	slices.Sort(padding)
 	if len(padding) == 0 {
 		return nil, fmt.Errorf("customTable produced empty padding pool")
 	}
@@ -401,7 +401,7 @@ func buildTable(password string, layout *byteLayout) (*table, error) {
 		decode: make(map[uint32]byte, 1<<16),
 		layout: layout,
 	}
-	for b := 0; b < 256; b++ {
+	for b := range 256 {
 		patList := patterns[order[b]]
 		if len(patList) == 0 {
 			return nil, fmt.Errorf("grid %d has no valid clue set", order[b])
@@ -432,9 +432,9 @@ func buildTable(password string, layout *byteLayout) (*table, error) {
 
 func getBasePatterns() ([][][4]byte, error) {
 	basePatternsOnce.Do(func() {
-		basePatterns, basePatternsErr = buildBasePatterns()
+		basePatterns, errBasePatterns = buildBasePatterns()
 	})
-	return basePatterns, basePatternsErr
+	return basePatterns, errBasePatterns
 }
 
 type grid [16]byte
@@ -502,7 +502,7 @@ func generateAllGrids() []grid {
 
 		for num := byte(1); num <= 4; num++ {
 			valid := true
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				if g[row*4+i] == num || g[i*4+col] == num {
 					valid = false
 					break
@@ -513,7 +513,7 @@ func generateAllGrids() []grid {
 			}
 
 			for r := 0; r < 2 && valid; r++ {
-				for c := 0; c < 2; c++ {
+				for c := range 2 {
 					if g[(boxRow+r)*4+(boxCol+c)] == num {
 						valid = false
 						break
@@ -537,7 +537,7 @@ func generateAllGrids() []grid {
 func hintPositions() [][4]byte {
 	// C(16, 4) = 1820.
 	positions := make([][4]byte, 0, 1820)
-	for a := 0; a < 13; a++ {
+	for a := range 13 {
 		for b := a + 1; b < 14; b++ {
 			for c := b + 1; c < 15; c++ {
 				for d := c + 1; d < 16; d++ {

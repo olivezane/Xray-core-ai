@@ -2,6 +2,7 @@ package custom
 
 import (
 	"encoding/binary"
+	"maps"
 	"net"
 
 	"github.com/xtls/xray-core/common/crypto"
@@ -55,9 +56,7 @@ func measureUDPItems(items []*UDPItem) (int, error) {
 
 func measureUDPItemsWithFallback(items []*UDPItem, fallback map[string]int) (int, error) {
 	sizeCtx := make(map[string]int)
-	for key, value := range fallback {
-		sizeCtx[key] = value
-	}
+	maps.Copy(sizeCtx, fallback)
 	total := 0
 	for _, item := range items {
 		itemSize, err := measureItem(item.Rand, item.Packet, item.Save, item.Var, item.Expr, sizeCtx)

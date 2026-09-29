@@ -31,7 +31,7 @@ func TestClientWaitForSettings(t *testing.T) {
 	defer cancel()
 	req, err := NewRequest(ctx, "https://example.org/.well-known/masque/ip/")
 	require.NoError(t, err)
-	_, _, err = NewClientConn(h3conn).Dial(req)
+	_, _, err = NewClientConn(h3conn).Dial(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
@@ -51,7 +51,7 @@ func TestClientDatagramCheck(t *testing.T) {
 	defer cancel()
 	req, err := NewRequest(ctx, "https://example.org/.well-known/masque/ip/")
 	require.NoError(t, err)
-	_, _, err = NewClientConn(h3conn).Dial(req)
+	_, _, err = NewClientConn(h3conn).Dial(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.ErrorContains(t, err, "connect-ip: server didn't enable datagrams")
 }
 
@@ -92,7 +92,7 @@ func TestNewClientConnSharesHTTP3Connection(t *testing.T) {
 	checkHTTP()
 	req, err := NewRequest(ctx, url+"/connect-ip")
 	require.NoError(t, err)
-	tunnel, rsp, err := NewClientConn(h3conn).Dial(req)
+	tunnel, rsp, err := NewClientConn(h3conn).Dial(req) //nolint:bodyclose // the response body is owned by tunnel
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, rsp.StatusCode)
 	checkHTTP()

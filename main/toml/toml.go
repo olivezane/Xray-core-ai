@@ -17,7 +17,7 @@ func init() {
 	common.Must(core.RegisterConfigLoader(&core.ConfigFormat{
 		Name:      "TOML",
 		Extension: []string{"toml"},
-		Loader: func(input interface{}) (*core.Config, error) {
+		Loader: func(input any) (*core.Config, error) {
 			switch v := input.(type) {
 			case cmdarg.Arg:
 				cf := &conf.Config{}

@@ -27,7 +27,7 @@ type Client interface {
 // ClientType returns the type of Client interface. Can be used for implementing common.HasType.
 //
 // xray:api:beta
-func ClientType() interface{} {
+func ClientType() any {
 	return (*Client)(nil)
 }
 

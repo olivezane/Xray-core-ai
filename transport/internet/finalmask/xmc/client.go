@@ -157,14 +157,14 @@ func (c *clientConn) handshake() error {
 		return fmt.Errorf("generate shared secret: %w", err)
 	}
 
-	encryptedSharedSecret, err := rsa.EncryptPKCS1v15(rand.Reader, rsaPublicKey, sharedSecret)
+	encryptedSharedSecret, err := rsa.EncryptPKCS1v15(rand.Reader, rsaPublicKey, sharedSecret) //nolint:staticcheck // wire-format compatibility, cannot be changed without breaking existing peers
 	if err != nil {
 		return fmt.Errorf("encrypt shared secret: %w", err)
 	}
 
 	verifyToken = append(verifyToken, []byte(c.password)...) // append pre-shared password
 
-	encryptedVerifyToken, err := rsa.EncryptPKCS1v15(rand.Reader, rsaPublicKey, verifyToken)
+	encryptedVerifyToken, err := rsa.EncryptPKCS1v15(rand.Reader, rsaPublicKey, verifyToken) //nolint:staticcheck // wire-format compatibility, cannot be changed without breaking existing peers
 	if err != nil {
 		return fmt.Errorf("encrypt verify token: %w", err)
 	}

@@ -258,12 +258,10 @@ func (t *stackMipstack) handleUDP(request *mipstack.UDPForwarderRequest) {
 		}
 
 		t.udpMu.Lock()
-		if existing, ok := t.responders[key]; ok {
-			entry = existing
-		} else {
-			entry = &mipstackUDPResponder{responder: responder}
-			entry.touch()
-			t.responders[key] = entry
+		if _, ok := t.responders[key]; !ok {
+			newEntry := &mipstackUDPResponder{responder: responder}
+			newEntry.touch()
+			t.responders[key] = newEntry
 		}
 		t.udpMu.Unlock()
 	}
@@ -439,7 +437,7 @@ func (t *stackMipstack) outboundPump() {
 		}
 
 		batch = batch[:0]
-		for i := 0; i < count; i++ {
+		for i := range count {
 			batch = append(batch, packets[i][:sizes[i]])
 		}
 		if err := t.device.WritePackets(batch); err != nil {

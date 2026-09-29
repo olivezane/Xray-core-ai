@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	utls "github.com/refraction-networking/utls"
@@ -90,8 +91,8 @@ func newClient(baseCtx context.Context, dispatcher routing.Dispatcher, outbound 
 	}
 	if isHTTPS {
 		return &http.Client{
-			Transport: &http2.Transport{
-				DialTLSContext: func(ctx context.Context, network string, address string, cfg *tls.Config) (net.Conn, error) {
+			Transport: &http2.Transport{ //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+				DialTLSContext: func(ctx context.Context, network string, address string, cfg *tls.Config) (net.Conn, error) { //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 					conn, err := dial(ctx, network, address)
 					if err != nil {
 						return nil, err
@@ -288,8 +289,8 @@ func swapOne(asset stage) (swap, error) {
 
 func (t *tx) rollback() error {
 	var errs []error
-	for i := len(t.swaps) - 1; i >= 0; i-- {
-		if err := t.swaps[i].rollback(); err != nil {
+	for _, v := range slices.Backward(t.swaps) {
+		if err := v.rollback(); err != nil {
 			errs = append(errs, err)
 		}
 	}

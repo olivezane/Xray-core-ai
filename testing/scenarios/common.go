@@ -238,10 +238,7 @@ func testTCPConn2(conn net.Conn, payloadSize int, timeout time.Duration) func() 
 			return nil
 		}
 		for payloadSize > 0 {
-			sizeToWrite := 1024
-			if payloadSize < 1024 {
-				sizeToWrite = payloadSize
-			}
+			sizeToWrite := min(payloadSize, 1024)
 			if err := singleWrite(sizeToWrite); err != nil {
 				return err
 			}

@@ -149,7 +149,7 @@ func (w *tcpWorker) Start() error {
 }
 
 func (w *tcpWorker) Close() error {
-	var errs []interface{}
+	var errs []any
 	if w.hub != nil {
 		if err := common.Close(w.hub); err != nil {
 			errs = append(errs, err)
@@ -170,7 +170,7 @@ func (w *tcpWorker) Port() net.Port {
 }
 
 type udpConn struct {
-	lastActivityTime int64 // in seconds
+	lastActivityTime atomic.Int64 // in seconds
 	reader           buf.Reader
 	writer           buf.Writer
 	output           func([]byte) (int, error)
@@ -188,7 +188,7 @@ func (c *udpConn) setInactive() {
 }
 
 func (c *udpConn) updateActivity() {
-	atomic.StoreInt64(&c.lastActivityTime, time.Now().Unix())
+	c.lastActivityTime.Store(time.Now().Unix())
 }
 
 // ReadMultiBuffer implements buf.Reader
@@ -394,7 +394,7 @@ func (w *udpWorker) clean() error {
 	}
 
 	for addr, conn := range w.activeConn {
-		if nowSec-atomic.LoadInt64(&conn.lastActivityTime) > 2*60 {
+		if nowSec-conn.lastActivityTime.Load() > 2*60 {
 			if !conn.inactive {
 				conn.setInactive()
 				delete(w.activeConn, addr)
@@ -418,7 +418,7 @@ func (w *udpWorker) Start() error {
 		return err
 	}
 
-	w.cone = w.ctx.Value("cone").(bool)
+	w.cone = w.ctx.Value(session.ConeKey).(bool)
 
 	w.checker = &task.Periodic{
 		Interval: time.Minute,
@@ -434,7 +434,7 @@ func (w *udpWorker) Close() error {
 	w.Lock()
 	defer w.Unlock()
 
-	var errs []interface{}
+	var errs []any
 
 	if w.hub != nil {
 		if err := w.hub.Close(); err != nil {
@@ -535,7 +535,7 @@ func (w *dsWorker) Start() error {
 }
 
 func (w *dsWorker) Close() error {
-	var errs []interface{}
+	var errs []any
 	if w.hub != nil {
 		if err := common.Close(w.hub); err != nil {
 			errs = append(errs, err)

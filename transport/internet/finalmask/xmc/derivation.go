@@ -90,10 +90,8 @@ func DeriveRSAKey(password string) (*rsa.PrivateKey, error) {
 	}
 
 	priv := &rsa.PrivateKey{
-		PublicKey: rsa.PublicKey{
-			N: n,
-			E: 65537,
-		},
+		N:      n,
+		E:      65537,
 		D:      d,
 		Primes: []*big.Int{p, q},
 	}

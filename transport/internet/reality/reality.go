@@ -105,7 +105,7 @@ func (c *UConn) VerifyPeerCertificate(rawCerts [][]byte, verifiedChains [][]*x50
 		fmt.Printf("REALITY localAddr: %v\tis using ML-DSA-65 for cert's extra verification: %v\n", localAddr, len(c.Config.Mldsa65Verify) > 0)
 	}
 	p, _ := reflect.TypeOf(c.Conn).Elem().FieldByName("peerCertificates")
-	certs := *(*([]*x509.Certificate))(unsafe.Pointer(uintptr(unsafe.Pointer(c.Conn)) + p.Offset))
+	certs := *(*([]*x509.Certificate))(unsafe.Add(unsafe.Pointer(c.Conn), p.Offset))
 	if pub, ok := certs[0].PublicKey.(ed25519.PublicKey); ok {
 		h := hmac.New(sha512.New, c.AuthKey)
 		h.Write(pub)
@@ -209,8 +209,8 @@ func UClient(c net.Conn, config *Config, ctx context.Context, dest net.Destinati
 		errors.LogError(ctx, "REALITY: received real certificate (potential MITM or redirection)")
 		go func() {
 			client := &http.Client{
-				Transport: &http2.Transport{
-					DialTLSContext: func(ctx context.Context, network, addr string, cfg *gotls.Config) (net.Conn, error) {
+				Transport: &http2.Transport{ //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+					DialTLSContext: func(ctx context.Context, network, addr string, cfg *gotls.Config) (net.Conn, error) { //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 						if config.Show {
 							fmt.Printf("REALITY localAddr: %v\tDialTLSContext\n", localAddr)
 						}
@@ -290,7 +290,7 @@ func UClient(c net.Conn, config *Config, ctx context.Context, dest net.Destinati
 			}
 			get(true)
 			concurrency := int(crypto.RandBetween(config.SpiderY[2], config.SpiderY[3]))
-			for i := 0; i < concurrency; i++ {
+			for range concurrency {
 				go get(false)
 			}
 			// Do not close the connection

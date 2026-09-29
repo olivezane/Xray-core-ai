@@ -187,10 +187,8 @@ func (v *UserMatcher) Apply(ctx routing.Context) bool {
 	if len(user) == 0 {
 		return false
 	}
-	for _, u := range v.user {
-		if u == user {
-			return true
-		}
+	if slices.Contains(v.user, user) {
+		return true
 	}
 	for _, re := range v.pattern {
 		if re.MatchString(user) {
@@ -222,12 +220,7 @@ func (v *InboundTagMatcher) Apply(ctx routing.Context) bool {
 	if len(tag) == 0 {
 		return false
 	}
-	for _, t := range v.tags {
-		if t == tag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(v.tags, tag)
 }
 
 type ProtocolMatcher struct {

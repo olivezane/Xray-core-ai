@@ -99,7 +99,7 @@ func (p *http2Peer) writeHeaders(endStream bool, fields ...string) {
 	p.t.Helper()
 	p.hbuf.Reset()
 	for i := 0; i < len(fields); i += 2 {
-		require.NoError(p.t, p.henc.WriteField(hpack.HeaderField{Name: fields[i], Value: fields[i+1]}))
+		require.NoError(p.t, p.henc.WriteField(hpack.HeaderField{Name: fields[i], Value: fields[i+1]})) //nolint:gosec // i steps by 2, so i+1 is in range
 	}
 	require.NoError(p.t, p.fr.WriteHeaders(http2.HeadersFrameParam{
 		StreamID:      http2StreamID,
@@ -129,7 +129,7 @@ func TestHTTP2ClientRequest(t *testing.T) {
 	}
 	results := make(chan result, 1)
 	go func() {
-		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), pr))
+		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), pr)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		results <- result{rsp, err}
 	}()
 
@@ -196,7 +196,7 @@ func TestHTTP2ClientDefaultUserAgent(t *testing.T) {
 
 func TestHTTP2ClientNeedsExtendedConnect(t *testing.T) {
 	cc, _ := newHTTP2Peer(t)
-	_, err := cc.RoundTrip(connectRequest(t, context.Background(), io.NopCloser(strings.NewReader(""))))
+	_, err := cc.RoundTrip(connectRequest(t, context.Background(), io.NopCloser(strings.NewReader("")))) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.ErrorIs(t, err, errHTTP2NoExtendedConnect)
 }
 
@@ -204,7 +204,7 @@ func TestHTTP2ClientSingleStream(t *testing.T) {
 	cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 	go cc.RoundTrip(connectRequest(t, context.Background(), nil))
 	p.readFrame()
-	_, err := cc.RoundTrip(connectRequest(t, context.Background(), nil))
+	_, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.ErrorIs(t, err, errHTTP2StreamUsed)
 }
 
@@ -244,7 +244,7 @@ func TestHTTP2ClientReceiveWindow(t *testing.T) {
 	cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 	rsps := make(chan *http.Response, 1)
 	go func() {
-		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), nil))
+		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		if err == nil {
 			rsps <- rsp
 		}
@@ -278,7 +278,7 @@ func TestHTTP2ClientRejectsOverflow(t *testing.T) {
 	cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 	rsps := make(chan *http.Response, 1)
 	go func() {
-		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), nil))
+		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		if err == nil {
 			rsps <- rsp
 		}
@@ -325,7 +325,7 @@ func TestHTTP2ClientStatus(t *testing.T) {
 	cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 	rsps := make(chan *http.Response, 1)
 	go func() {
-		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), nil))
+		rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		if err == nil {
 			rsps <- rsp
 		}
@@ -346,7 +346,7 @@ func TestHTTP2ClientReset(t *testing.T) {
 		cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 		errs := make(chan error, 1)
 		go func() {
-			_, err := cc.RoundTrip(connectRequest(t, context.Background(), nil))
+			_, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 			errs <- err
 		}()
 		p.readFrame()
@@ -362,7 +362,7 @@ func TestHTTP2ClientReset(t *testing.T) {
 		defer pw.Close()
 		rsps := make(chan *http.Response, 1)
 		go func() {
-			rsp, err := cc.RoundTrip(connectRequest(t, ctx, pr))
+			rsp, err := cc.RoundTrip(connectRequest(t, ctx, pr)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 			if err == nil {
 				rsps <- rsp
 			}
@@ -384,7 +384,7 @@ func TestHTTP2ClientReset(t *testing.T) {
 		cc, p := newHTTP2Peer(t, http2.Setting{ID: http2.SettingEnableConnectProtocol, Val: 1})
 		errs := make(chan error, 1)
 		go func() {
-			_, err := cc.RoundTrip(connectRequest(t, context.Background(), nil))
+			_, err := cc.RoundTrip(connectRequest(t, context.Background(), nil)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 			errs <- err
 		}()
 		p.readFrame()

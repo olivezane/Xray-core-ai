@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/transport/internet"
 )
 
@@ -39,7 +40,7 @@ func (s *fakeStore) handle(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		s.tokens++
 		s.mu.Unlock()
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"access_token": "tok-fake", "expires_in": 3600,
 		})
 		return
@@ -103,22 +104,22 @@ func (s *fakeStore) seenAuth() string {
 	return s.sawAuth
 }
 
-func templateSettings(store *fakeStore, auth map[string]interface{}, secrets []string) *internet.MemoryStreamConfig {
+func templateSettings(store *fakeStore, auth map[string]any, secrets []string) *internet.MemoryStreamConfig {
 	base := store.server.URL
-	tmpl := map[string]interface{}{
+	tmpl := map[string]any{
 		"flatten": true,
 		"auth":    auth,
-		"put":     map[string]interface{}{"method": "PUT", "url": base + "/folder/{name}"},
-		"get":     map[string]interface{}{"method": "GET", "url": base + "/folder/{name}"},
-		"delete":  map[string]interface{}{"method": "DELETE", "url": base + "/folder/{name}"},
-		"list": map[string]interface{}{
+		"put":     map[string]any{"method": "PUT", "url": base + "/folder/{name}"},
+		"get":     map[string]any{"method": "GET", "url": base + "/folder/{name}"},
+		"delete":  map[string]any{"method": "DELETE", "url": base + "/folder/{name}"},
+		"list": map[string]any{
 			"method":     "PROPFIND",
 			"url":        base + "/folder/",
 			"namesRegex": `<d:href>/folder/([^<]+)</d:href>`,
 		},
-		"retry": map[string]interface{}{"status": []int{429, 500, 502, 503}},
+		"retry": map[string]any{"status": []int{429, 500, 502, 503}},
 	}
-	raw, _ := json.Marshal(tmpl)
+	raw := common.Must2(json.Marshal(tmpl))
 	return &internet.MemoryStreamConfig{
 		ProtocolName: protocolName,
 		ProtocolSettings: &Config{
@@ -134,7 +135,7 @@ func templateSettings(store *fakeStore, auth map[string]interface{}, secrets []s
 	}
 }
 
-func newTemplateBackend(t *testing.T, store *fakeStore, auth map[string]interface{}, secrets []string) *templateStorage {
+func newTemplateBackend(t *testing.T, store *fakeStore, auth map[string]any, secrets []string) *templateStorage {
 	t.Helper()
 	settings := templateSettings(store, auth, secrets)
 	storage, err := newTemplateStorage(settings, settings.ProtocolSettings.(*Config))
@@ -146,7 +147,7 @@ func newTemplateBackend(t *testing.T, store *fakeStore, auth map[string]interfac
 
 func TestTemplateRoundTrip(t *testing.T) {
 	store := newFakeStore(t)
-	storage := newTemplateBackend(t, store, map[string]interface{}{"type": "none"}, nil)
+	storage := newTemplateBackend(t, store, map[string]any{"type": "none"}, nil)
 	ctx := context.Background()
 
 	if err := storage.Put(ctx, "streams/abc/c2s/000000000.seg", []byte("hello")); err != nil {
@@ -182,7 +183,7 @@ func TestTemplateRoundTrip(t *testing.T) {
 
 func TestTemplateListReturnsDirectChildren(t *testing.T) {
 	store := newFakeStore(t)
-	storage := newTemplateBackend(t, store, map[string]interface{}{"type": "none"}, nil)
+	storage := newTemplateBackend(t, store, map[string]any{"type": "none"}, nil)
 	ctx := context.Background()
 
 	for _, name := range []string{
@@ -207,7 +208,7 @@ func TestTemplateListReturnsDirectChildren(t *testing.T) {
 func TestTemplateBasicAuth(t *testing.T) {
 	store := newFakeStore(t)
 	store.needAuth = "Basic dXNlcjpwYXNz"
-	auth := map[string]interface{}{"type": "basic", "username": "{secret0}", "password": "{secret1}"}
+	auth := map[string]any{"type": "basic", "username": "{secret0}", "password": "{secret1}"}
 	storage := newTemplateBackend(t, store, auth, []string{"user", "pass"})
 
 	if err := storage.Put(context.Background(), "sessions/a", []byte("x")); err != nil {
@@ -221,16 +222,16 @@ func TestTemplateBasicAuth(t *testing.T) {
 func TestTemplateOAuth(t *testing.T) {
 	store := newFakeStore(t)
 	store.needAuth = "Bearer tok-fake"
-	auth := map[string]interface{}{
+	auth := map[string]any{
 		"type":     "oauth2",
 		"tokenUrl": store.server.URL + "/token",
-		"form":     map[string]interface{}{"grant_type": "refresh_token", "refresh_token": "{secret0}"},
-		"header":   map[string]interface{}{"Authorization": "Bearer {token}"},
+		"form":     map[string]any{"grant_type": "refresh_token", "refresh_token": "{secret0}"},
+		"header":   map[string]any{"Authorization": "Bearer {token}"},
 	}
 	storage := newTemplateBackend(t, store, auth, []string{"refresh"})
 	ctx := context.Background()
 
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		if err := storage.Put(ctx, fmt.Sprintf("sessions/s%d", i), nil); err != nil {
 			t.Fatalf("Put: %v", err)
 		}
@@ -242,7 +243,7 @@ func TestTemplateOAuth(t *testing.T) {
 
 func TestTemplateTransport(t *testing.T) {
 	store := newFakeStore(t)
-	settings := templateSettings(store, map[string]interface{}{"type": "none"}, nil)
+	settings := templateSettings(store, map[string]any{"type": "none"}, nil)
 
 	client, server, cleanup := pairWith(t, settings)
 	defer cleanup()
@@ -279,15 +280,15 @@ func TestTemplateTransport(t *testing.T) {
 
 func TestTemplateConcurrency(t *testing.T) {
 	store := newFakeStore(t)
-	settings := templateSettings(store, map[string]interface{}{"type": "none"}, nil)
+	settings := templateSettings(store, map[string]any{"type": "none"}, nil)
 
-	var tmpl map[string]interface{}
+	var tmpl map[string]any
 	cfg := settings.ProtocolSettings.(*Config)
 	if err := json.Unmarshal([]byte(cfg.Template), &tmpl); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	tmpl["concurrency"] = 4
-	raw, _ := json.Marshal(tmpl)
+	raw := common.Must2(json.Marshal(tmpl))
 	cfg.Template = string(raw)
 
 	storage, err := newTemplateStorage(settings, cfg)
@@ -301,7 +302,7 @@ func TestTemplateConcurrency(t *testing.T) {
 
 func TestTemplateConcurrencyDefault(t *testing.T) {
 	store := newFakeStore(t)
-	storage := newTemplateBackend(t, store, map[string]interface{}{"type": "none"}, nil)
+	storage := newTemplateBackend(t, store, map[string]any{"type": "none"}, nil)
 	if cap(storage.inflight) != driveMaxInflight {
 		t.Fatalf("default inflight cap is %d, want %d", cap(storage.inflight), driveMaxInflight)
 	}

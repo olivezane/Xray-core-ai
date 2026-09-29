@@ -202,6 +202,7 @@ func TestTCPStream(t *testing.T) {
 				_, _ = rand.Read(serverSalt)
 				respKey := DeriveSessionSubKey(rawKey, serverSalt, method.KeySaltLength)
 				respAead, err := method.NewAEAD(respKey)
+				common.Must(err)
 				writer := NewStreamWriter(serverConn, respAead)
 				_, _ = serverConn.Write(serverSalt)
 

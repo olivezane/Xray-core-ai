@@ -213,7 +213,7 @@ func TestLiveDriveParallelPut(t *testing.T) {
 	}
 
 	start := time.Now()
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		if err := storage.Put(ctx, fmt.Sprintf("streams/benchtest/seq%d", i), chunk); err != nil {
 			t.Fatalf("sequential put: %v", err)
 		}
@@ -225,7 +225,7 @@ func TestLiveDriveParallelPut(t *testing.T) {
 	start = time.Now()
 	var wg sync.WaitGroup
 	failures := make([]error, 8)
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -251,7 +251,7 @@ func TestLiveDriveParallelPut(t *testing.T) {
 
 	start = time.Now()
 	wg = sync.WaitGroup{}
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -285,7 +285,7 @@ func TestLiveDriveSegmentSweep(t *testing.T) {
 
 		start := time.Now()
 		var wg sync.WaitGroup
-		for i := 0; i < count; i++ {
+		for i := range count {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -315,7 +315,7 @@ func TestLiveDriveListLag(t *testing.T) {
 	const rounds = 6
 	var worst time.Duration
 
-	for i := 0; i < rounds; i++ {
+	for i := range rounds {
 		name := fmt.Sprintf("streams/lagtest/round%d/000000000.seg", i)
 		if err := storage.Put(ctx, name, []byte("probe")); err != nil {
 			t.Fatalf("Put: %v", err)

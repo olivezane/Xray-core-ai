@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pires/go-proxyproto"
@@ -367,7 +368,7 @@ func (w *VisionWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 					if w.trafficState.EnableXtls {
 						*switchToDirectCopy = true
 					}
-					var command byte = CommandPaddingContinue
+					var command = CommandPaddingContinue
 					if i == len(mb)-1 {
 						command = CommandPaddingEnd
 						if w.trafficState.EnableXtls {
@@ -383,7 +384,7 @@ func (w *VisionWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 					mb[i] = XtlsPadding(b, CommandPaddingEnd, &w.writeOnceUserUUID, longPadding, w.ctx, w.testseed)
 					break
 				}
-				var command byte = CommandPaddingContinue
+				var command = CommandPaddingContinue
 				if i == len(mb)-1 && !*isPadding {
 					command = CommandPaddingEnd
 					if w.trafficState.EnableXtls {
@@ -411,7 +412,7 @@ func IsCompleteRecord(buffer buf.MultiBuffer) bool {
 	if buffer.Copy(b) != int(buffer.Len()) {
 		panic("impossible bytes allocation")
 	}
-	var headerLen int = 5
+	var headerLen = 5
 	var recordLen int
 
 	totalLen := len(b)
@@ -471,7 +472,7 @@ func ReshapeMultiBuffer(ctx context.Context, buffer buf.MultiBuffer) buf.MultiBu
 		return buffer
 	}
 	mb2 := make(buf.MultiBuffer, 0, len(buffer)+needReshape)
-	toPrint := ""
+	var toPrint strings.Builder
 	for i, buffer1 := range buffer {
 		if buffer1.Len() >= buf.Size-21 {
 			index := int32(bytes.LastIndex(buffer1.Bytes(), TlsApplicationDataStart))
@@ -482,22 +483,21 @@ func ReshapeMultiBuffer(ctx context.Context, buffer buf.MultiBuffer) buf.MultiBu
 			buffer2.Write(buffer1.BytesFrom(index))
 			buffer1.Resize(0, index)
 			mb2 = append(mb2, buffer1, buffer2)
-			toPrint += " " + strconv.Itoa(int(buffer1.Len())) + " " + strconv.Itoa(int(buffer2.Len()))
+			toPrint.WriteString(" " + strconv.Itoa(int(buffer1.Len())) + " " + strconv.Itoa(int(buffer2.Len())))
 		} else {
 			mb2 = append(mb2, buffer1)
-			toPrint += " " + strconv.Itoa(int(buffer1.Len()))
+			toPrint.WriteString(" " + strconv.Itoa(int(buffer1.Len())))
 		}
 		buffer[i] = nil
 	}
-	buffer = buffer[:0]
-	errors.LogDebug(ctx, "ReshapeMultiBuffer ", toPrint)
+	errors.LogDebug(ctx, "ReshapeMultiBuffer ", toPrint.String())
 	return mb2
 }
 
 // XtlsPadding add padding to eliminate length signature during tls handshake
 func XtlsPadding(b *buf.Buffer, command byte, userUUID *[]byte, longPadding bool, ctx context.Context, testseed []uint32) *buf.Buffer {
 	var contentLen int32 = 0
-	var paddingLen int32 = 0
+	var paddingLen int32
 	if b != nil {
 		contentLen = b.Len()
 	}
@@ -526,7 +526,6 @@ func XtlsPadding(b *buf.Buffer, command byte, userUUID *[]byte, longPadding bool
 	if b != nil {
 		newbuffer.Write(b.Bytes())
 		b.Release()
-		b = nil
 	}
 	newbuffer.Extend(paddingLen)
 	errors.LogDebug(ctx, "XtlsPadding ", contentLen, " ", paddingLen, " ", command)
@@ -613,7 +612,6 @@ func XtlsUnpadding(b *buf.Buffer, s *TrafficState, isUplink bool, ctx context.Co
 		}
 	}
 	b.Release()
-	b = nil
 	return newbuffer
 }
 

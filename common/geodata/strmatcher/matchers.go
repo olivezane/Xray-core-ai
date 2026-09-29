@@ -292,7 +292,7 @@ func CompositeMatches(matches [][]uint32) []uint32 {
 		return slices.Clone(matches[0])
 	default:
 		result := make([]uint32, 0, 5)
-		for i := 0; i < len(matches); i++ {
+		for i := range matches {
 			result = append(result, matches[i]...)
 		}
 		return result
@@ -312,8 +312,8 @@ func CompositeMatchesReverse(matches [][]uint32) []uint32 {
 		return matches[0]
 	default:
 		result := make([]uint32, 0, 5)
-		for i := len(matches) - 1; i >= 0; i-- {
-			result = append(result, matches[i]...)
+		for _, matche := range slices.Backward(matches) {
+			result = append(result, matche...)
 		}
 		return result
 	}

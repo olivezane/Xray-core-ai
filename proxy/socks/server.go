@@ -39,7 +39,7 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	s := &Server{
 		config:        config,
 		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
-		cone:          ctx.Value("cone").(bool),
+		cone:          ctx.Value(session.ConeKey).(bool),
 	}
 	httpConfig := &http.ServerConfig{
 		UserLevel: config.UserLevel,
@@ -234,7 +234,7 @@ func (s *Server) handleUDPPayload(ctx context.Context, conn stat.Connection, dis
 				newInbound.Source = net.DestinationFromAddr(conn.RemoteAddr())
 				newInbound.Local = net.DestinationFromAddr(conn.LocalAddr())
 				inbound = &newInbound
-				ctx = session.ContextWithInbound(ctx, inbound)
+				ctx = session.ContextWithInbound(ctx, inbound) //nolint:fatcontext // guarded by sync.Once, runs once per connection
 				errors.LogInfo(ctx, "client UDP connection from ", inbound.Source)
 			}
 		})
@@ -278,7 +278,7 @@ func (s *Server) handleUDPPayload(ctx context.Context, conn stat.Connection, dis
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config any) (any, error) {
 		return NewServer(ctx, config.(*ServerConfig))
 	}))
 }

@@ -222,10 +222,7 @@ func (c *xdnsConnClient) sendLoop() {
 		}
 
 		if pollTimerExpired {
-			pollDelay = time.Duration(float64(pollDelay) * pollDelayMultiplier)
-			if pollDelay > maxPollDelay {
-				pollDelay = maxPollDelay
-			}
+			pollDelay = min(time.Duration(float64(pollDelay)*pollDelayMultiplier), maxPollDelay)
 		} else {
 			if !pollTimer.Stop() {
 				<-pollTimer.C
@@ -364,10 +361,7 @@ func encode(p []byte, clientID []byte, domain Name, qtype uint16) ([]byte, error
 func chunks(p []byte, n int) [][]byte {
 	var result [][]byte
 	for len(p) > 0 {
-		sz := len(p)
-		if sz > n {
-			sz = n
-		}
+		sz := min(len(p), n)
 		result = append(result, p[:sz])
 		p = p[sz:]
 	}

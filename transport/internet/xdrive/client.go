@@ -109,11 +109,11 @@ func newServiceClient(streamSettings *internet.MemoryStreamConfig, timeout time.
 
 	var secure http.RoundTripper
 	if overHTTP2 {
-		secure = &http2.Transport{
-			DialTLSContext: func(ctx context.Context, network, addr string, cfg *gotls.Config) (net.Conn, error) {
+		secure = &http2.Transport{ //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+			DialTLSContext: func(ctx context.Context, network, addr string, cfg *gotls.Config) (net.Conn, error) { //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 				return dialTLS(ctx, addr)
 			},
-			IdleConnTimeout: net.ConnIdleTimeout,
+			IdleConnTimeout: net.ConnIdleTimeout, //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 		}
 	} else {
 		secure = &http.Transport{

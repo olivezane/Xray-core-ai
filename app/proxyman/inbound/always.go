@@ -44,7 +44,7 @@ func getStatCounter(v *core.Instance, tag string) (stats.Counter, stats.Counter)
 }
 
 type AlwaysOnInboundHandler struct {
-	proxyConfig    interface{}
+	proxyConfig    any
 	receiverConfig *proxyman.ReceiverConfig
 	proxy          proxy.Inbound
 	workers        []worker
@@ -52,7 +52,7 @@ type AlwaysOnInboundHandler struct {
 	tag            string
 }
 
-func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *proxyman.ReceiverConfig, proxyConfig interface{}) (*AlwaysOnInboundHandler, error) {
+func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *proxyman.ReceiverConfig, proxyConfig any) (*AlwaysOnInboundHandler, error) {
 	sniffingRequest, err := proxyman.BuildSniffingRequest(receiverConfig.SniffingSettings)
 	if err != nil {
 		return nil, err

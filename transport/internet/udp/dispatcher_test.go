@@ -36,7 +36,7 @@ func (d *TestDispatcher) Close() error {
 	return nil
 }
 
-func (*TestDispatcher) Type() interface{} {
+func (*TestDispatcher) Type() any {
 	return routing.DispatcherType()
 }
 
@@ -68,13 +68,13 @@ func TestSameDestinationDispatching(t *testing.T) {
 	b := buf.New()
 	b.WriteString("abcd")
 
-	var msgCount uint32
+	var msgCount atomic.Uint32
 	dispatcher := NewDispatcher(td, func(ctx context.Context, packet *udp.Packet) {
-		atomic.AddUint32(&msgCount, 1)
+		msgCount.Add(1)
 	})
 
 	dispatcher.Dispatch(ctx, dest, b)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		dispatcher.Dispatch(ctx, dest, b)
 	}
 
@@ -84,7 +84,7 @@ func TestSameDestinationDispatching(t *testing.T) {
 	if count != 1 {
 		t.Error("count: ", count)
 	}
-	if v := atomic.LoadUint32(&msgCount); v != 6 {
+	if v := msgCount.Load(); v != 6 {
 		t.Error("msgCount: ", v)
 	}
 }

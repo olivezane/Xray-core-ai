@@ -110,7 +110,7 @@ func TestPipeWriteMultiThread(t *testing.T) {
 	pReader, pWriter := New(WithSizeLimit(0))
 
 	var errg errgroup.Group
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		errg.Go(func() error {
 			b := buf.New()
 			b.WriteString("abcd")

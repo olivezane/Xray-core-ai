@@ -43,7 +43,7 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		return New(ctx, config.(*Config))
 	}))
 }
@@ -80,7 +80,7 @@ func New(ctx context.Context, config *Config) (*Handler, error) {
 	handler := &Handler{
 		server:        server,
 		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
-		cone:          ctx.Value("cone").(bool),
+		cone:          ctx.Value(session.ConeKey).(bool),
 	}
 
 	a := handler.server.User.Account.(*vless.MemoryAccount)

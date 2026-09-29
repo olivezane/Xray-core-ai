@@ -24,7 +24,7 @@ func GetMessageType(message proto.Message) string {
 }
 
 // GetInstance creates a new instance of the message with messageType.
-func GetInstance(messageType string) (interface{}, error) {
+func GetInstance(messageType string) (any, error) {
 	messageTypeDescriptor := protoreflect.FullName(messageType)
 	mType, err := protoregistry.GlobalTypes.FindMessageByName(messageTypeDescriptor)
 	if err != nil {

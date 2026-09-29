@@ -80,7 +80,7 @@ func (p *http2ClientPeer) writeHeaders(streamID uint32, endStream bool, fields .
 	p.t.Helper()
 	p.hbuf.Reset()
 	for i := 0; i < len(fields); i += 2 {
-		require.NoError(p.t, p.henc.WriteField(hpack.HeaderField{Name: fields[i], Value: fields[i+1]}))
+		require.NoError(p.t, p.henc.WriteField(hpack.HeaderField{Name: fields[i], Value: fields[i+1]})) //nolint:gosec // i steps by 2, so i+1 is in range
 	}
 	require.NoError(p.t, p.fr.WriteHeaders(http2.HeadersFrameParam{
 		StreamID:      streamID,
@@ -134,6 +134,7 @@ func TestHTTP2ServerRoundTrip(t *testing.T) {
 	pr, pw := io.Pipe()
 	rsp, err := cc.RoundTrip(connectRequest(t, context.Background(), pr))
 	require.NoError(t, err)
+	defer rsp.Body.Close()
 	require.Equal(t, http.StatusOK, rsp.StatusCode)
 	require.Equal(t, "?1", rsp.Header.Get("Capsule-Protocol"))
 

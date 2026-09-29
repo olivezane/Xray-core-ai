@@ -60,8 +60,8 @@ func TestMaskAddress(t *testing.T) {
 	maskedAddr := log.MaskedMsgWrapper{
 		Mask4: m4,
 		Mask6: m6,
-	}
-	maskedAddr.Message = net.ParseIP("11.45.1.4")
+
+		Message: net.ParseIP("11.45.1.4")}
 	if maskedAddr.String() != "11.45.*.*" {
 		t.Fatal("expected '11.45.*.*', but actually ", maskedAddr.String())
 	}
@@ -77,8 +77,8 @@ func TestMaskAddress(t *testing.T) {
 	maskedAddr = log.MaskedMsgWrapper{
 		Mask4: m4,
 		Mask6: m6,
-	}
-	maskedAddr.Message = net.ParseIP("11.45.1.4")
+
+		Message: net.ParseIP("11.45.1.4")}
 	if maskedAddr.String() != "11.45.*.*" {
 		t.Fatal("expected '11.45.*.*', but actually ", maskedAddr.String())
 	}

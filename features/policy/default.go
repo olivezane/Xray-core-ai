@@ -8,7 +8,7 @@ import (
 type DefaultManager struct{}
 
 // Type implements common.HasType.
-func (DefaultManager) Type() interface{} {
+func (DefaultManager) Type() any {
 	return ManagerType()
 }
 

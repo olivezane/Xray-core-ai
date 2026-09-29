@@ -71,15 +71,13 @@ func TestMipstackClosesUnderTraffic(t *testing.T) {
 
 	sending := make(chan struct{})
 	var senders sync.WaitGroup
-	senders.Add(1)
-	go func() {
-		defer senders.Done()
+	senders.Go(func() {
 		defer close(sending)
-		for i := 0; i < 200; i++ {
+		for range 200 {
 			_, _ = client.WriteTo([]byte("ping"), server)
 			time.Sleep(time.Millisecond)
 		}
-	}()
+	})
 
 	closeWithin(t, stack, 10*time.Second)
 	senders.Wait()

@@ -104,10 +104,7 @@ func (w *StreamWriter) WriteChunk(payload []byte) error {
 func (w *StreamWriter) Write(p []byte) (int, error) {
 	n := len(p)
 	for len(p) > 0 {
-		chunkSize := len(p)
-		if chunkSize > MaxPacketSize {
-			chunkSize = MaxPacketSize
-		}
+		chunkSize := min(len(p), MaxPacketSize)
 		if err := w.WriteChunk(p[:chunkSize]); err != nil {
 			return 0, err
 		}

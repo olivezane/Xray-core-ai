@@ -3,12 +3,14 @@ package core
 import (
 	"context"
 	"reflect"
+	"slices"
 	"sync"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/platform"
 	"github.com/xtls/xray-core/common/serial"
+	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/features"
 	"github.com/xtls/xray-core/features/dns"
 	"github.com/xtls/xray-core/features/dns/localdns"
@@ -26,13 +28,13 @@ type Server interface {
 }
 
 // ServerType returns the type of the server.
-func ServerType() interface{} {
+func ServerType() any {
 	return (*Instance)(nil)
 }
 
 type resolution struct {
 	deps     []reflect.Type
-	callback interface{}
+	callback any
 }
 
 func getFeature(allFeatures []features.Feature, t reflect.Type) features.Feature {
@@ -48,8 +50,7 @@ func (r *resolution) callbackResolution(allFeatures []features.Feature) error {
 	callback := reflect.ValueOf(r.callback)
 	var input []reflect.Value
 	callbackType := callback.Type()
-	for i := 0; i < callbackType.NumIn(); i++ {
-		pt := callbackType.In(i)
+	for pt := range callbackType.Ins() {
 		for _, f := range allFeatures {
 			if reflect.TypeOf(f).AssignableTo(pt) {
 				input = append(input, reflect.ValueOf(f))
@@ -64,10 +65,10 @@ func (r *resolution) callbackResolution(allFeatures []features.Feature) error {
 
 	var err error
 	ret := callback.Call(input)
-	errInterface := reflect.TypeOf((*error)(nil)).Elem()
-	for i := len(ret) - 1; i >= 0; i-- {
-		if ret[i].Type() == errInterface {
-			v := ret[i].Interface()
+	errInterface := reflect.TypeFor[error]()
+	for _, r := range slices.Backward(ret) {
+		if r.Type() == errInterface {
+			v := r.Interface()
 			if v != nil {
 				err = v.(error)
 			}
@@ -149,14 +150,14 @@ func addOutboundHandlers(server *Instance, configs []*OutboundHandlerConfig) err
 
 // RequireFeatures is a helper function to require features from Instance in context.
 // See Instance.RequireFeatures for more information.
-func RequireFeatures(ctx context.Context, callback interface{}) error {
+func RequireFeatures(ctx context.Context, callback any) error {
 	v := MustFromContext(ctx)
 	return v.RequireFeatures(callback, false)
 }
 
 // OptionalFeatures is a helper function to aquire features from Instance in context.
 // See Instance.RequireFeatures for more information.
-func OptionalFeatures(ctx context.Context, callback interface{}) error {
+func OptionalFeatures(ctx context.Context, callback any) error {
 	v := MustFromContext(ctx)
 	return v.RequireFeatures(callback, true)
 }
@@ -190,7 +191,7 @@ func initInstanceWithConfig(config *Config, server *Instance) (bool, error) {
 	if err := platform.ReloadEnvSettings(); err != nil {
 		return true, errors.New("failed to reload environment settings").Base(err)
 	}
-	server.ctx = context.WithValue(server.ctx, "cone",
+	server.ctx = context.WithValue(server.ctx, session.ConeKey,
 		platform.NewEnvFlag(platform.UseCone).GetValue(func() string { return "" }) != "true")
 
 	for _, appSettings := range config.App {
@@ -210,7 +211,7 @@ func initInstanceWithConfig(config *Config, server *Instance) (bool, error) {
 	}
 
 	essentialFeatures := []struct {
-		Type     interface{}
+		Type     any
 		Instance features.Feature
 	}{
 		{dns.ClientType(), localdns.New()},
@@ -253,7 +254,7 @@ func initInstanceWithConfig(config *Config, server *Instance) (bool, error) {
 }
 
 // Type implements common.HasType.
-func (s *Instance) Type() interface{} {
+func (s *Instance) Type() any {
 	return ServerType()
 }
 
@@ -264,7 +265,7 @@ func (s *Instance) Close() error {
 
 	s.running = false
 
-	var errs []interface{}
+	var errs []any
 	for _, f := range s.features {
 		if err := f.Close(); err != nil {
 			errs = append(errs, err)
@@ -279,15 +280,15 @@ func (s *Instance) Close() error {
 
 // RequireFeatures registers a callback, which will be called when all dependent features are registered.
 // The callback must be a func(). All its parameters must be features.Feature.
-func (s *Instance) RequireFeatures(callback interface{}, optional bool) error {
+func (s *Instance) RequireFeatures(callback any, optional bool) error {
 	callbackType := reflect.TypeOf(callback)
 	if callbackType.Kind() != reflect.Func {
 		panic("not a function")
 	}
 
 	var featureTypes []reflect.Type
-	for i := 0; i < callbackType.NumIn(); i++ {
-		featureTypes = append(featureTypes, reflect.PtrTo(callbackType.In(i)))
+	for in := range callbackType.Ins() {
+		featureTypes = append(featureTypes, reflect.PointerTo(in))
 	}
 
 	r := resolution{
@@ -376,7 +377,7 @@ func (s *Instance) AddFeature(feature features.Feature) error {
 }
 
 // GetFeature returns a feature of the given type, or nil if such feature is not registered.
-func (s *Instance) GetFeature(featureType interface{}) features.Feature {
+func (s *Instance) GetFeature(featureType any) features.Feature {
 	return getFeature(s.features, reflect.TypeOf(featureType))
 }
 

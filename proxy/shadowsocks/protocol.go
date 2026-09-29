@@ -178,11 +178,11 @@ func ReadTCPResponse(user *protocol.MemoryUser, reader io.Reader) (buf.Reader, e
 	var iv []byte
 	if account.Cipher.IVSize() > 0 {
 		iv = make([]byte, account.Cipher.IVSize())
-		if n, err := io.ReadFull(reader, iv); err != nil {
+		n, err := io.ReadFull(reader, iv)
+		if err != nil {
 			return nil, errors.New("failed to read IV").Base(err)
-		} else { // nolint: golint
-			drainer.AcknowledgeReceive(n)
 		}
+		drainer.AcknowledgeReceive(n)
 	}
 
 	return account.Cipher.NewDecryptionReader(account.Key, iv, reader)

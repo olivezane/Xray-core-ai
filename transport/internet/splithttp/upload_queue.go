@@ -83,7 +83,7 @@ func (h *uploadQueue) Read(b []byte) (int, error) {
 
 	for len(h.heap) > 0 {
 		packet := heap.Pop(&h.heap).(Packet)
-		n := 0
+		var n int
 
 		if packet.Seq == h.nextSeq {
 			copy(b, packet.Payload)
@@ -122,7 +122,7 @@ func (h *uploadQueue) Read(b []byte) (int, error) {
 }
 
 // heap code directly taken from https://pkg.go.dev/container/heap
-type uploadHeap []Packet
+type uploadHeap []Packet //nolint:recvcheck // read-only methods use value receivers, mutating ones need pointers
 
 func (h uploadHeap) Len() int           { return len(h) }
 func (h uploadHeap) Less(i, j int) bool { return h[i].Seq < h[j].Seq }

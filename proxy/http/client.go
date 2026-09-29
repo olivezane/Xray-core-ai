@@ -39,7 +39,7 @@ type Client struct {
 
 type h2Conn struct {
 	rawConn net.Conn
-	h2Conn  *http2.ClientConn
+	h2Conn  *http2.ClientConn //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 }
 
 var (
@@ -248,18 +248,16 @@ func setUpHTTPTunnel(ctx context.Context, dest net.Destination, target string, u
 		return rawConn, nil
 	}
 
-	connectHTTP2 := func(rawConn net.Conn, h2clientConn *http2.ClientConn) (net.Conn, error) {
+	connectHTTP2 := func(rawConn net.Conn, h2clientConn *http2.ClientConn) (net.Conn, error) { //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 		pr, pw := io.Pipe()
 		req.Body = pr
 
 		var pErr error
 		var wg sync.WaitGroup
-		wg.Add(1)
 
-		go func() {
+		wg.Go(func() {
 			_, pErr = pw.Write(firstPayload)
-			wg.Done()
-		}()
+		})
 
 		resp, err := h2clientConn.RoundTrip(req)
 		if err != nil {
@@ -269,11 +267,13 @@ func setUpHTTPTunnel(ctx context.Context, dest net.Destination, target string, u
 
 		wg.Wait()
 		if pErr != nil {
+			resp.Body.Close()
 			rawConn.Close()
 			return nil, pErr
 		}
 
 		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
 			rawConn.Close()
 			return nil, errors.New("Proxy responded with non 200 code: " + resp.Status)
 		}
@@ -322,8 +322,8 @@ func setUpHTTPTunnel(ctx context.Context, dest net.Destination, target string, u
 	case "", "http/1.1":
 		return connectHTTP1(rawConn)
 	case "h2":
-		t := http2.Transport{}
-		h2clientConn, err := t.NewClientConn(rawConn)
+		t := http2.Transport{}                        //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+		h2clientConn, err := t.NewClientConn(rawConn) //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 		if err != nil {
 			rawConn.Close()
 			return nil, err
@@ -376,7 +376,7 @@ func (h *http2Conn) Close() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config any) (any, error) {
 		return NewClient(ctx, config.(*ClientConfig))
 	}))
 }

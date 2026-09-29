@@ -51,7 +51,7 @@ func reloadEnvSettings() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		h := new(Handler)
 		if streamSettings, ok := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig); ok && streamSettings.SocketSettings != nil {
 			h.resolveStrategy = streamSettings.SocketSettings.DomainStrategy
@@ -265,10 +265,6 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 	}
 
 	destination := ob.Target
-	origTargetAddr := ob.OriginalTarget.Address
-	if origTargetAddr == nil {
-		origTargetAddr = ob.Target.Address
-	}
 	dialer.SetOutboundGateway(ctx, ob)
 	outGateway := ob.Gateway
 	UDPOverride := net.UDPDestination(nil, 0)

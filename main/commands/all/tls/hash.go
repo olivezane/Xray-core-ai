@@ -10,7 +10,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/xtls/xray-core/main/commands/base"
-	. "github.com/xtls/xray-core/transport/internet/tls"
+	xtls "github.com/xtls/xray-core/transport/internet/tls"
 )
 
 var cmdHash = &base.Command{
@@ -67,7 +67,7 @@ func executeHash(cmd *base.Command, args []string) {
 	}
 	tabWriter := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	for i, cert := range certs {
-		hash := GenerateCertHashHex(cert)
+		hash := xtls.GenerateCertHashHex(cert)
 		if i == 0 {
 			fmt.Fprintf(tabWriter, "Leaf SHA256:\t%s\n", hash)
 		} else {

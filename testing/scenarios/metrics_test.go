@@ -74,6 +74,7 @@ func TestMetrics(t *testing.T) {
 
 	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/pprof/goroutine?debug=1", metricsPort))
 	common.Must(err)
+	defer resp.Body.Close()
 	if resp == nil {
 		t.Error("unexpected pprof nil response")
 	}
@@ -90,6 +91,7 @@ func TestMetrics(t *testing.T) {
 
 	resp2, err2 := http.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/vars", metricsPort))
 	common.Must(err2)
+	defer resp2.Body.Close()
 	if resp2 == nil {
 		t.Error("unexpected expvars nil response")
 	}
@@ -100,7 +102,7 @@ func TestMetrics(t *testing.T) {
 	if err2 != nil {
 		t.Fatal(err2)
 	}
-	var json2 map[string]interface{}
+	var json2 map[string]any
 	if json.Unmarshal(body2, &json2) != nil {
 		t.Error("unexpected response body from expvars handler")
 	}

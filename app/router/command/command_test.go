@@ -82,7 +82,7 @@ func TestServiceSubscribeRoutingStats(t *testing.T) {
 	// Client goroutine
 	go func() {
 		defer lis.Close()
-		conn, err := grpc.DialContext(context.Background(), "bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient("passthrough:///bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			errCh <- err
 			return
@@ -216,7 +216,7 @@ func TestServiceSubscribeSubsetOfFields(t *testing.T) {
 	// Client goroutine
 	go func() {
 		defer lis.Close()
-		conn, err := grpc.DialContext(context.Background(), "bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient("passthrough:///bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			errCh <- err
 			return
@@ -339,7 +339,7 @@ func TestServiceTestRoute(t *testing.T) {
 	// Client goroutine
 	go func() {
 		defer lis.Close()
-		conn, err := grpc.DialContext(context.Background(), "bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient("passthrough:///bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			errCh <- err
 		}

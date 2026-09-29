@@ -273,7 +273,7 @@ func (t *Handler) Process(ctx context.Context, network net.Network, conn stat.Co
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		t := &Handler{config: config.(*Config)}
 		err := core.RequireFeatures(ctx, func(pm policy.Manager, dispatcher routing.Dispatcher) error {
 			return t.Init(ctx, pm, dispatcher)

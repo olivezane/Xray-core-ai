@@ -46,7 +46,7 @@ import (
 )
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		var dc dns.Client
 		if err := core.RequireFeatures(ctx, func(d dns.Client) error {
 			dc = d
@@ -384,10 +384,9 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 					firstBytes := first.Bytes()
 					for i := 4; i <= 8; i++ { // 5 -> 9
 						if firstBytes[i] == '/' && firstBytes[i-1] == ' ' {
-							search := len(firstBytes)
-							if search > 64 {
-								search = 64 // up to about 60
-							}
+							search := min(len(firstBytes),
+								// up to about 60
+								64)
 							for j := i + 1; j < search; j++ {
 								k := firstBytes[j]
 								if k == '\r' || k == '\n' { // avoid logging \r or \n

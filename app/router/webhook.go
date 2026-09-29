@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"sync"
@@ -17,7 +18,8 @@ import (
 	routing_session "github.com/xtls/xray-core/features/routing/session"
 )
 
-func ptr[T any](v T) *T { return &v }
+//go:fix inline
+func ptr[T any](v T) *T { return new(v) }
 
 type event struct {
 	Email          *string `json:"email"`
@@ -74,9 +76,7 @@ func NewWebhookNotifier(cfg *WebhookConfig) (*WebhookNotifier, error) {
 
 	if len(cfg.Headers) > 0 {
 		h.headers = make(map[string]string, len(cfg.Headers))
-		for k, v := range cfg.Headers {
-			h.headers[k] = v
-		}
+		maps.Copy(h.headers, cfg.Headers)
 	}
 
 	return h, nil
@@ -109,31 +109,31 @@ func (h *WebhookNotifier) Fire(ctx routing.Context, outboundTag string) {
 func buildEvent(ctx routing.Context, outboundTag string) *event {
 	ev := &event{
 		Timestamp:   time.Now().Unix(),
-		OutboundTag: ptr(outboundTag),
-		InboundTag:  ptr(ctx.GetInboundTag()),
-		Protocol:    ptr(ctx.GetProtocol()),
-		Network:     ptr(ctx.GetNetwork().SystemString()),
+		OutboundTag: new(outboundTag),
+		InboundTag:  new(ctx.GetInboundTag()),
+		Protocol:    new(ctx.GetProtocol()),
+		Network:     new(ctx.GetNetwork().SystemString()),
 	}
 
 	if user := ctx.GetUser(); user != "" {
-		ev.Email = ptr(user)
+		ev.Email = new(user)
 	}
 
 	if srcIPs := ctx.GetSourceIPs(); len(srcIPs) > 0 {
 		srcPort := ctx.GetSourcePort()
-		ev.Source = ptr(net.JoinHostPort(srcIPs[0].String(), srcPort.String()))
+		ev.Source = new(net.JoinHostPort(srcIPs[0].String(), srcPort.String()))
 	}
 
 	targetPort := ctx.GetTargetPort()
 	if domain := ctx.GetTargetDomain(); domain != "" {
-		ev.Destination = ptr(net.JoinHostPort(domain, targetPort.String()))
+		ev.Destination = new(net.JoinHostPort(domain, targetPort.String()))
 	} else if targetIPs := ctx.GetTargetIPs(); len(targetIPs) > 0 {
-		ev.Destination = ptr(net.JoinHostPort(targetIPs[0].String(), targetPort.String()))
+		ev.Destination = new(net.JoinHostPort(targetIPs[0].String(), targetPort.String()))
 	}
 
 	if localIPs := ctx.GetLocalIPs(); len(localIPs) > 0 {
 		localPort := ctx.GetLocalPort()
-		ev.InboundLocal = ptr(net.JoinHostPort(localIPs[0].String(), localPort.String()))
+		ev.InboundLocal = new(net.JoinHostPort(localIPs[0].String(), localPort.String()))
 	}
 
 	if sctx, ok := ctx.(*routing_session.Context); ok {
@@ -145,17 +145,17 @@ func buildEvent(ctx routing.Context, outboundTag string) *event {
 
 func enrichFromSession(ev *event, sctx *routing_session.Context) {
 	if sctx.Inbound != nil {
-		ev.InboundName = ptr(sctx.Inbound.Name)
+		ev.InboundName = new(sctx.Inbound.Name)
 		if sctx.Inbound.User != nil {
-			ev.Level = ptr(sctx.Inbound.User.Level)
+			ev.Level = new(sctx.Inbound.User.Level)
 		}
 	}
 	if sctx.Outbound != nil {
 		if sctx.Outbound.OriginalTarget.Address != nil {
-			ev.OriginalTarget = ptr(sctx.Outbound.OriginalTarget.String())
+			ev.OriginalTarget = new(sctx.Outbound.OriginalTarget.String())
 		}
 		if sctx.Outbound.RouteTarget.Address != nil {
-			ev.RouteTarget = ptr(sctx.Outbound.RouteTarget.String())
+			ev.RouteTarget = new(sctx.Outbound.RouteTarget.String())
 		}
 	}
 }

@@ -167,10 +167,7 @@ func expandSymmetricNATCandidates(candidates []netip.AddrPort, seen map[netip.Ad
 			continue
 		}
 		start := int(ports[0])
-		end := int(ports[len(ports)-1]) + symmetricNATExtraPorts
-		if end > 65535 {
-			end = 65535
-		}
+		end := min(int(ports[len(ports)-1])+symmetricNATExtraPorts, 65535)
 		added := 0
 		for port := start; port <= end && added < symmetricNATMaxPortsPerHost; port++ {
 			addr := netip.AddrPortFrom(ip, uint16(port))

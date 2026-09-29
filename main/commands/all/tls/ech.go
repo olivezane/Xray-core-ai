@@ -40,12 +40,10 @@ var (
 )
 
 func executeECH(cmd *base.Command, args []string) {
-	var kem uint16
-
 	// if *input_pqSignatureSchemesEnabled {
 	// 	kem = 0x30 // hpke.KEM_X25519_KYBER768_DRAFT00
 	// } else {
-	kem = hpke.DHKEM(ecdh.X25519()).ID()
+	kem := hpke.DHKEM(ecdh.X25519()).ID()
 	// }
 
 	echConfig, priv, err := generateECHKeySet(0, *input_serverName, kem)

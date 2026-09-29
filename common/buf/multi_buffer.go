@@ -260,7 +260,7 @@ func (mb MultiBuffer) IsEmpty() bool {
 
 // String returns the content of the MultiBuffer in string.
 func (mb MultiBuffer) String() string {
-	v := make([]interface{}, len(mb))
+	v := make([]any, len(mb))
 	for i, b := range mb {
 		v[i] = b
 	}

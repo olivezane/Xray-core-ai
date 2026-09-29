@@ -214,6 +214,7 @@ func Test_ListenXHAndDial_H2C(t *testing.T) {
 
 	resp, err := client.Get("http://" + net.LocalHostIP.String() + ":" + listenPort.String())
 	common.Must(err)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 404 {
 		t.Error("Expected 404 but got:", resp.StatusCode)

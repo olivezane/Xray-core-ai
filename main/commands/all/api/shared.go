@@ -40,7 +40,7 @@ func setSharedFlags(cmd *base.Command) {
 
 func dialAPIServer() (conn *grpc.ClientConn, ctx context.Context, close func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(apiTimeout)*time.Second)
-	conn, err := grpc.DialContext(ctx, apiServerAddrPtr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, apiServerAddrPtr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()) //nolint:staticcheck // grpc.NewClient has no blocking-dial equivalent; migrating needs an explicit state-wait loop
 	if err != nil {
 		base.Fatalf("failed to dial %s", apiServerAddrPtr)
 	}
@@ -120,9 +120,9 @@ func showJSONResponse(m proto.Message) {
 	}
 }
 
-func isNil(i interface{}) bool {
+func isNil(i any) bool {
 	vi := reflect.ValueOf(i)
-	if vi.Kind() == reflect.Ptr {
+	if vi.Kind() == reflect.Pointer {
 		return vi.IsNil()
 	}
 	return i == nil

@@ -7,7 +7,7 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 )
 
-type ConfigCreator func() interface{}
+type ConfigCreator func() any
 
 type ConfigCreatorCache map[string]ConfigCreator
 
@@ -20,7 +20,7 @@ func (v ConfigCreatorCache) RegisterCreator(id string, creator ConfigCreator) er
 	return nil
 }
 
-func (v ConfigCreatorCache) CreateConfig(id string) (interface{}, error) {
+func (v ConfigCreatorCache) CreateConfig(id string) (any, error) {
 	creator, found := v[id]
 	if !found {
 		return nil, errors.New("unknown config id: ", id)
@@ -42,7 +42,7 @@ func NewJSONConfigLoader(cache ConfigCreatorCache, idKey string, configKey strin
 	}
 }
 
-func (v *JSONConfigLoader) LoadWithID(raw []byte, id string) (interface{}, error) {
+func (v *JSONConfigLoader) LoadWithID(raw []byte, id string) (any, error) {
 	id = strings.ToLower(id)
 	config, err := v.cache.CreateConfig(id)
 	if err != nil {
@@ -54,7 +54,7 @@ func (v *JSONConfigLoader) LoadWithID(raw []byte, id string) (interface{}, error
 	return config, nil
 }
 
-func (v *JSONConfigLoader) Load(raw []byte) (interface{}, string, error) {
+func (v *JSONConfigLoader) Load(raw []byte) (any, string, error) {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &obj); err != nil {
 		return nil, "", err

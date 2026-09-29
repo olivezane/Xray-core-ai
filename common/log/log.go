@@ -19,7 +19,7 @@ type Handler interface {
 // GeneralMessage is a general log message that can contain all kind of content.
 type GeneralMessage struct {
 	Severity Severity
-	Content  interface{}
+	Content  any
 }
 
 // String implements Message.

@@ -50,10 +50,10 @@ func NewDoHNameServer(url *url.URL, dispatcher routing.Dispatcher, h2c bool, dis
 		clientIP:        clientIP,
 	}
 	s.httpClient = &http.Client{
-		Transport: &http2.Transport{
-			IdleConnTimeout: net.ConnIdleTimeout,
-			ReadIdleTimeout: net.ChromeH2KeepAlivePeriod,
-			DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+		Transport: &http2.Transport{ //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+			IdleConnTimeout: net.ConnIdleTimeout,         //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+			ReadIdleTimeout: net.ChromeH2KeepAlivePeriod, //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+			DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) { //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 				dest, err := net.ParseDestination(network + ":" + addr)
 				if err != nil {
 					return nil, err

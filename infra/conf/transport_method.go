@@ -229,8 +229,8 @@ func (v *Authenticator) Build() (proto.Message, error) {
 }
 
 var tcpHeaderLoader = NewJSONConfigLoader(ConfigCreatorCache{
-	"none": func() interface{} { return new(NoOpConnectionAuthenticator) },
-	"http": func() interface{} { return new(Authenticator) },
+	"none": func() any { return new(NoOpConnectionAuthenticator) },
+	"http": func() any { return new(Authenticator) },
 }, "type", "")
 
 type TCPConfig struct {
@@ -720,7 +720,7 @@ func (b Bandwidth) Bps() (uint64, error) {
 		return 0, err
 	}
 
-	mul := uint64(1)
+	var mul uint64
 	switch unit {
 	case "", "b", "bps":
 		mul = Byte

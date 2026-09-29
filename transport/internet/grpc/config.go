@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() interface{} {
+	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() any {
 		return new(Config)
 	}))
 }
@@ -21,10 +21,7 @@ func (c *Config) getServiceName() string {
 	}
 
 	// Otherwise new custom paths
-	lastIndex := strings.LastIndex(c.ServiceName, "/")
-	if lastIndex < 1 {
-		lastIndex = 1
-	}
+	lastIndex := max(strings.LastIndex(c.ServiceName, "/"), 1)
 	rawServiceName := c.ServiceName[1:lastIndex] // trim from first to last '/'
 	serviceNameParts := strings.Split(rawServiceName, "/")
 	for i := range serviceNameParts {

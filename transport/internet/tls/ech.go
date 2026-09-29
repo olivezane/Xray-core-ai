@@ -194,10 +194,10 @@ func dnsQuery(server string, domain string, sockopt *internet.SocketConfig) ([]b
 		if client, _ = clientForECHDOH.Load(serverKey); client == nil {
 			// All traffic sent by core should via xray's internet.DialSystem
 			// This involves the behavior of some Android VPN GUI clients
-			tr := &http2.Transport{
-				IdleConnTimeout: net.ConnIdleTimeout,
-				ReadIdleTimeout: net.ChromeH2KeepAlivePeriod,
-				DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+			tr := &http2.Transport{ //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+				IdleConnTimeout: net.ConnIdleTimeout,         //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+				ReadIdleTimeout: net.ChromeH2KeepAlivePeriod, //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
+				DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) { //nolint:staticcheck // TODO: migrate to net/http Transport (needs ALPN re-validation)
 					dest, err := net.ParseDestination(network + ":" + addr)
 					if err != nil {
 						return nil, err

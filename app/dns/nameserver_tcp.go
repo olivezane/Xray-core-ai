@@ -23,7 +23,7 @@ import (
 type TCPNameServer struct {
 	cacheController *CacheController
 	destination     *net.Destination
-	reqID           uint32
+	reqID           atomic.Uint32
 	dial            func(context.Context) (net.Conn, error)
 	clientIP        net.IP
 }
@@ -101,7 +101,7 @@ func (s *TCPNameServer) IsDisableCache() bool {
 }
 
 func (s *TCPNameServer) newReqID() uint16 {
-	return uint16(atomic.AddUint32(&s.reqID, 1))
+	return uint16(s.reqID.Add(1))
 }
 
 // getCacheController implements CachedNameserver.

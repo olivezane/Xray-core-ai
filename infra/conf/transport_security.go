@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -114,10 +115,10 @@ func (c *REALITYConfig) Build() (proto.Message, error) {
 				}
 			}
 			// errors.LogWarning(context.Background(), `REALITY: Changing "minClientVer" will increase the likelihood of your server's IP being blocked by the GFW`)
-		} else {
-			// config.MinClientVer = []byte{26, 3, 27} // change it at your own risk: https://github.com/XTLS/Xray-core/commit/af7eb68028732a8ee3c0e5d6ab2b8a657bb2e770
-			// errors.LogWarning(context.Background(), `REALITY: The default minimal client version is Xray-core v26.3.27, other clients may be refused to connect`)
 		}
+		// Otherwise the default minimal client version applies:
+		// config.MinClientVer = []byte{26, 3, 27} // change it at your own risk: https://github.com/XTLS/Xray-core/commit/af7eb68028732a8ee3c0e5d6ab2b8a657bb2e770
+		// errors.LogWarning(context.Background(), `REALITY: The default minimal client version is Xray-core v26.3.27, other clients may be refused to connect`)
 		if c.MaxClientVer != "" {
 			config.MaxClientVer = make([]byte, 3)
 			var u uint64
@@ -337,10 +338,8 @@ func (c *TLSConfig) Build() (proto.Message, error) {
 		config.NextProtocol = []string(*c.ALPN)
 	}
 	if len(config.NextProtocol) > 1 {
-		for _, p := range config.NextProtocol {
-			if tls.IsFromMitm(p) {
-				return nil, errors.New(`only one element is allowed in "alpn" when using "fromMitm" in it`)
-			}
+		if slices.ContainsFunc(config.NextProtocol, tls.IsFromMitm) {
+			return nil, errors.New(`only one element is allowed in "alpn" when using "fromMitm" in it`)
 		}
 	}
 	if c.CurvePreferences != nil && len(*c.CurvePreferences) > 0 {

@@ -89,7 +89,7 @@ func reload() error {
 	return errors.Combine(commongeodata.IPReg.Reload(), commongeodata.DomainReg.Reload())
 }
 
-func (g *Instance) Type() interface{} {
+func (g *Instance) Type() any {
 	return (*Instance)(nil)
 }
 
@@ -128,7 +128,7 @@ func (g *Instance) Close() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg any) (any, error) {
 		return New(ctx, cfg.(*Config))
 	}))
 }

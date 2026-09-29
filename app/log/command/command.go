@@ -48,7 +48,7 @@ func (s *service) Register(server *grpc.Server) {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg interface{}) (interface{}, error) {
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg any) (any, error) {
 		s := core.MustFromContext(ctx)
 		return &service{v: s}, nil
 	}))

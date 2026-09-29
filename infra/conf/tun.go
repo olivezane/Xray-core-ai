@@ -85,7 +85,7 @@ func GetAvailableTunName() (string, error) {
 
 	rangeSize := maxTunIndex - minTunIndex + 1
 
-	for offset := 0; offset < rangeSize; offset++ {
+	for offset := range rangeSize {
 		index := minTunIndex + (startIndex-minTunIndex+offset)%rangeSize
 		name := tunNamePrefix + strconv.Itoa(index)
 

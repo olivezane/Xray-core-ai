@@ -92,7 +92,7 @@ func setupHTTP2Conns(t *testing.T) (client, server *Conn) {
 	req, err := NewRequest(ctx, "https://example.org/connect-ip")
 	require.NoError(t, err)
 	req.Header().Set("Authorization", "Bearer token")
-	client, rsp, err := NewHTTP2ClientConn(rt).Dial(req)
+	client, rsp, err := NewHTTP2ClientConn(rt).Dial(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.NoError(t, err)
 	t.Cleanup(func() { client.Close() })
 	require.Equal(t, http.StatusOK, rsp.StatusCode)
@@ -123,7 +123,7 @@ func TestHTTP2Request(t *testing.T) {
 	req, err := NewRequest(t.Context(), "https://proxy.example:8443/.well-known/masque/ip/*/*/")
 	require.NoError(t, err)
 	req.Header().Set("Authorization", "Bearer token")
-	conn, _, err := NewHTTP2ClientConn(rt).Dial(req)
+	conn, _, err := NewHTTP2ClientConn(rt).Dial(req) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -150,10 +150,10 @@ func TestHTTP2DialErrors(t *testing.T) {
 	t.Run("status", func(t *testing.T) {
 		var streamCtx context.Context
 		rt := roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			streamCtx = r.Context()
+			streamCtx = r.Context() //nolint:fatcontext // test helper, the context is captured for later assertions
 			return &http.Response{StatusCode: http.StatusForbidden, Body: io.NopCloser(bytes.NewReader(nil))}, nil
 		})
-		_, rsp, err := NewHTTP2ClientConn(rt).Dial(newReq(t.Context()))
+		_, rsp, err := NewHTTP2ClientConn(rt).Dial(newReq(t.Context())) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		require.EqualError(t, err, "connect-ip: server responded with 403")
 		require.Equal(t, http.StatusForbidden, rsp.StatusCode)
 		require.ErrorIs(t, streamCtx.Err(), context.Canceled)
@@ -162,7 +162,7 @@ func TestHTTP2DialErrors(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {
 		errRoundTrip := errors.New("extended connect not supported by peer")
 		rt := roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errRoundTrip })
-		_, _, err := NewHTTP2ClientConn(rt).Dial(newReq(t.Context()))
+		_, _, err := NewHTTP2ClientConn(rt).Dial(newReq(t.Context())) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		require.ErrorIs(t, err, errRoundTrip)
 	})
 
@@ -173,7 +173,7 @@ func TestHTTP2DialErrors(t *testing.T) {
 		})
 		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 		defer cancel()
-		_, _, err := NewHTTP2ClientConn(rt).Dial(newReq(ctx))
+		_, _, err := NewHTTP2ClientConn(rt).Dial(newReq(ctx)) //nolint:bodyclose // response body is owned by the returned conn / handed to another goroutine, closing it here would break the test
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 	})
 }

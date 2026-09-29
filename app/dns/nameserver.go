@@ -36,7 +36,7 @@ type Client struct {
 	actPrior      bool
 	actUnprior    bool
 	tag           string
-	timeoutMs     time.Duration
+	timeout       time.Duration
 	finalQuery    bool
 	ipOption      *dns.IPOption
 	checkSystem   bool
@@ -135,9 +135,9 @@ func NewClient(
 			}
 		}
 
-		timeoutMs := 4000 * time.Millisecond
+		timeout := 4000 * time.Millisecond
 		if ns.TimeoutMs > 0 {
-			timeoutMs = time.Duration(ns.TimeoutMs) * time.Millisecond
+			timeout = time.Duration(ns.TimeoutMs) * time.Millisecond
 		}
 
 		checkSystem := ns.QueryStrategy == QueryStrategy_USE_SYS
@@ -149,7 +149,7 @@ func NewClient(
 		client.actPrior = ns.ActPrior
 		client.actUnprior = ns.ActUnprior
 		client.tag = tag
-		client.timeoutMs = timeoutMs
+		client.timeout = timeout
 		client.finalQuery = ns.FinalQuery
 		client.ipOption = &ipOption
 		client.checkSystem = checkSystem
@@ -179,7 +179,7 @@ func (c *Client) QueryIP(ctx context.Context, domain string, option dns.IPOption
 		return nil, 0, dns.ErrEmptyResponse
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, c.timeoutMs)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	ctx = session.ContextWithInbound(ctx, &session.Inbound{Tag: c.tag})
 	ips, ttl, err := c.server.QueryIP(ctx, domain, option)
 	cancel()

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -723,8 +724,8 @@ func (t *DarwinTun) unsetSystemRoutes() error {
 	if indexErr != nil && len(t.systemRoutes) > 0 {
 		errs = append(errs, indexErr)
 	}
-	for i := len(t.systemRoutes) - 1; i >= 0; i-- {
-		destination := t.systemRoutes[i]
+	for _, destination := range slices.Backward(t.systemRoutes) {
+
 		if err := execDarwinRoute(unix.RTM_DELETE, tunIndex, destination, t.gateway); err != nil && !errors.Is(err, unix.ESRCH) {
 			errs = append(errs, xerrors.New("failed to delete system route ", destination).Base(err))
 		}
@@ -766,7 +767,7 @@ func buildDarwinSystemRoutes(configured []string) ([]netip.Prefix, error) {
 
 func darwinProtectedDefaultRoutes(ipv4 bool) []netip.Prefix {
 	routes := make([]netip.Prefix, 0, 8)
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		if ipv4 {
 			var address [4]byte
 			address[0] = 1 << i
