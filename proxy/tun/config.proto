@@ -15,7 +15,8 @@ message Config {
   repeated string auto_system_routing_table = 6;
   string auto_outbounds_interface = 7;
   string desc = 8;
-  bool auto_system_dns = 9;
-  string stack = 10;
-  string tcp_congestion = 11;
+  bool auto_system_dns_to_gateway = 9;
+  repeated string auto_system_wfp_block_leak = 10;
+  string stack = 11;
+  string tcp_congestion = 12;
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/cipher"
 	"encoding/binary"
-	"io"
 	"strconv"
 	"time"
 
@@ -15,9 +14,6 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/session"
-	"github.com/xtls/xray-core/common/signal"
-	"github.com/xtls/xray-core/common/task"
-	"github.com/xtls/xray-core/common/utils"
 	"github.com/xtls/xray-core/common/uuid"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/policy"
@@ -35,18 +31,17 @@ type relayDest struct {
 	destination net.Destination
 	email       string
 	level       uint32
-	key         []byte
 	blockCipher cipher.Block
 }
 
 type RelayInbound struct {
-	networks        []net.Network
-	method          *CipherMethod
-	relayPSK        []byte
-	relayBlock      cipher.Block
-	destinations    map[[AESBlockSize]byte]*relayDest
-	rawDestinations []*RelayDestination
-	policyManager   policy.Manager
+	networks      []net.Network
+	method        *CipherMethod
+	relayPSK      []byte
+	relayBlock    cipher.Block
+	destinations  map[[AESBlockSize]byte]*relayDest
+	udpSessions   *UDPSessionManager
+	policyManager policy.Manager
 }
 
 func NewRelayServer(ctx context.Context, config *RelayServerConfig) (*RelayInbound, error) {
@@ -77,18 +72,14 @@ func NewRelayServer(ctx context.Context, config *RelayServerConfig) (*RelayInbou
 	}
 
 	v := core.MustFromContext(ctx)
-	pm, ok := v.GetFeature(policy.ManagerType()).(policy.Manager)
-	if !ok {
-		return nil, errors.New("policy.Manager is not registered in Xray core")
-	}
 	i := &RelayInbound{
-		networks:        networks,
-		method:          method,
-		relayPSK:        relayPSK,
-		relayBlock:      relayBlock,
-		destinations:    make(map[[AESBlockSize]byte]*relayDest),
-		rawDestinations: config.Destinations,
-		policyManager:   pm,
+		networks:      networks,
+		method:        method,
+		relayPSK:      relayPSK,
+		relayBlock:    relayBlock,
+		destinations:  make(map[[AESBlockSize]byte]*relayDest),
+		udpSessions:   NewUDPSessionManager(500 * time.Second),
+		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
 	}
 
 	for idx, d := range config.Destinations {
@@ -109,10 +100,9 @@ func NewRelayServer(ctx context.Context, config *RelayServerConfig) (*RelayInbou
 		hash := DeriveUserPSKHash(destKey)
 
 		i.destinations[hash] = &relayDest{
-			destination: net.TCPDestination(d.Address.AsAddress(), net.Port(d.Port)), //nolint:gosec // the user level is a small config value
+			destination: net.TCPDestination(d.Address.AsAddress(), net.Port(d.Port)),
 			email:       d.Email,
-			level:       uint32(d.Level), //nolint:gosec // the user level is a small config value
-			key:         destKey,
+			level:       uint32(d.Level),
 			blockCipher: destBlock,
 		}
 	}
@@ -143,31 +133,39 @@ func (i *RelayInbound) processTCP(ctx context.Context, conn net.Conn, dispatcher
 		return errors.New("unable to set read deadline").Base(err)
 	}
 
-	// Read Salt + Outer EIH
+	// Read initial handshake in a single read call per SIP022 §3.1.3 & §3.1.4
 	needed := i.method.KeySaltLength + AESBlockSize
-	var headerBuf [48]byte
-	headerSlice := headerBuf[:needed]
-	if _, err := io.ReadFull(conn, headerSlice); err != nil {
-		return err
-	}
-
-	salt := headerSlice[:i.method.KeySaltLength]
-	eih := headerSlice[i.method.KeySaltLength:]
-
-	identitySubkey := DeriveIdentitySubKey(i.relayPSK, salt, i.method.KeySaltLength)
-	block, err := i.method.NewBlock(identitySubkey)
+	requestHeader := buf.New()
+	n, err := requestHeader.ReadFrom(conn)
 	if err != nil {
+		requestHeader.Release()
+		ResetTCPConn(conn)
 		return err
 	}
+	if int(n) < needed {
+		requestHeader.Release()
+		ResetTCPConn(conn)
+		return ErrInvalidRequest
+	}
 
-	var decryptedHash [AESBlockSize]byte
-	block.Decrypt(decryptedHash[:], eih)
+	headerSlice := requestHeader.Bytes()
+	salt := headerSlice[:i.method.KeySaltLength]
+	eih := headerSlice[i.method.KeySaltLength:needed]
+
+	decryptedHash, err := DecryptEIH(i.method, i.relayPSK, salt, eih)
+	if err != nil {
+		requestHeader.Release()
+		ResetTCPConn(conn)
+		return err
+	}
 
 	targetDest, ok := i.destinations[decryptedHash]
 	if !ok {
+		requestHeader.Release()
+		ResetTCPConn(conn)
 		return ErrInvalidRequest
 	}
-	_ = conn.SetReadDeadline(time.Time{})
+	conn.SetReadDeadline(time.Time{})
 
 	inbound := session.InboundFromContext(ctx)
 	inbound.User = &protocol.MemoryUser{
@@ -186,47 +184,26 @@ func (i *RelayInbound) processTCP(ctx context.Context, conn net.Conn, dispatcher
 
 	link, err := dispatcher.Dispatch(ctx, targetDest.destination)
 	if err != nil {
+		requestHeader.Release()
 		return err
 	}
 
-	// Unwrap outer EIH: send client salt to next hop, stripping this hop's EIH
-	saltBuf := buf.New()
-	if _, err := saltBuf.Write(salt); err != nil {
+	// Unwrap outer EIH: send client salt and remaining handshake bytes to next hop
+	// in a single write call, satisfying downstream server's single-read handshake expectation (SIP022 §3.1.3).
+	var saltCopy [32]byte
+	copy(saltCopy[:i.method.KeySaltLength], salt)
+	copy(requestHeader.Bytes()[AESBlockSize:AESBlockSize+i.method.KeySaltLength], saltCopy[:i.method.KeySaltLength])
+	requestHeader.Advance(AESBlockSize)
+
+	if err := link.Writer.WriteMultiBuffer(buf.MultiBuffer{requestHeader}); err != nil {
 		return err
 	}
-	if err := link.Writer.WriteMultiBuffer(buf.MultiBuffer{saltBuf}); err != nil {
-		return err
-	}
 
-	sessionPolicy = i.policyManager.ForLevel(targetDest.level)
-	ctx, cancel := context.WithCancel(ctx)
-	timer := signal.CancelAfterInactivity(ctx, cancel, sessionPolicy.Timeouts.ConnectionIdle)
-	ctx = policy.ContextWithBufferPolicy(ctx, sessionPolicy.Buffer)
-
-	requestDone := func() error {
-		defer timer.SetTimeout(sessionPolicy.Timeouts.DownlinkOnly)
-		return buf.Copy(buf.NewReader(conn), link.Writer, buf.UpdateActivity(timer))
-	}
-
-	responseDone := func() error {
-		defer timer.SetTimeout(sessionPolicy.Timeouts.UplinkOnly)
-		return buf.Copy(link.Reader, buf.NewWriter(conn), buf.UpdateActivity(timer))
-	}
-
-	responseDoneAndCloseWriter := task.OnSuccess(responseDone, task.Close(link.Writer))
-	return task.Run(ctx, requestDone, responseDoneAndCloseWriter)
+	return TransportTCP(ctx, i.policyManager.ForLevel(targetDest.level), buf.NewReader(conn), buf.NewWriter(conn), link)
 }
 
 func (i *RelayInbound) processUDP(ctx context.Context, conn stat.Connection, dispatcher routing.Dispatcher) error {
-	udpConns := utils.NewTypedSyncMap[uint64, *udpConnEntry]()
-	defer func() {
-		udpConns.Range(func(key uint64, entry *udpConnEntry) bool {
-			entry.timer.SetTimeout(0)
-			return true
-		})
-	}()
-
-	reader := buf.NewReader(conn)
+	reader := buf.NewPacketReader(conn)
 	for {
 		mb, err := reader.ReadMultiBuffer()
 		if err != nil {
@@ -244,11 +221,7 @@ func (i *RelayInbound) processUDP(ctx context.Context, conn stat.Connection, dis
 			var packetHeader [AESBlockSize]byte
 			i.relayBlock.Decrypt(packetHeader[:], data[:AESBlockSize])
 
-			var eiHeader [AESBlockSize]byte
-			i.relayBlock.Decrypt(eiHeader[:], data[AESBlockSize:2*AESBlockSize])
-			for idx := range AESBlockSize {
-				eiHeader[idx] ^= packetHeader[idx]
-			}
+			eiHeader := DecryptUDPEIH(i.relayBlock, packetHeader[:], data[AESBlockSize:2*AESBlockSize])
 
 			targetDest, ok := i.destinations[eiHeader]
 			if !ok {
@@ -269,68 +242,24 @@ func (i *RelayInbound) processUDP(ctx context.Context, conn stat.Connection, dis
 			dest := targetDest.destination
 			dest.Network = net.Network_UDP
 
-			entry, ok := udpConns.Load(sessionID)
-			if !ok {
-				sessCtx, cancel := context.WithCancel(ctx)
-				inbound := session.InboundFromContext(sessCtx)
-				inbound.User = &protocol.MemoryUser{
-					Email: targetDest.email,
-					Level: targetDest.level,
+			sessionItem := i.udpSessions.GetOrCreate(sessionID)
+			if sessionItem.User == nil {
+				sessionItem.Lock()
+				if sessionItem.User == nil {
+					sessionItem.User = &protocol.MemoryUser{
+						Email: targetDest.email,
+						Level: targetDest.level,
+					}
 				}
-
-				sessCtx = log.ContextWithAccessMessage(sessCtx, &log.AccessMessage{
-					From:   conn.RemoteAddr(),
-					To:     dest,
-					Status: log.AccessAccepted,
-					Email:  targetDest.email,
-				})
-
-				link, err := dispatcher.Dispatch(sessCtx, dest)
-				if err != nil {
-					cancel()
-					b.Release()
-					continue
-				}
-
-				newEntry := &udpConnEntry{
-					link:   link,
-					cancel: cancel,
-				}
-				sessionPolicy := i.policyManager.ForLevel(targetDest.level)
-				newEntry.timer = signal.CancelAfterInactivity(sessCtx, func() {
-					udpConns.Delete(sessionID)
-					common.Interrupt(link.Reader)
-					common.Interrupt(link.Writer)
-					cancel()
-				}, sessionPolicy.Timeouts.ConnectionIdle)
-
-				actual, loaded := udpConns.LoadOrStore(sessionID, newEntry)
-				if loaded {
-					newEntry.timer.SetTimeout(0)
-					entry = actual
-				} else {
-					entry = newEntry
-					go func(cEntry *udpConnEntry) {
-						defer func() {
-							cEntry.timer.SetTimeout(0)
-						}()
-						for {
-							resMb, err := cEntry.link.Reader.ReadMultiBuffer()
-							if err != nil {
-								return
-							}
-							cEntry.timer.Update()
-							for _, rb := range resMb {
-								_, _ = conn.Write(rb.Bytes())
-								rb.Release()
-							}
-						}
-					}(entry)
-				}
+				sessionItem.Unlock()
+			}
+			link, err := sessionItem.EnsureLink(ctx, conn, dest, dispatcher, i.policyManager, nil)
+			if err != nil {
+				b.Release()
+				continue
 			}
 
-			entry.timer.Update()
-			_ = entry.link.Writer.WriteMultiBuffer(buf.MultiBuffer{b})
+			_ = link.Writer.WriteMultiBuffer(buf.MultiBuffer{b})
 		}
 	}
 }
