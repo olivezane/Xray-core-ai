@@ -152,7 +152,7 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 			return errors.New("failed to create UDP connection").Base(err)
 		}
 		defer conn.Close()
-		pc, ok := conn.(*internet.PacketConnWrapper)
+		pc, ok := conn.(*net.PacketConnWrapper)
 		if !ok {
 			return errors.New("unexpected UDP connection type: ", conn)
 		}

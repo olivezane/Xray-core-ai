@@ -119,7 +119,7 @@ func NewServer(ctx context.Context, conf *DeviceConfig) (*Server, error) {
 		users.Store(user.Account.(*MemoryAccount).Pub, user)
 	}
 
-	return &Server{
+	s := &Server{
 		conf:          conf,
 		ctx:           core.ToBackgroundDetachedContext(ctx),
 		policyManager: p,
@@ -137,7 +137,10 @@ func NewServer(ctx context.Context, conf *DeviceConfig) (*Server, error) {
 
 		pub:   pub,
 		users: users,
-	}, nil
+	}
+	// Install the stack's protocol handlers before the device can deliver packets to it (Start -> dev.Up).
+	CreateForwarder(stack, s.HandleConnection)
+	return s, nil
 }
 
 func (s *Server) AddUser(ctx context.Context, user *protocol.MemoryUser) error {
@@ -352,7 +355,6 @@ func (s *Server) Start() error {
 		return err
 	}
 	s.dev = dev
-	CreateForwarder(s.stack, s.HandleConnection)
 	return nil
 }
 

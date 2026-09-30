@@ -120,7 +120,7 @@ func (c *client) dial(ctx context.Context) error {
 			return errors.New("failed to dial to dest").Base(err)
 		}
 		//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
-		pktConn = conn.(*finalmask.PacketConnWrapper).PacketConn
+		pktConn = conn.(*net.PacketConnWrapper).PacketConn
 		udpAddr = conn.RemoteAddr()
 	} else {
 		conn, err := internet.DialSystem(ctx, c.dest, c.socketConfig)
@@ -128,7 +128,7 @@ func (c *client) dial(ctx context.Context) error {
 			return errors.New("failed to dial to dest").Base(err)
 		}
 		switch c := conn.(type) {
-		case *internet.PacketConnWrapper:
+		case *net.PacketConnWrapper:
 			pktConn = c.PacketConn
 			udpAddr = c.RemoteAddr()
 		case *cnc.Connection:

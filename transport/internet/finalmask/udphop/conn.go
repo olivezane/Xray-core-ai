@@ -74,7 +74,7 @@ func NewUDPHopConn(c *Config, dest *net.Destination, dialer *finalmask.Dialer) (
 		return nil, err
 	}
 	//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
-	cur := conn.(*finalmask.PacketConnWrapper).PacketConn
+	cur := conn.(*net.PacketConnWrapper).PacketConn
 	//nolint:forcetypeassert // the socket was created by this package as a UDP socket
 	addr := conn.RemoteAddr().(*net.UDPAddr)
 	client := &udpHopConn{
@@ -153,7 +153,7 @@ func (c *udpHopConn) hop() {
 		}
 		c.pre = c.cur
 		//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
-		c.cur = conn.(*finalmask.PacketConnWrapper).PacketConn
+		c.cur = conn.(*net.PacketConnWrapper).PacketConn
 		c.wg.Add(1)
 		go c.recv(c.cur)
 	}
@@ -227,13 +227,6 @@ func (c *udpHopConn) Close() error {
 	}
 	_ = c.cur.Close()
 	c.wg.Wait()
-	select {
-	case packet := <-c.readCh:
-		if packet.p != nil {
-			pool.Put(packet.p[:cap(packet.p)]) //nolint:staticcheck // SA6002: per-packet path; switching the pool to *[]byte needs a benchmark before it is touched
-		}
-	default:
-	}
 	close(c.readCh)
 	return nil
 }

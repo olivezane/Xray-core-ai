@@ -321,7 +321,7 @@ func TestPacketConnReadWrite(t *testing.T) {
 			}
 			t.Cleanup(func() { _ = clientConn.Close() })
 			//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
-			client := clientConn.(*finalmask.PacketConnWrapper).PacketConn
+			client := clientConn.(*net.PacketConnWrapper).PacketConn
 
 			_ = client.SetDeadline(time.Now().Add(time.Second))
 			_ = server.SetDeadline(time.Now().Add(time.Second))

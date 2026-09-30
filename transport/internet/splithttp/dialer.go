@@ -25,7 +25,6 @@ import (
 	"github.com/xtls/xray-core/common/signal/done"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/browser_dialer"
-	"github.com/xtls/xray-core/transport/internet/finalmask"
 	"github.com/xtls/xray-core/transport/internet/hysteria/congestion"
 	"github.com/xtls/xray-core/transport/internet/hysteria/congestion/bbr"
 	"github.com/xtls/xray-core/transport/internet/reality"
@@ -208,7 +207,7 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 						return nil, errors.New("failed to dial to dest").Base(err)
 					}
 					//nolint:forcetypeassert // finalmask wraps every packet conn it hands out
-					pktConn = conn.(*finalmask.PacketConnWrapper).PacketConn
+					pktConn = conn.(*net.PacketConnWrapper).PacketConn
 					udpAddr = conn.RemoteAddr()
 				} else {
 					conn, err := internet.DialSystem(ctx, dest, streamSettings.SocketSettings)
@@ -216,7 +215,7 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 						return nil, errors.New("failed to dial to dest").Base(err)
 					}
 					switch c := conn.(type) {
-					case *internet.PacketConnWrapper:
+					case *net.PacketConnWrapper:
 						pktConn = c.PacketConn
 						udpAddr = c.RemoteAddr()
 					case *cnc.Connection:
