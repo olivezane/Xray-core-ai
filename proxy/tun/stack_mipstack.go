@@ -109,6 +109,21 @@ func newMipstack(ctx context.Context, options StackOptions, handler ConnectionHa
 		return nil, xerrors.New("failed to create the ", StackMipstack, " network stack").Base(err)
 	}
 
+	// the input link of this inbound completes every checksum it carries: the
+	// TUN device is opened without checksum offload features, so the kernel
+	// finishes each packet before the device hands it over, and the gVisor
+	// Stack of the same inbound already trusts that link (RXChecksumOffload on
+	// its endpoint). Verifying again would only repeat work the link has done,
+	// so every category is delegated to it.
+	var offload mipstack.RXChecksumOffload
+	mips.SetRXChecksumOffload(*offload.
+		SetIPv4Header(true).
+		SetTCP(true).
+		SetUDP(true).
+		SetICMPv4(true).
+		SetICMPv6(true).
+		SetIGMP(true))
+
 	stack := &stackMipstack{
 		ctx:         ctx,
 		device:      device,

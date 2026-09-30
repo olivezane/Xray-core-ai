@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/metacubex/mipstack"
+	"github.com/xtls/xray-core/common/buf"
 	xnet "github.com/xtls/xray-core/common/net"
 )
 
@@ -253,5 +254,74 @@ func TestMipstackCarriesTCPToTheConnectionHandler(t *testing.T) {
 	}
 	if string(response) != "pong" {
 		t.Fatalf("reply = %q, want %q", response, "pong")
+	}
+}
+
+// TestMipstackAcceptsUnverifiedChecksums locks in that the MIPS Stack leaves
+// checksum verification to the input link, the same trust the gVisor Stack of
+// this inbound already has. A real TUN device completes every checksum it
+// carries, so a datagram with a wrong checksum can only come from a test like
+// this one, and the stack must still deliver it to the inbound.
+func TestMipstackAcceptsUnverifiedChecksums(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	device := newBridgeDevice()
+	handler := newRecordingConnectionHandler()
+	stack, err := newMipstack(ctx, StackOptions{
+		Tun:         device,
+		MTU:         mipstackDefaultMTU,
+		IdleTimeout: time.Minute,
+	}, handler)
+	if err != nil {
+		t.Fatalf("create the MIPS Stack: %v", err)
+	}
+	if err := stack.Start(); err != nil {
+		t.Fatalf("start the MIPS Stack: %v", err)
+	}
+	defer device.close()
+	defer stack.Close()
+
+	client := netip.MustParseAddrPort("10.0.0.2:5000")
+	server := netip.MustParseAddrPort("192.0.2.10:53")
+	payload := []byte("query")
+
+	datagram, err := mipstack.UDPDatagram{Source: client, Destination: server, Payload: payload}.MarshalBinary()
+	if err != nil {
+		t.Fatalf("build the datagram: %v", err)
+	}
+	packet, err := mipstack.IPPacket{
+		Source:      client.Addr(),
+		Destination: server.Addr(),
+		Protocol:    mipstack.ProtocolUDP,
+		HopLimit:    64,
+		Payload:     datagram,
+	}.MarshalBinary()
+	if err != nil {
+		t.Fatalf("build the packet: %v", err)
+	}
+
+	// break the checksum: its low byte sits directly before the payload, at the
+	// end of the eight-byte UDP header
+	packet[len(packet)-len(payload)-1] ^= 0xff
+	parsed, err := mipstack.ParseIPPacket(packet)
+	if err != nil {
+		t.Fatalf("parse the test packet: %v", err)
+	}
+	if _, err := parsed.UDPDatagram(); err == nil {
+		t.Fatal("the test packet carries a valid udp checksum, so it proves nothing")
+	}
+
+	if !device.inject(packet) {
+		t.Fatal("the device is closed")
+	}
+
+	accepted := handler.next(t, 10*time.Second)
+	reader, ok := accepted.connection.(buf.Reader)
+	if !ok {
+		t.Fatalf("the intercepted UDP session is no buffer reader: %T", accepted.connection)
+	}
+	if datagrams := readDatagrams(t, reader, 1); datagrams[0].payload != string(payload) {
+		t.Fatalf("the inbound received %q, want the datagram with the broken checksum", datagrams[0].payload)
 	}
 }
