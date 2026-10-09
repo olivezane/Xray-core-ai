@@ -490,6 +490,13 @@ func mipstackUDPDestination(address netip.AddrPort) net.Destination {
 // localAddressesFromGateways turns the configured gateway prefixes into the
 // Local Addresses of the MIPS Stack. Gateways the device itself rejects are
 // skipped, and no Local Address is invented.
+//
+// The host field is masked away on purpose. The gateway address belongs to the
+// host, not to the stack: mipstack sends output addressed to one of its Local
+// Addresses into its loopback queue instead of the device, so a stack owning
+// the gateway address would swallow every reply the inbound sends back to the
+// host. The masked prefix still marks the address family as owned, which is all
+// this transparent forwarder needs from it.
 func localAddressesFromGateways(gateways []string) []netip.Prefix {
 	var addresses []netip.Prefix
 	for _, gateway := range gateways {
