@@ -25,6 +25,9 @@ func (updater *InterfaceUpdater) Get() *net.Interface {
 	return updater.iface
 }
 
+// Update refreshes the cached interface. A failed lookup keeps the last known
+// good interface, so a transient network transition (e.g. wifi -> cellular)
+// does not drop the binding.
 func (updater *InterfaceUpdater) Update() {
 	updater.Lock()
 	defer updater.Unlock()
@@ -32,13 +35,11 @@ func (updater *InterfaceUpdater) Update() {
 	got, err := findOutboundInterface(updater.tunIndex, updater.fixedName)
 	if err != nil {
 		errors.LogInfoInner(context.Background(), err, "[tun] failed to update interface")
-		updater.iface = nil
 		return
 	}
 
 	if got == nil {
 		errors.LogInfo(context.Background(), "[tun] failed to update interface > got == nil")
-		updater.iface = nil
 		return
 	}
 
