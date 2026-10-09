@@ -142,8 +142,12 @@ func (t *Handler) Start() error {
 	errors.LogInfo(t.ctx, tunName, " created")
 
 	tunStackOptions := StackOptions{
-		Tun:         tunInterface,
-		IdleTimeout: t.policyManager.ForLevel(t.config.UserLevel).Timeouts.ConnectionIdle,
+		Tun:           tunInterface,
+		MTU:           t.config.MTU,
+		IdleTimeout:   t.policyManager.ForLevel(t.config.UserLevel).Timeouts.ConnectionIdle,
+		Stack:         t.config.Stack,
+		TCPCongestion: t.config.TcpCongestion,
+		Gateway:       t.config.Gateway,
 	}
 	tunStack, err := NewStack(t.ctx, tunStackOptions, t)
 	if err != nil {

@@ -24,6 +24,9 @@ type udpConnectionHandler struct {
 
 	handleConnection func(conn net.Conn, dest net.Destination)
 	writePacket      func(data []byte, src net.Destination, dst net.Destination) error
+	// onFinished is called with the client address of a session that ended. It
+	// may be nil.
+	onFinished func(src net.Destination)
 }
 
 func newUdpConnectionHandler(handleConnection func(conn net.Conn, dest net.Destination), writePacket func(data []byte, src net.Destination, dst net.Destination) error) *udpConnectionHandler {
@@ -34,6 +37,12 @@ func newUdpConnectionHandler(handleConnection func(conn net.Conn, dest net.Desti
 	}
 
 	return handler
+}
+
+// SetOnFinished registers a callback for the client address of a session that
+// ended. It must be called before the handler starts serving datagrams.
+func (u *udpConnectionHandler) SetOnFinished(onFinished func(src net.Destination)) {
+	u.onFinished = onFinished
 }
 
 // HandlePacket handles UDP packets coming from tun, to forward to the dispatcher
@@ -81,11 +90,16 @@ func (u *udpConnectionHandler) HandlePacket(src net.Destination, dst net.Destina
 func (u *udpConnectionHandler) connectionFinished(conn *udpConn) {
 	u.Lock()
 	// Close runs twice per flow; a newer conn may already own this src.
-	if u.udpConns[conn.src] == conn {
+	removed := u.udpConns[conn.src] == conn
+	if removed {
 		delete(u.udpConns, conn.src)
 		close(conn.egress)
 	}
 	u.Unlock()
+
+	if removed && u.onFinished != nil {
+		u.onFinished(conn.src)
+	}
 }
 
 // udp connection abstraction
@@ -154,7 +168,7 @@ func (c *udpConn) Write(p []byte) (int, error) {
 	// sending packets back mean sending payload with source/destination reversed
 	err := c.handler.writePacket(p, c.dst, c.src)
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 
 	return len(p), nil
