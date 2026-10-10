@@ -90,6 +90,7 @@ jobs:
           _NAME=${{ matrix.assetname }}
           echo "GOOS: ${{ matrix.goos }}, GOARCH: ${{ matrix.goarch }}, RELEASE_NAME: $_NAME"
           echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -179,6 +180,6 @@ jobs:
       - name: Upload files to Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: Xray-${{ env.ASSET_NAME }}
+          name: Xray-${{ env.ASSET_NAME }}-${{ env.SHORT_SHA }}
           path: |
             ./build_assets/*
