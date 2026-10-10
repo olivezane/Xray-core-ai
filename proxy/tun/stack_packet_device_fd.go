@@ -30,17 +30,15 @@ func platformPacketDevice(device Tun) (packetDevice, error) {
 	if len(fds) != 1 {
 		return nil, xerrors.New("tun device exposes ", len(fds), " packet file descriptors, the stack needs exactly one")
 	}
-	// the poll-then-read loop below needs a non-blocking descriptor. FreeBSD
-	// opens the device blocking, and Darwin hands out a blocking descriptor too:
-	// File.Fd puts one back into blocking mode before returning it
-	if err := unix.SetNonblock(fds[0], true); err != nil {
-		return nil, err
-	}
+	// the descriptor is left exactly as the device opened it: the read loop
+	// polls before every read, so a blocking descriptor does not block it, and
+	// changing the mode here would reach a device whose Start has not run yet
 	return &fdPacketDevice{fd: fds[0], headerRoom: packetDeviceHeaderRoom}, nil
 }
 
 // fdPacketDevice is a packet device over the plain file descriptor a platform
-// TUN device owns.
+// TUN device owns. The descriptor may be blocking or not: every read is
+// preceded by a poll, so a read never parks the inbound pump.
 //
 // headerRoom is how many bytes the device puts in front of every packet and
 // counts as part of the read: zero for Linux and Android, which carry bare IP
@@ -109,6 +107,11 @@ func (d *fdPacketDevice) WritePackets(packets [][]byte) error {
 			}
 		}
 
+		// shortcut: writes are not polled, so on a blocking descriptor (Darwin,
+		// FreeBSD) a full device queue parks the outbound pump until the kernel
+		// drains it. The gVisor device writes through the same descriptor, so
+		// this is not new; open the descriptor O_NONBLOCK if a device ever
+		// backs up for long enough to stall a close.
 		_, err := unix.Write(d.fd, buffer)
 		// a device that cannot buffer the packet right now drops it, the same
 		// way the gVisor Stack treats a would-block write

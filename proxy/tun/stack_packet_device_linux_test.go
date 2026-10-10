@@ -30,22 +30,6 @@ func (f *fakeFDTun) newEndpoint() (stack.LinkEndpoint, error) {
 	})
 }
 
-// newPacketSocket returns a datagram socket pair, the closest stand-in for a
-// TUN descriptor: both ends carry whole packets and both are readable and
-// writable. The first element is the test's end, the second the device's.
-func newPacketSocket(t *testing.T) [2]int {
-	t.Helper()
-	pair, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_DGRAM, 0)
-	if err != nil {
-		t.Fatalf("create socket pair: %v", err)
-	}
-	t.Cleanup(func() {
-		unix.Close(pair[0])
-		unix.Close(pair[1])
-	})
-	return pair
-}
-
 func TestFDPacketDeviceRejectsMultipleDescriptors(t *testing.T) {
 	pair := newPacketSocket(t)
 
