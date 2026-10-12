@@ -15,17 +15,17 @@ Plainly enabling it in the config probably will result nothing, or lock your rou
 ## DETAILS
 
 By default, enabling the feature will only bring the tun interface up. \
-When configured explicitly, Windows and Linux can apply interface addresses from `gateway`, while macOS and FreeBSD use the first IPv4 prefix from `gateway` for the point-to-point address. \
+When configured explicitly, Windows and Linux can apply interface addresses from `gateway`, while macOS uses the first IPv4 prefix from `gateway` for the point-to-point address and FreeBSD for the interface address, the one after the gateway. \
 Without `gateway`, the systems differ: Xray assigns no address on Linux, Windows gives the interface link-local addresses itself (an IPv6 one at once, an IPv4 one from `169.254.0.0/16` after a few seconds), and macOS and FreeBSD use `169.254.10.1/30`. \
-Windows, Linux and macOS can also apply system routes from `autoSystemRoutingTable`.
-macOS does not configure system DNS from the `dns` field, and neither does Linux by default; system DNS remains managed by the OS or distribution-specific network services. \
+Windows, Linux, macOS and FreeBSD can also apply system routes from `autoSystemRoutingTable`.
+macOS does not configure system DNS from the `dns` field, and neither do Linux and FreeBSD by default; system DNS remains managed by the OS or distribution-specific network services. \
 For more advanced routing policies or rules, OS level configuration can still manage the named interface (e.g. xray0) when it appears.
 This keeps complex system level routing and rules in a single place of responsibility - the OS itself. \
 Examples of how to achieve this on a simple Linux system (Ubuntu with systemd-networkd) can be found at the end of this README.
 
-### SYSTEM DNS ON LINUX (`autoSystemDnsToGateway`)
+### SYSTEM DNS ON LINUX AND FREEBSD (`autoSystemDnsToGateway`)
 
-On Linux, setting `autoSystemDnsToGateway` to `true` lets the inbound point the system resolver at the tun interface, so name lookups resolve through Xray instead of going out over the physical link. It is off by default, and it is Linux-only.
+On Linux and FreeBSD, setting `autoSystemDnsToGateway` to `true` lets the inbound point the system resolver at the tun interface, so name lookups resolve through Xray instead of going out over the physical link. It is off by default, and it exists only on those two systems. This section describes Linux; the FreeBSD differences follow in [SYSTEM DNS ON FREEBSD](#system-dns-on-freebsd).
 
 It uses `resolvectl`, which means it only works when all of these hold. Where Xray can tell that one does not, it does not start:
 
@@ -66,6 +66,24 @@ Where it cannot apply, Xray does not start, rather than run with the leak descri
 
 On `Close()` the setting is reverted. It is **not** reverted if the process is killed with `SIGKILL`, since a process cannot handle that signal; run `resolvectl revert <iface>` to clean up by hand. An application that brings its own DNS endpoint is unaffected either way — this only covers the system resolver.
 
+### SYSTEM DNS ON FREEBSD
+
+On FreeBSD the same option goes through `resolvconf(8)`, the openresolv that ships in the base system, instead of `resolvectl`. The checks on Xray's own `dns` and routing configuration above apply unchanged, as does the loop through a `dns` upstream that bootstraps over the system resolver.
+
+The address handed over is the gateway itself, not the next address: on FreeBSD the interface gets the address after the first IPv4 `gateway` (as on macOS), and the gateway, which nothing owns, is routed into the TUN, so a query to it is what Xray answers (e.g. `169.254.10.1/30` -> resolver `169.254.10.1`, local address `169.254.10.2`). Without `gateway` the config is rejected, as on Linux.
+
+The entry is added with `resolvconf -a <iface> -x`, which makes the TUN's nameserver the only one in use, the equivalent of `domain ~.` plus `default-route true` above; without `-x` the nameservers DHCP supplied stay listed alongside it, and the system falls back to them. `resolvconf` exits successfully, and still records the entry, when `resolvconf=NO` is set in `resolvconf.conf`, but then runs none of the subscribers that write the resolver files, so Xray confirms the takeover in those files and does not start when the nameserver reached none of them: `/etc/resolv.conf` first, where it also has to be the only nameserver besides loopback ones (`inclusive_interfaces` in `resolvconf.conf` makes `resolvconf` ignore `-x` and keep the DHCP nameservers listed, which would be the leak again), and then, when `resolvconf.conf` names an `unbound_conf` file, that file. The latter is the `local_unbound` layout, where `local-unbound-setup` turns the `libc` subscriber off and has `resolvconf` write unbound's forwarders instead, with `resolv.conf` left pointed at loopback; the system then resolves through unbound, which forwards into the TUN. That only works with unbound's DNSSEC validation turned off, which `local_unbound` has on by default: the extra queries validation makes get no answer through the `dns` outbound, and resolution times out. A drop-in such as `/var/unbound/conf.d/xray.conf` with `server:` and `module-config: "iterator"`, followed by `service local_unbound restart`, turns it off (verified on FreeBSD 15.1).
+
+| Environment | Behaviour |
+|---|---|
+| default FreeBSD, `resolv.conf` managed by `resolvconf` (DHCP or static) | applies |
+| `local_unbound` enabled | applies, through unbound's forwarders; needs validation off (see above) |
+| `resolvconf=NO` in `resolvconf.conf` | no resolver file changes, does not start |
+| `inclusive_interfaces` covering the TUN in `resolvconf.conf` | DHCP nameservers stay listed, does not start |
+| another resolver in front of `resolv.conf` that `resolvconf` is not configured to feed | nameserver reaches no resolver file, does not start |
+
+On `Close()` the entry is removed with `resolvconf -d <iface>`. It is **not** removed if the process is killed with `SIGKILL`; run `resolvconf -d <iface>` to clean up by hand. The next start with the same interface name replaces the stale entry on its own.
+
 Due to this inbound not actually being a proxy, the configuration ignore required listen and port options, and never listen on any port. \
 Here is simple Xray config snippet to enable the inbound:
 ```
@@ -90,14 +108,16 @@ It is ignored on other platforms.
 
 The inbound runs one user-space network stack, selected by `stack`:
 
-- unset or `"gvisor"` (default): the gVisor stack, unchanged behaviour.
+- unset or `"lightweight"` (default): the lightweight IP stack of this repository.
 - `"mipstack"`: the MIPS Stack, the pure-Go user-space IP stack of mihomo, `github.com/metacubex/mipstack`.
 
-The short name `"mips"` is not a stack name, because this repository already uses it for a CPU architecture.
+The short name `"mips"` is not a stack name, because this repository already uses it for a CPU architecture. The gVisor stack is no longer selectable, and naming it is a configuration error.
 
-On a MIPS Stack, `tcpCongestion` selects the congestion control algorithm for intercepted TCP connections: unset or `"cubic"` (default), `"bbr"`, `"bbr3"`, or `"reno"`. Setting it while `stack` is `"gvisor"` is a configuration error, because the gVisor stack ignores it.
+On a MIPS Stack, `tcpCongestion` selects the congestion control algorithm for intercepted TCP connections: unset or `"cubic"` (default), `"bbr"`, `"bbr3"`, or `"reno"`. Setting it while `stack` selects the lightweight stack is a configuration error, because that stack ignores it.
 
-A MIPS Stack takes its local addresses from `gateway`, the same field that configures the device. With no `gateway` it owns no address and works purely as a transparent forwarder, which is what this inbound does in any case. It also enforces the user level's connection idle timeout on intercepted TCP connections; the gVisor stack does not.
+A MIPS Stack carries its packets through the device of the platform it runs on, so it is available where that device offers them: Linux, Android, Darwin, FreeBSD and Windows. Selecting it anywhere else fails at startup.
+
+A MIPS Stack takes its local addresses from `gateway`, the same field that configures the device. With no `gateway` it owns no address and works purely as a transparent forwarder, which is what this inbound does in any case. It also enforces the user level's connection idle timeout on intercepted TCP connections; the lightweight stack does not.
 
 UDP behaviour is the same on both stacks: one session per client, so a client using several remote servers at once keeps that one session (FullCone), and replies still appear to come from the remote the client addressed. On a MIPS Stack the reply capability of each client and remote pair is released when the session ends or the connection idle timeout expires, or after five minutes of inactivity when the user level disables that timeout.
 
@@ -262,10 +282,10 @@ So everything applicable for ipv4 above also works for ipv6, you only need to gi
 FreeBSD support of the same functionality is implemented through tun(4).
 
 Interface name in the configuration must comply to the scheme "tunN", where N is some number. \
-It's necessary to set an IP address to the interface, ex.:
-```
-ifconfig tun0 inet 169.254.10.1/30
-```
+FreeBSD requires the tun interface to have an IPv4 address before IPv4 routes can use it. \
+By default Xray uses `169.254.10.1/30` as the gateway and assigns the next address in the prefix to the tun interface; the gateway itself belongs to nothing and is routed into the TUN. \
+You can override this by setting `gateway`; FreeBSD uses the first IPv4 prefix in the list, and IPv6 `gateway` entries are not used for addressing.
+
 To attach routing to the interface, route command like following can be executed:
 ```
 route add -net 1.1.1.0/24 -iface tun10
@@ -274,6 +294,10 @@ route add -net 1.1.1.0/24 -iface tun10
 route add -inet6 -host 2606:4700:4700::1111 -iface tun10
 route add -inet6 -host 2606:4700:4700::1001 -iface tun10
 ```
+Alternatively, configure `autoSystemRoutingTable` and Xray will add and remove those system routes while it is running. \
+With `autoSystemRoutingTable`, Xray's own connections are kept out of the TUN through `autoOutboundsInterface` (the default), which on FreeBSD switches them to a second routing table (FIB 1) that mirrors the physical default route; this needs the boot tunable `net.fibs` set to at least 2, and Xray does not start otherwise. \
+`autoSystemDnsToGateway` points the system resolver at the TUN through `resolvconf(8)`, see [SYSTEM DNS ON FREEBSD](#system-dns-on-freebsd).
+
 Important to remember that everything written above about Linux routing concept, also apply to FreeBSD. If you simply route default route through tun interface, that will result network loop and immediate network failure.
 
 ## MAC OS X SUPPORT

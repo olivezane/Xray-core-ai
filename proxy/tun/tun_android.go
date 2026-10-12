@@ -17,8 +17,6 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/platform"
 	"golang.org/x/sys/unix"
-	"gvisor.dev/gvisor/pkg/tcpip/link/fdbased"
-	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 
 const (
@@ -31,8 +29,7 @@ const (
 //   - FD mode: xray.tun.fd env set > 0, interface provided externally (V2RayNG etc.)
 //   - Self-create mode: no FD, creates TUN via /dev/tun and configures addresses/routes/rules
 type AndroidTun struct {
-	tunFd   int
-	tunName string
+	*fdTun
 	options *Config
 	ownsTun bool // self-created vs FD-provided
 	tunLink netlink.Link
@@ -46,6 +43,26 @@ type AndroidTun struct {
 
 var _ Tun = (*AndroidTun)(nil)
 
+// checkBareTunFd refuses a TUN descriptor that puts a header in front of every
+// packet, so that an application handing its device over learns at startup
+// rather than from the packets that never arrive. Both stacks read the Android
+// device as bare IP packets, and neither of them can skip a header the device
+// does not announce to them.
+func checkBareTunFd(fd int) error {
+	ifr, err := unix.NewIfreq("")
+	if err != nil {
+		return errors.New("invalid ", platform.TunFdKey).Base(err)
+	}
+	if err = unix.IoctlIfreq(fd, unix.TUNGETIFF, ifr); err != nil {
+		return errors.New("invalid ", platform.TunFdKey, ": not a TUN file descriptor").Base(err)
+	}
+	flags := ifr.Uint16()
+	if flags&unix.IFF_NO_PI == 0 || flags&unix.IFF_VNET_HDR != 0 {
+		return errors.New("invalid ", platform.TunFdKey, ": TUN device must use IFF_NO_PI and no IFF_VNET_HDR")
+	}
+	return nil
+}
+
 // NewTun builds a new AndroidTun.
 // If xray.tun.fd > 0 is provided, it wraps that FD directly (legacy/App mode).
 // Otherwise it creates a TUN device via the kernel interface.
@@ -55,23 +72,31 @@ func NewTun(options *Config) (Tun, error) {
 	if fdStr != "" {
 		fd, err := strconv.Atoi(fdStr)
 		if err == nil && fd > 0 {
+			if err = checkBareTunFd(fd); err != nil {
+				unix.Close(fd)
+				return nil, err
+			}
 			if err = unix.SetNonblock(fd, true); err != nil {
 				unix.Close(fd)
 				return nil, err
 			}
-			return &AndroidTun{tunFd: fd, options: options}, nil
+			// the descriptor stays with the application, Close ends the reading of a duplicate
+			fd, err = unix.FcntlInt(uintptr(fd), unix.F_DUPFD_CLOEXEC, 0)
+			if err != nil {
+				return nil, err
+			}
+			return &AndroidTun{fdTun: newFdTun(fd, 0), options: options}, nil
 		}
 	}
 
 	// No external FD — create TUN ourselves
-	tunFd, tunLink, name, err := openTun(options.Name)
+	tunFd, tunLink, _, err := openTun(options.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	return &AndroidTun{
-		tunFd:   tunFd,
-		tunName: name,
+		fdTun:   newFdTun(tunFd, 0),
 		options: options,
 		ownsTun: true,
 		tunLink: tunLink,
@@ -157,19 +182,18 @@ func (t *AndroidTun) Start() error {
 
 // Close tears down TUN: rules, routes, addresses, link down, fd.
 func (t *AndroidTun) Close() error {
-	if !t.ownsTun {
-		return nil
+	if t.ownsTun {
+		t.routeMonitorOnce.Do(func() {
+			if t.routeMonitorStop != nil {
+				close(t.routeMonitorStop)
+			}
+		})
+		t.unsetRules()
+		t.unsetRoutes()
+		t.unsetInterfaceAddresses()
+		netlink.LinkSetDown(t.tunLink)
 	}
-	t.routeMonitorOnce.Do(func() {
-		if t.routeMonitorStop != nil {
-			close(t.routeMonitorStop)
-		}
-	})
-	t.unsetRules()
-	t.unsetRoutes()
-	t.unsetInterfaceAddresses()
-	netlink.LinkSetDown(t.tunLink)
-	return unix.Close(t.tunFd)
+	return t.closeFile()
 }
 
 // Name returns the TUN interface name.
@@ -181,7 +205,7 @@ func (t *AndroidTun) Name() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err = unix.IoctlIfreq(t.tunFd, unix.TUNGETIFF, ifr); err != nil {
+	if err = unix.IoctlIfreq(t.fd, unix.TUNGETIFF, ifr); err != nil {
 		return "", err
 	}
 	return ifr.Name(), nil
@@ -203,18 +227,11 @@ func (t *AndroidTun) Index() (int, error) {
 	return iface.Index, nil
 }
 
-// FDs returns the file descriptor backing the tun device, used by the MIPS
-// Stack's packet device to move packets through it.
-func (t *AndroidTun) FDs() []int {
-	return []int{t.tunFd}
-}
-
-func (t *AndroidTun) newEndpoint() (stack.LinkEndpoint, error) {
-	return fdbased.New(&fdbased.Options{
-		FDs:               []int{t.tunFd},
-		MTU:               t.options.MTU,
-		RXChecksumOffload: true,
-	})
+// packetDevice implements tunPacketDevice: the MIPS Stack reads and writes the
+// packets of this device through its file descriptor. The device carries bare
+// IP packets, so there is no header to reserve.
+func (t *AndroidTun) packetDevice() (packetDevice, error) {
+	return packetDeviceOfFd(t.fd, 0)
 }
 
 // ---------------------------------------------------------------------------

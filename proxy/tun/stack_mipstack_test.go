@@ -63,6 +63,10 @@ func (d *bridgeDevice) Wait() {
 	}
 }
 
+// packetDevice implements tunPacketDevice: the device the test drives is itself
+// the packet device, so its packets need no adapting
+func (d *bridgeDevice) packetDevice() (packetDevice, error) { return d, nil }
+
 func (d *bridgeDevice) Close() error {
 	d.close()
 	return nil

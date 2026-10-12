@@ -11,6 +11,7 @@ import (
 
 	"github.com/metacubex/mipstack"
 	"github.com/xtls/xray-core/common"
+	"github.com/xtls/xray-core/common/buf"
 	xerrors "github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 )
@@ -79,11 +80,10 @@ type stackMipstack struct {
 	pumps     sync.WaitGroup
 }
 
-// newMipstack builds the MIPS Stack for one TUN inbound
 // newMipstack builds a MIPS Stack from options that SelectStack has already
 // validated
 func newMipstack(ctx context.Context, options StackOptions, handler ConnectionHandler) (Stack, error) {
-	device, err := newPacketDevice(options.Tun)
+	device, err := mipstackPacketDevice(options.Tun)
 	if err != nil {
 		return nil, err
 	}
@@ -111,10 +111,9 @@ func newMipstack(ctx context.Context, options StackOptions, handler ConnectionHa
 
 	// the input link of this inbound completes every checksum it carries: the
 	// TUN device is opened without checksum offload features, so the kernel
-	// finishes each packet before the device hands it over, and the gVisor
-	// Stack of the same inbound already trusts that link (RXChecksumOffload on
-	// its endpoint). Verifying again would only repeat work the link has done,
-	// so every category is delegated to it.
+	// finishes each packet before the device hands it over. Verifying again
+	// would only repeat work the link has done, so every category is delegated
+	// to it.
 	var offload mipstack.RXChecksumOffload
 	mips.SetRXChecksumOffload(*offload.
 		SetIPv4Header(true).
@@ -135,8 +134,8 @@ func newMipstack(ctx context.Context, options StackOptions, handler ConnectionHa
 		sweepStop:   make(chan struct{}),
 	}
 
-	// the intercepted client sessions are the ones the gVisor Stack already
-	// uses: one session per client, replying from the address the client
+	// the intercepted client sessions follow the same rule as the lightweight
+	// Stack: one session per client, replying from the address the client
 	// addressed
 	stack.udpSessions = newUdpConnectionHandler(handler.HandleConnection, stack.writeUDPReply)
 	stack.udpSessions.SetOnFinished(stack.releaseResponders)
@@ -283,12 +282,13 @@ func (t *stackMipstack) handleUDP(request *mipstack.UDPForwarderRequest) {
 
 	// the payload of the interception call is only valid until the handler
 	// returns, while the session reads it later
-	payload := append([]byte(nil), request.Payload()...)
+	payload := buf.NewWithSize(int32(len(request.Payload())))
+	payload.Write(request.Payload())
 	t.udpSessions.HandlePacket(mipstackUDPDestination(client), mipstackUDPDestination(remote), payload)
 }
 
-// handleICMP answers the intercepted echo requests, as the gVisor Stack does,
-// and consumes every other message
+// handleICMP answers the intercepted echo requests, as the lightweight Stack
+// does, and consumes every other message
 func (t *stackMipstack) handleICMP(request *mipstack.ICMPForwarderRequest) {
 	if t.closed.Load() {
 		request.Drop()

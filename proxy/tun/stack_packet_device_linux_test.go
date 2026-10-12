@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"golang.org/x/sys/unix"
-	"gvisor.dev/gvisor/pkg/tcpip/link/fdbased"
-	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 
 // fakeFDTun is a device whose packets flow through a plain file descriptor,
@@ -17,30 +15,24 @@ import (
 type fakeFDTun struct {
 	fakeTun
 	fds []int
-	mtu uint32
 }
 
-func (f *fakeFDTun) FDs() []int { return f.fds }
-
-func (f *fakeFDTun) newEndpoint() (stack.LinkEndpoint, error) {
-	return fdbased.New(&fdbased.Options{
-		FDs:               f.fds,
-		MTU:               f.mtu,
-		RXChecksumOffload: true,
-	})
+func (f *fakeFDTun) packetDevice() (packetDevice, error) {
+	if len(f.fds) == 0 {
+		return nil, errors.New("the tun device exposes no packet descriptor")
+	}
+	return packetDeviceOfFd(f.fds[0], packetDeviceHeaderRoom)
 }
 
-func TestFDPacketDeviceRejectsMultipleDescriptors(t *testing.T) {
-	pair := newPacketSocket(t)
-
-	if _, err := newPacketDevice(&fakeFDTun{fds: []int{pair[1], pair[1]}}); err == nil {
-		t.Fatal("a device with several packet descriptors must be rejected instead of silently using one")
+func TestFDPacketDeviceRejectsADeviceWithoutAPacketDescriptor(t *testing.T) {
+	if _, err := mipstackPacketDevice(&fakeFDTun{}); err == nil {
+		t.Fatal("a device with no packet descriptor must be rejected instead of built on a descriptor that does not exist")
 	}
 }
 
 func TestFDPacketDeviceDrainsABatchAndWritesPackets(t *testing.T) {
 	pair := newPacketSocket(t)
-	device, err := newPacketDevice(&fakeFDTun{fds: []int{pair[1]}})
+	device, err := mipstackPacketDevice(&fakeFDTun{fds: []int{pair[1]}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

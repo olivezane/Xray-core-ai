@@ -17,21 +17,17 @@ const windowsPacketDeviceWaitMillis = 1000
 // windowsPacketDevice is a packet device over the Wintun ring buffer the
 // Windows TUN device owns. The ring hands out the packets it received, and the
 // room for the packets it sends, as plain slices, so nothing has to be wrapped
-// in a gVisor packet buffer on the way through. Its Wait parks on the same read
-// event the gVisor device uses, but with a bound, since that event is not
-// signalled when the session ends.
+// in a packet buffer on the way through. Its Wait parks on the same read event
+// the device exposes, but with a bound, since that event is not signalled when
+// the session ends.
 type windowsPacketDevice struct {
 	device *WindowsTun
 }
 
-// platformPacketDevice returns the packet device a platform TUN device carries
-// packets through by itself, or nothing when the platform has none of its own
-func platformPacketDevice(device Tun) (packetDevice, error) {
-	windowsDevice, ok := device.(*WindowsTun)
-	if !ok {
-		return nil, nil
-	}
-	return &windowsPacketDevice{device: windowsDevice}, nil
+// packetDevice implements tunPacketDevice: the MIPS Stack reads and writes the
+// packets of this device through the Wintun ring buffer it already owns
+func (t *WindowsTun) packetDevice() (packetDevice, error) {
+	return &windowsPacketDevice{device: t}, nil
 }
 
 func (d *windowsPacketDevice) ReadPackets(packets [][]byte) (int, error) {
@@ -76,8 +72,7 @@ func (d *windowsPacketDevice) WritePackets(packets [][]byte) error {
 	for _, packet := range packets {
 		buffer, err := d.device.session.AllocateSendPacket(len(packet))
 		if go_errors.Is(err, windows.ERROR_BUFFER_OVERFLOW) {
-			// the ring is full: drop the packet, the same way the gVisor Stack
-			// treats a would-block write
+			// the ring is full: drop the packet
 			continue
 		}
 		if err != nil {

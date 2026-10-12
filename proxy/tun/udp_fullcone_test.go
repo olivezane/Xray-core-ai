@@ -43,7 +43,7 @@ func TestUDPFullConeAllocationReuseAndEgress(t *testing.T) {
 	handler, connCh, dials, _ := newUDPTestHandler(t)
 
 	// first packet from the client allocates a connection
-	handler.HandlePacket(client, serverA, []byte("ping-a"))
+	handler.HandlePacket(client, serverA, buf.FromBytes([]byte("ping-a")))
 	conn := <-connCh
 	if atomic.LoadInt32(dials) != 1 {
 		t.Fatalf("expected exactly 1 dial after the first packet, got %d", atomic.LoadInt32(dials))
@@ -51,7 +51,7 @@ func TestUDPFullConeAllocationReuseAndEgress(t *testing.T) {
 
 	// FullCone: a packet from the same source to a different server reuses
 	// the same connection instead of dialing again
-	handler.HandlePacket(client, serverB, []byte("ping-b"))
+	handler.HandlePacket(client, serverB, buf.FromBytes([]byte("ping-b")))
 	if atomic.LoadInt32(dials) != 1 {
 		t.Fatalf("expected no new dial for an existing source, got %d", atomic.LoadInt32(dials))
 	}
@@ -73,7 +73,7 @@ func TestUDPFullConeEgressWritesBackToSource(t *testing.T) {
 	serverA := xnet.UDPDestination(xnet.IPAddress([]byte{1, 2, 3, 4}), 53)
 
 	handler, connCh, _, writes := newUDPTestHandler(t)
-	handler.HandlePacket(client, serverA, []byte("ping"))
+	handler.HandlePacket(client, serverA, buf.FromBytes([]byte("ping")))
 	conn := <-connCh
 
 	// a reply packet addressed to the client goes back to the client's
@@ -104,7 +104,7 @@ func TestUDPFullConeCloseFreesBinding(t *testing.T) {
 	serverA := xnet.UDPDestination(xnet.IPAddress([]byte{1, 2, 3, 4}), 53)
 
 	handler, connCh, dials, _ := newUDPTestHandler(t)
-	handler.HandlePacket(client, serverA, []byte("first"))
+	handler.HandlePacket(client, serverA, buf.FromBytes([]byte("first")))
 	conn := <-connCh
 
 	// drain the buffered packet, then close: the NAT binding is freed
@@ -118,7 +118,7 @@ func TestUDPFullConeCloseFreesBinding(t *testing.T) {
 	}
 
 	// a new packet from the same source dials a fresh connection
-	handler.HandlePacket(client, serverA, []byte("second"))
+	handler.HandlePacket(client, serverA, buf.FromBytes([]byte("second")))
 	conn2 := <-connCh
 	if atomic.LoadInt32(dials) != 2 {
 		t.Fatalf("expected a new dial after Close, got %d", atomic.LoadInt32(dials))

@@ -38,15 +38,9 @@ type framedFDTun struct {
 	device *fdPacketDevice
 }
 
-func (f *framedFDTun) ReadPackets(packets [][]byte) (int, error) {
-	return f.device.ReadPackets(packets)
-}
-
-func (f *framedFDTun) WritePackets(packets [][]byte) error {
-	return f.device.WritePackets(packets)
-}
-
-func (f *framedFDTun) Wait() { f.device.Wait() }
+// packetDevice implements tunPacketDevice: the test builds the device by hand,
+// so it hands that one over unchanged
+func (f *framedFDTun) packetDevice() (packetDevice, error) { return f.device, nil }
 
 // TestFDPacketDeviceStripsAndAddsTheUnixHeader covers the Darwin and FreeBSD
 // framing, where the device puts a Unix address family header in front of every
