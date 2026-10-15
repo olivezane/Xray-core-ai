@@ -45,10 +45,15 @@ type StackOptions struct {
 	Gateway []string
 }
 
-// StackSelection is a validated stack name and TCP congestion control
+// StackSelection is a validated stack name, TCP congestion control, and what
+// the stack needs of the device that will carry it
 type StackSelection struct {
 	Stack         string
 	TCPCongestion string
+	// Segments says the stack reads and writes the virtio_net_hdr that the
+	// device puts in front of its packets, so the device is opened with
+	// IFF_VNET_HDR for it, see segmenter
+	Segments bool
 }
 
 // SelectStack validates and canonicalizes a configured stack name and TCP
@@ -59,7 +64,7 @@ func SelectStack(stack string, congestion string) (StackSelection, error) {
 		if strings.TrimSpace(congestion) != "" {
 			return StackSelection{}, errors.New("tcp congestion control is only supported by the ", StackMipstack, " stack")
 		}
-		return StackSelection{Stack: StackLightweight}, nil
+		return StackSelection{Stack: StackLightweight, Segments: true}, nil
 	case StackMipstack:
 		control, err := normalizeTCPCongestion(congestion)
 		if err != nil {
@@ -71,19 +76,15 @@ func SelectStack(stack string, congestion string) (StackSelection, error) {
 	}
 }
 
-// cfgStack reads the stack name a TUN Configuration selects. It is used by the
+// cfgStack reads the stack a TUN Configuration selects. It is used by the
 // platform device constructors, which have to shape the device for the Stack
 // that will read it, and is the one place that knows which Configuration field
 // carries the name.
-func cfgStack(options *Config) (string, error) {
+func cfgStack(options *Config) (StackSelection, error) {
 	if options == nil {
-		return "", errors.New("tun configuration is missing")
+		return StackSelection{}, errors.New("tun configuration is missing")
 	}
-	selection, err := SelectStack(options.Stack, options.TcpCongestion)
-	if err != nil {
-		return "", err
-	}
-	return selection.Stack, nil
+	return SelectStack(options.Stack, options.TcpCongestion)
 }
 
 // NewStack builds the stack named by options.Stack

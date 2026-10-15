@@ -942,9 +942,9 @@ func TestSelectStackCanonicalizesTheSelection(t *testing.T) {
 		congestion string
 		want       StackSelection
 	}{
-		{stack: "", want: StackSelection{Stack: StackLightweight}},
-		{stack: "lightweight", want: StackSelection{Stack: StackLightweight}},
-		{stack: " LightWeight ", want: StackSelection{Stack: StackLightweight}},
+		{stack: "", want: StackSelection{Stack: StackLightweight, Segments: true}},
+		{stack: "lightweight", want: StackSelection{Stack: StackLightweight, Segments: true}},
+		{stack: " LightWeight ", want: StackSelection{Stack: StackLightweight, Segments: true}},
 		{stack: "mipstack", want: StackSelection{Stack: StackMipstack, TCPCongestion: "cubic"}},
 		{stack: "mipstack", congestion: "bbr", want: StackSelection{Stack: StackMipstack, TCPCongestion: "bbr"}},
 		{stack: "MIPSTACK", congestion: " BBR3 ", want: StackSelection{Stack: StackMipstack, TCPCongestion: "bbr3"}},

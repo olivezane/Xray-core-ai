@@ -197,19 +197,9 @@ func (t *LinuxTun) unsetSystemDNS() {
 // LinuxTun implements Tun
 var _ Tun = (*LinuxTun)(nil)
 
-// mipstackSelected reports whether the configured Stack takes its packets
-// straight off the file descriptor, which decides how the device is opened
-func mipstackSelected(options *Config) (bool, error) {
-	name, err := cfgStack(options)
-	if err != nil {
-		return false, err
-	}
-	return name == StackMipstack, nil
-}
-
 // NewTun builds new tun interface handler (linux specific)
 func NewTun(options *Config) (Tun, error) {
-	mipstack, err := mipstackSelected(options)
+	selection, err := cfgStack(options)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +209,7 @@ func NewTun(options *Config) (Tun, error) {
 		return nil, err
 	}
 	if fdProvided {
-		if mipstack && vnet != 0 {
+		if !selection.Segments && vnet != 0 {
 			// the mipstack Stack reads the descriptor as bare packets, so a
 			// virtio_net_hdr in front of them would be taken for the IP header
 			return nil, errors.New("invalid ", platform.TunFdKey, ": the ", StackMipstack, " stack needs a TUN device without IFF_VNET_HDR")
@@ -234,14 +224,11 @@ func NewTun(options *Config) (Tun, error) {
 	// A virtio_net_hdr in front of every packet is what lets the system leave
 	// its TCP segments as large as they are and takes such segments back
 	// (IFF_VNET_HDR with the offload features, see WriteSegment). Only the
-	// lightweight Stack reads and writes that header. The mipstack Stack takes
-	// its packets straight off the file descriptor, so on that Stack the device
-	// is opened bare and without offload, the way the Android one is; a device
-	// that was opened without IFF_VNET_HDR refuses TUNSETOFFLOAD with EINVAL
-	// forever, so the mode is picked here, once.
-	if mipstack {
-		tunFd, err = open(options.Name, 0)
-	} else {
+	// lightweight Stack reads and writes that header, which is what the
+	// selection asks of this device. A device that was opened without
+	// IFF_VNET_HDR refuses TUNSETOFFLOAD with EINVAL forever, so the mode is
+	// picked here, once.
+	if selection.Segments {
 		vnet = vnetSize
 		tunFd, err = open(options.Name, unix.IFF_VNET_HDR)
 		if err == nil && unix.IoctlSetInt(tunFd, unix.TUNSETOFFLOAD, unix.TUN_F_CSUM|unix.TUN_F_TSO4|unix.TUN_F_TSO6) != nil {
@@ -249,6 +236,8 @@ func NewTun(options *Config) (Tun, error) {
 			// every packet and the Stack still reads it
 			_ = unix.IoctlSetInt(tunFd, unix.TUNSETOFFLOAD, 0)
 		}
+	} else {
+		tunFd, err = open(options.Name, 0)
 	}
 	if err != nil {
 		return nil, err

@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"github.com/xtls/xray-core/common/buf"
-	"github.com/xtls/xray-core/features/stats"
 	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
@@ -17,14 +16,13 @@ type lazyBufferReader interface {
 
 // newUplinkReader reads the uplink of one connection. A stack connection that
 // hands its buffer out lazily keeps the buffer pool untouched while the
-// connection sits idle, and counts its bytes here instead of in the connection
-// wrapper its Read method never reaches.
-func newUplinkReader(conn net.Conn, counter stats.Counter) buf.Reader {
+// connection sits idle, because it offers the buffer instead of blocking on it.
+func newUplinkReader(conn net.Conn) buf.Reader {
 	lazy, ok := stat.TryUnwrapStatsConn(conn).(lazyBufferReader)
 	if !ok {
 		return buf.NewReader(conn)
 	}
-	return &lazyReader{readWithBuffer: lazy.ReadWithBuffer, counter: counter}
+	return &lazyReader{readWithBuffer: lazy.ReadWithBuffer}
 }
 
 // lazyReader reads one pooled buffer per payload, taking it from the pool when
@@ -33,7 +31,6 @@ func newUplinkReader(conn net.Conn, counter stats.Counter) buf.Reader {
 // took before blocking, so payloads are still read in chunks of that size.
 type lazyReader struct {
 	readWithBuffer func(getBuffer func(sizeHint int) []byte) (int, error)
-	counter        stats.Counter
 }
 
 // ReadMultiBuffer implements buf.Reader.
@@ -46,9 +43,6 @@ func (r *lazyReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	if buffer == nil {
 		// the payload never arrived, so the pool was never touched
 		return nil, err
-	}
-	if r.counter != nil {
-		r.counter.Add(int64(n))
 	}
 	if n == 0 {
 		// the stack reports an empty buffer as a short buffer without

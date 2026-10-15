@@ -248,14 +248,8 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 	})
 	errors.LogInfo(ctx, "processing from ", source, " to ", destination)
 
-	// A stack connection that hands its buffer out lazily keeps the pool untouched while idle, and
-	// counts its bytes in the reader; the eager one is counted by the wrapper. Counting in both
-	// would count the payload twice.
-	reader := newUplinkReader(conn, t.uplinkCounter)
-	wrapped := &buf.TimeoutWrapperReader{Reader: reader}
-	if _, lazy := reader.(*lazyReader); !lazy {
-		wrapped.Counter = t.uplinkCounter
-	}
+	// both kinds of connection are buf.Reader and buf.Writer, what they carry is counted on the way
+	reader := &buf.TimeoutWrapperReader{Reader: newUplinkReader(conn), Counter: t.uplinkCounter}
 	writer := buf.NewWriter(conn)
 	if destination.Network != net.Network_UDP {
 		writer = &tunTCPWriter{writer: writer, counter: t.downlinkCounter}
@@ -264,7 +258,7 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 	}
 
 	link := &transport.Link{
-		Reader: wrapped,
+		Reader: reader,
 		Writer: writer,
 	}
 	if err := t.dispatcher.DispatchLink(ctx, destination, link); err != nil {

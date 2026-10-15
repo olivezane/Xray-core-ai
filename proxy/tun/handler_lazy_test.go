@@ -60,20 +60,20 @@ func (c *lazyTestConn) recordedHints() []int {
 }
 
 func TestUplinkReaderPrefersTheLazyRead(t *testing.T) {
-	if reader := newUplinkReader(newLazyTestConn(nil), nil); reader == nil {
+	if reader := newUplinkReader(newLazyTestConn(nil)); reader == nil {
 		t.Fatal("no reader for a lazy connection")
 	} else if _, ok := reader.(*lazyReader); !ok {
 		t.Fatalf("lazy connection got %T, want a lazy reader", reader)
 	}
 
 	wrapped := &stat.CounterConnection{Connection: newLazyTestConn(nil), ReadCounter: new(testCounter)}
-	if reader := newUplinkReader(wrapped, nil); reader == nil {
+	if reader := newUplinkReader(wrapped); reader == nil {
 		t.Fatal("no reader for a counted lazy connection")
 	} else if _, ok := reader.(*lazyReader); !ok {
 		t.Fatalf("counted lazy connection got %T, want a lazy reader", reader)
 	}
 
-	if reader := newUplinkReader(newTestConn(nil), nil); reader == nil {
+	if reader := newUplinkReader(newTestConn(nil)); reader == nil {
 		t.Fatal("no reader for an eager connection")
 	} else if _, ok := reader.(*lazyReader); ok {
 		t.Fatal("a connection without the lazy read got a lazy reader")
@@ -81,9 +81,8 @@ func TestUplinkReaderPrefersTheLazyRead(t *testing.T) {
 }
 
 func TestLazyReaderTakesTheBufferWhenPayloadArrives(t *testing.T) {
-	counter := new(testCounter)
 	conn := newLazyTestConn([]byte("uplink"))
-	reader := newUplinkReader(conn, counter)
+	reader := newUplinkReader(conn)
 
 	mb, err := reader.ReadMultiBuffer()
 	if err != nil {
@@ -97,9 +96,6 @@ func TestLazyReaderTakesTheBufferWhenPayloadArrives(t *testing.T) {
 	}
 	buf.ReleaseMulti(mb)
 
-	if got := counter.Value(); got != int64(len("uplink")) {
-		t.Fatalf("uplink counter = %d, want %d", got, len("uplink"))
-	}
 	if got := conn.recordedHints(); !slices.Equal(got, []int{len("uplink")}) {
 		t.Fatalf("buffer hints = %v, want %v", got, []int{len("uplink")})
 	}
@@ -109,9 +105,8 @@ func TestLazyReaderTakesTheBufferWhenPayloadArrives(t *testing.T) {
 }
 
 func TestLazyReaderTakesNoBufferForATerminalState(t *testing.T) {
-	counter := new(testCounter)
 	conn := newLazyTestConn(nil)
-	reader := newUplinkReader(conn, counter)
+	reader := newUplinkReader(conn)
 
 	mb, err := reader.ReadMultiBuffer()
 	if !errors.Is(err, io.EOF) {
@@ -120,14 +115,14 @@ func TestLazyReaderTakesNoBufferForATerminalState(t *testing.T) {
 	if mb != nil {
 		t.Fatalf("read of a finished connection = %v, want no buffer", mb)
 	}
-	if got := counter.Value(); got != 0 {
-		t.Fatalf("uplink counter = %d, want 0", got)
-	}
 	if got := conn.recordedEvents(); !slices.Equal(got, []string{"read"}) {
 		t.Fatalf("read events = %v, want no buffer taken", got)
 	}
 }
 
+// TestHandlerCountsLazyTunConnectionTraffic keeps the lazy read from double
+// counting: the wrapper counts the lazy connection too, so the lazy reader must
+// not count it again.
 func TestHandlerCountsLazyTunConnectionTraffic(t *testing.T) {
 	uplinkCounter := new(testCounter)
 	downlinkCounter := new(testCounter)
