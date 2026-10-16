@@ -214,6 +214,23 @@ func (t *stackMipstack) Close() error {
 	return err
 }
 
+// Input implements Stack. The packets of the TUN inbound reach the stack through
+// the pumps; this serves a caller that reads the device itself
+func (t *stackMipstack) Input(packet []byte) {
+	_, _ = t.stack.Write([][]byte{packet}, 0)
+}
+
+// DialTCP implements Stack
+func (t *stackMipstack) DialTCP(ctx context.Context, address netip.AddrPort) (net.Conn, error) {
+	return t.stack.DialTCP(ctx, "tcp", netip.AddrPort{}, address)
+}
+
+// DialUDP implements Stack. The port is opened on the Local Addresses the
+// gateway prefixes of the device give the stack
+func (t *stackMipstack) DialUDP() (net.PacketConn, error) {
+	return t.stack.ListenUDP(t.ctx, "udp", netip.AddrPort{})
+}
+
 // handleTCP hands one intercepted TCP connection to the inbound
 func (t *stackMipstack) handleTCP(request *mipstack.TCPForwarderRequest) {
 	if t.closed.Load() {
