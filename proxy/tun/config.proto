@@ -17,6 +17,4 @@ message Config {
   string desc = 8;
   bool auto_system_dns_to_gateway = 9;
   repeated string auto_system_wfp_block_leak = 10;
-  string stack = 11;
-  string tcp_congestion = 12;
 }

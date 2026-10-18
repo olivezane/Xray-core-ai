@@ -227,13 +227,6 @@ func (t *AndroidTun) Index() (int, error) {
 	return iface.Index, nil
 }
 
-// packetDevice implements tunPacketDevice: the MIPS Stack reads and writes the
-// packets of this device through its file descriptor. The device carries bare
-// IP packets, so there is no header to reserve.
-func (t *AndroidTun) packetDevice() (packetDevice, error) {
-	return packetDeviceOfFd(t.fd, 0)
-}
-
 // ---------------------------------------------------------------------------
 // Address management
 // ---------------------------------------------------------------------------

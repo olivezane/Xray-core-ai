@@ -9,7 +9,6 @@ import (
 	gonet "net"
 	"net/netip"
 	"slices"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,16 +16,6 @@ import (
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
-)
-
-const (
-	// StackLightweight is the lightweight IP stack of this repository, selected
-	// when the configuration names none
-	StackLightweight = "lightweight"
-	// StackMipstack is the MIPS Stack, the pure-Go user-space IP stack of
-	// mihomo. The short name "mips" is not accepted: it already means a CPU
-	// architecture in this repository.
-	StackMipstack = "mipstack"
 )
 
 // Stack interface implement ip protocol stack, bridging raw network packets and data streams
@@ -43,86 +32,17 @@ type Stack interface {
 	DialUDP() (net.PacketConn, error)
 }
 
-// StackOptions describes the stack a TUN inbound asks for
+// StackOptions for the stack implementation
 type StackOptions struct {
-	Tun Tun
-	MTU uint32
-	// IdleTimeout is the connection idle timeout of the user level
+	Tun         Tun
+	MTU         uint32
 	IdleTimeout time.Duration
-	// Stack names the stack to build. Empty selects the lightweight Stack.
-	Stack string
-	// TCPCongestion names the TCP congestion control of the MIPS Stack
-	TCPCongestion string
-	// Gateway holds the interface address prefixes of the device, which are
-	// the Local Addresses of the MIPS Stack
-	Gateway []string
 	// Addresses are what the stack opens connections from
 	Addresses []netip.Addr
 	// Remote is set if the tun is a tunnel to another system and not the tun of this one: what comes through it
 	// has come a long way, so its checksums are looked at, nothing but that way limits the windows, and the
 	// segments of TCP carry the times of both sides if the other side has them
 	Remote bool
-}
-
-// StackSelection is a validated stack name, TCP congestion control, and what
-// the stack needs of the device that will carry it
-type StackSelection struct {
-	Stack         string
-	TCPCongestion string
-	// Segments says the stack reads and writes the virtio_net_hdr that the
-	// device puts in front of its packets, so the device is opened with
-	// IFF_VNET_HDR for it, see segmenter
-	Segments bool
-}
-
-// SelectStack validates and canonicalizes a configured stack name and TCP
-// congestion control
-func SelectStack(stack string, congestion string) (StackSelection, error) {
-	switch strings.ToLower(strings.TrimSpace(stack)) {
-	case "", StackLightweight:
-		if strings.TrimSpace(congestion) != "" {
-			return StackSelection{}, errors.New("tcp congestion control is only supported by the ", StackMipstack, " stack")
-		}
-		return StackSelection{Stack: StackLightweight, Segments: true}, nil
-	case StackMipstack:
-		control, err := normalizeTCPCongestion(congestion)
-		if err != nil {
-			return StackSelection{}, err
-		}
-		return StackSelection{Stack: StackMipstack, TCPCongestion: control}, nil
-	default:
-		return StackSelection{}, errors.New("unknown tun stack: ", stack)
-	}
-}
-
-// cfgStack reads the stack a TUN Configuration selects. It is used by the
-// platform device constructors, which have to shape the device for the Stack
-// that will read it, and is the one place that knows which Configuration field
-// carries the name.
-func cfgStack(options *Config) (StackSelection, error) {
-	if options == nil {
-		return StackSelection{}, errors.New("tun configuration is missing")
-	}
-	return SelectStack(options.Stack, options.TcpCongestion)
-}
-
-// NewStack builds the stack named by options.Stack
-func NewStack(ctx context.Context, options StackOptions, handler ConnectionHandler) (Stack, error) {
-	selection, err := SelectStack(options.Stack, options.TCPCongestion)
-	if err != nil {
-		return nil, err
-	}
-	options.Stack = selection.Stack
-	options.TCPCongestion = selection.TCPCongestion
-
-	switch selection.Stack {
-	case StackLightweight:
-		return newLightweightStack(ctx, options, handler)
-	case StackMipstack:
-		return newMipstack(ctx, options, handler)
-	default:
-		return nil, errors.New("unknown tun stack: ", options.Stack)
-	}
 }
 
 // flow is what the packets of one connection have in common, src is the side of the system
@@ -167,9 +87,8 @@ type stack struct {
 	identification [64]atomic.Uint32
 }
 
-// newLightweightStack builds the lightweight IP stack from options that
-// SelectStack has already validated
-func newLightweightStack(ctx context.Context, options StackOptions, handler ConnectionHandler) (Stack, error) {
+// NewStack builds new ip stack. Without a handler it takes no connections, only opens them
+func NewStack(ctx context.Context, options StackOptions, handler ConnectionHandler) (Stack, error) {
 	s := &stack{
 		ctx:       ctx,
 		tun:       options.Tun,

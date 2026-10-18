@@ -199,21 +199,11 @@ var _ Tun = (*LinuxTun)(nil)
 
 // NewTun builds new tun interface handler (linux specific)
 func NewTun(options *Config) (Tun, error) {
-	selection, err := cfgStack(options)
-	if err != nil {
-		return nil, err
-	}
-
 	tunFd, vnet, tunLink, fdProvided, err := openFromEnv(options.Name)
 	if err != nil {
 		return nil, err
 	}
 	if fdProvided {
-		if !selection.Segments && vnet != 0 {
-			// the mipstack Stack reads the descriptor as bare packets, so a
-			// virtio_net_hdr in front of them would be taken for the IP header
-			return nil, errors.New("invalid ", platform.TunFdKey, ": the ", StackMipstack, " stack needs a TUN device without IFF_VNET_HDR")
-		}
 		return &LinuxTun{
 			fdTun:   newFdTun(tunFd, vnet),
 			tunLink: tunLink,
@@ -221,22 +211,16 @@ func NewTun(options *Config) (Tun, error) {
 		}, nil
 	}
 
-	// A virtio_net_hdr in front of every packet is what lets the system leave
-	// its TCP segments as large as they are and takes such segments back
-	// (IFF_VNET_HDR with the offload features, see WriteSegment). Only the
-	// lightweight Stack reads and writes that header, which is what the
-	// selection asks of this device. A device that was opened without
-	// IFF_VNET_HDR refuses TUNSETOFFLOAD with EINVAL forever, so the mode is
-	// picked here, once.
-	if selection.Segments {
-		vnet = vnetSize
-		tunFd, err = open(options.Name, unix.IFF_VNET_HDR)
-		if err == nil && unix.IoctlSetInt(tunFd, unix.TUNSETOFFLOAD, unix.TUN_F_CSUM|unix.TUN_F_TSO4|unix.TUN_F_TSO6) != nil {
-			// offload is refused, but the virtio_net_hdr is still in front of
-			// every packet and the Stack still reads it
-			_ = unix.IoctlSetInt(tunFd, unix.TUNSETOFFLOAD, 0)
-		}
-	} else {
+	// with a virtio_net_hdr on every packet the system leaves its TCP segments as large as they are,
+	// with their checksums not completed, and takes such segments. Without it where that is refused
+	vnet = vnetSize
+	tunFd, err = open(options.Name, unix.IFF_VNET_HDR)
+	if err == nil && unix.IoctlSetInt(tunFd, unix.TUNSETOFFLOAD, unix.TUN_F_CSUM|unix.TUN_F_TSO4|unix.TUN_F_TSO6) != nil {
+		_ = unix.Close(tunFd)
+		err = unix.EINVAL
+	}
+	if err != nil {
+		vnet = 0
 		tunFd, err = open(options.Name, 0)
 	}
 	if err != nil {
@@ -291,8 +275,6 @@ func openFromEnv(expectedName string) (int, int, netlink.Link, bool, error) {
 	}
 	vnet := 0
 	if flags&unix.IFF_VNET_HDR != 0 {
-		// the header is read and written by the lightweight Stack only; whether
-		// that Stack is the one that will read this descriptor is NewTun's call
 		if vnet, err = unix.IoctlGetInt(fd, unix.TUNGETVNETHDRSZ); err != nil || vnet < vnetSize || vnet > packetRoom {
 			return -1, 0, nil, true, errors.New("invalid ", platform.TunFdKey, ": virtio_net_hdr of ", vnet, " bytes").Base(err)
 		}

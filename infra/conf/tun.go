@@ -24,8 +24,6 @@ type TunConfig struct {
 	UserLevel              uint32   `json:"userLevel"`
 	AutoSystemRoutingTable []string `json:"autoSystemRoutingTable"`
 	AutoOutboundsInterface *string  `json:"autoOutboundsInterface"`
-	Stack                  string   `json:"stack"`
-	TCPCongestion          string   `json:"tcpCongestion"`
 	AutoSystemDnsToGateway bool     `json:"autoSystemDnsToGateway"`
 	AutoSystemWfpBlockLeak []string `json:"autoSystemWfpBlockLeak"`
 }
@@ -39,8 +37,6 @@ func (v *TunConfig) Build() (proto.Message, error) {
 		DNS:                    v.DNS,
 		UserLevel:              v.UserLevel,
 		AutoSystemRoutingTable: v.AutoSystemRoutingTable,
-		Stack:                  v.Stack,
-		TcpCongestion:          v.TCPCongestion,
 		AutoSystemDnsToGateway: v.AutoSystemDnsToGateway,
 	}
 	for _, leak := range v.AutoSystemWfpBlockLeak {

@@ -141,6 +141,7 @@ func (t *Handler) Start() error {
 		internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
 			iface := updater.Get()
 			if iface == nil {
+				// no interface to bind to yet: let the connection use the default
 				return nil
 			}
 			var controlErr, sockErr error
@@ -165,12 +166,9 @@ func (t *Handler) Start() error {
 	errors.LogInfo(t.ctx, tunName, " created")
 
 	tunStackOptions := StackOptions{
-		Tun:           tunInterface,
-		MTU:           t.config.MTU,
-		IdleTimeout:   t.policyManager.ForLevel(t.config.UserLevel).Timeouts.ConnectionIdle,
-		Stack:         t.config.Stack,
-		TCPCongestion: t.config.TcpCongestion,
-		Gateway:       t.config.Gateway,
+		Tun:         tunInterface,
+		MTU:         t.config.MTU,
+		IdleTimeout: t.policyManager.ForLevel(t.config.UserLevel).Timeouts.ConnectionIdle,
 	}
 	tunStack, err := NewStack(t.ctx, tunStackOptions, t)
 	if err != nil {
@@ -255,7 +253,7 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 	errors.LogInfo(ctx, "processing from ", source, " to ", destination)
 
 	// both kinds of connection are buf.Reader and buf.Writer, what they carry is counted on the way
-	reader := &buf.TimeoutWrapperReader{Reader: newUplinkReader(conn), Counter: t.uplinkCounter}
+	reader := &buf.TimeoutWrapperReader{Reader: buf.NewReader(conn), Counter: t.uplinkCounter}
 	writer := buf.NewWriter(conn)
 	if destination.Network != net.Network_UDP {
 		writer = &TCPWriter{Writer: writer, Counter: t.downlinkCounter}
