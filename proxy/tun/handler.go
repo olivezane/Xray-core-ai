@@ -141,8 +141,8 @@ func (t *Handler) Start() error {
 		internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
 			iface := updater.Get()
 			if iface == nil {
-				// no interface to bind to yet: let the connection use the default
-				return nil
+				errors.LogInfo(context.Background(), "[tun] falied to set interface > iface == nil")
+				return errors.New("iface not found")
 			}
 			var controlErr, sockErr error
 			controlErr = c.Control(func(fd uintptr) {
@@ -219,14 +219,7 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 	defer cancel()
 	ctx = c.ContextWithID(ctx, session.NewID())
 
-	// if the connection is already closed, conn.RemoteAddr() will be nil, and
-	// net.DestinationFromAddr cannot tell what that is
-	remote := conn.RemoteAddr()
-	if remote == nil {
-		errors.LogInfo(t.ctx, "dropped quickly closed connection")
-		return
-	}
-	source := net.DestinationFromAddr(remote)
+	source := net.DestinationFromAddr(conn.RemoteAddr())
 
 	inbound := session.Inbound{
 		Name:          "tun",
@@ -272,6 +265,11 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 
 // Close implements common.Closable.
 func (t *Handler) Close() error {
+	if updater != nil {
+		updater.Lock()
+		updater.iface = nil
+		updater.Unlock()
+	}
 	return errors.Combine(common.CloseIfExists(t.stack), common.CloseIfExists(t.tun))
 }
 

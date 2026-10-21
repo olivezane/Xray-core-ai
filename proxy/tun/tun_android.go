@@ -73,11 +73,9 @@ func NewTun(options *Config) (Tun, error) {
 		fd, err := strconv.Atoi(fdStr)
 		if err == nil && fd > 0 {
 			if err = checkBareTunFd(fd); err != nil {
-				unix.Close(fd)
 				return nil, err
 			}
 			if err = unix.SetNonblock(fd, true); err != nil {
-				unix.Close(fd)
 				return nil, err
 			}
 			// the descriptor stays with the application, Close ends the reading of a duplicate
@@ -90,7 +88,7 @@ func NewTun(options *Config) (Tun, error) {
 	}
 
 	// No external FD — create TUN ourselves
-	tunFd, tunLink, _, err := openTun(options.Name)
+	tunFd, tunLink, err := openTun(options.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +103,7 @@ func NewTun(options *Config) (Tun, error) {
 
 // openTun opens or creates the TUN device.
 // Android may have /dev/tun or /dev/net/tun depending on kernel config.
-func openTun(name string) (int, netlink.Link, string, error) {
+func openTun(name string) (int, netlink.Link, error) {
 	ctrlPath := "/dev/tun"
 	if _, err := os.Stat(ctrlPath); os.IsNotExist(err) {
 		ctrlPath = "/dev/net/tun"
@@ -113,39 +111,45 @@ func openTun(name string) (int, netlink.Link, string, error) {
 
 	fd, err := unix.Open(ctrlPath, unix.O_RDWR, 0)
 	if err != nil {
-		return -1, nil, "", errors.New("failed to open TUN device: ", ctrlPath).Base(err)
+		return -1, nil, errors.New("failed to open TUN device: ", ctrlPath).Base(err)
 	}
 
 	ifr, err := unix.NewIfreq(name)
 	if err != nil {
 		unix.Close(fd)
-		return -1, nil, "", err
+		return -1, nil, err
 	}
 
 	ifr.SetUint16(uint16(unix.IFF_TUN | unix.IFF_NO_PI))
 	if err = unix.IoctlIfreq(fd, unix.TUNSETIFF, ifr); err != nil {
 		unix.Close(fd)
-		return -1, nil, "", err
+		return -1, nil, err
 	}
 
 	actualName := ifr.Name()
 	if err = unix.SetNonblock(fd, true); err != nil {
 		unix.Close(fd)
-		return -1, nil, "", err
+		return -1, nil, err
 	}
 
 	tunLink, err := netlink.LinkByName(actualName)
 	if err != nil {
 		unix.Close(fd)
-		return -1, nil, "", err
+		return -1, nil, err
 	}
 
-	return fd, tunLink, actualName, nil
+	return fd, tunLink, nil
 }
 
 // Start sets up TUN: MTU, IP addresses, link up, routes, ip rules.
 // In FD mode the external App is expected to handle setup.
 func (t *AndroidTun) Start() error {
+	// registered before the ownsTun check so FD mode keeps refreshing too
+	if updater != nil {
+		t.routeMonitorStop = make(chan struct{})
+		go t.monitorRouteChanges()
+	}
+
 	if !t.ownsTun {
 		return nil
 	}
@@ -172,22 +176,17 @@ func (t *AndroidTun) Start() error {
 		return err
 	}
 
-	if updater != nil {
-		t.routeMonitorStop = make(chan struct{})
-		go t.monitorRouteChanges()
-	}
-
 	return nil
 }
 
 // Close tears down TUN: rules, routes, addresses, link down, fd.
 func (t *AndroidTun) Close() error {
+	t.routeMonitorOnce.Do(func() {
+		if t.routeMonitorStop != nil {
+			close(t.routeMonitorStop)
+		}
+	})
 	if t.ownsTun {
-		t.routeMonitorOnce.Do(func() {
-			if t.routeMonitorStop != nil {
-				close(t.routeMonitorStop)
-			}
-		})
 		t.unsetRules()
 		t.unsetRoutes()
 		t.unsetInterfaceAddresses()
@@ -326,6 +325,10 @@ func (t *AndroidTun) setRules() error {
 		r.Family = family
 		r.Table = ipRoute2TableIndex
 		if err := netlink.RuleAdd(r); err != nil {
+			// the rule is already there, either ours from a previous run or another app's
+			if errors.Cause(err) == unix.EEXIST {
+				continue
+			}
 			t.unsetRules()
 			return errors.New("failed to add rule").Base(err)
 		}
@@ -340,12 +343,15 @@ func (t *AndroidTun) unsetRules() error {
 	}
 	var errs []error
 	for _, rule := range list {
-		if rule.Priority != ipRoute2RuleIndex {
+		// only touch our own rule: RuleDel matches on family and priority alone,
+		// so without the table check it would delete any other app's pref-9000 rule
+		if rule.Priority != ipRoute2RuleIndex || rule.Table != ipRoute2TableIndex {
 			continue
 		}
 		del := netlink.NewRule()
 		del.Family = rule.Family
 		del.Priority = rule.Priority
+		del.Table = rule.Table
 		if err := netlink.RuleDel(del); err != nil {
 			errs = append(errs, errors.New("failed to delete rule priority ", rule.Priority).Base(err))
 		}
@@ -358,12 +364,6 @@ func (t *AndroidTun) unsetRules() error {
 // ---------------------------------------------------------------------------
 
 func (t *AndroidTun) monitorRouteChanges() {
-	if netlinkBanned() {
-		errors.LogInfo(context.Background(), "[tun] android: netlink banned by Google, fallback to polling /proc/net/route")
-		t.pollRouteChanges()
-		return
-	}
-
 	routeCh := make(chan netlink.RouteUpdate, 1)
 	if err := netlink.RouteSubscribe(routeCh, t.routeMonitorStop); err != nil {
 		errors.LogInfo(context.Background(), "[tun] android: failed to subscribe route changes: ", err)
@@ -378,31 +378,23 @@ func (t *AndroidTun) monitorRouteChanges() {
 		return
 	}
 
-	timer := time.NewTimer(0)
-	if !timer.Stop() {
-		<-timer.C
-	}
-
 	for {
 		select {
 		case _, ok := <-routeCh:
 			if !ok {
 				return
 			}
-			timer.Reset(time.Second)
+			if updater != nil {
+				updater.Update()
+			}
 		case _, ok := <-linkCh:
 			if !ok {
 				return
 			}
-			timer.Reset(time.Second)
-		case <-timer.C:
 			if updater != nil {
 				updater.Update()
 			}
 		case <-t.routeMonitorStop:
-			if !timer.Stop() {
-				<-timer.C
-			}
 			return
 		}
 	}
@@ -424,23 +416,6 @@ func (t *AndroidTun) pollRouteChanges() {
 	}
 }
 
-// netlinkBanned checks whether Android 14+ has banned netlink for this process.
-func netlinkBanned() bool {
-	fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_DGRAM, unix.NETLINK_ROUTE)
-	if err != nil {
-		return true
-	}
-	defer unix.Close(fd)
-	return unix.Bind(fd, &unix.SockaddrNetlink{Family: unix.AF_NETLINK}) != nil
-}
-
-// Android ip-rule family constants (AF_INET / AF_INET6 values on Linux and
-// Android).
-const (
-	androidFamilyIPv4 = 2
-	androidFamilyIPv6 = 10
-)
-
 // androidRuleFamilies returns the IP families that need ip-rule redirects for
 // the configured autoSystemRoutingTable CIDRs. Empty input yields no
 // families: with no routes in the custom table, adding rules would only
@@ -454,9 +429,9 @@ func androidRuleFamilies(cidrs []string) []int {
 		if err != nil {
 			continue
 		}
-		f := androidFamilyIPv4
+		f := unix.AF_INET
 		if prefix.Addr().Is6() {
-			f = androidFamilyIPv6
+			f = unix.AF_INET6
 		}
 		if !seen[f] {
 			seen[f] = true
@@ -583,9 +558,6 @@ func procDefaultInterface(tunIndex int) *net.Interface {
 		if usableOutboundInterface(iface, tunIndex) {
 			return iface
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil
 	}
 	return nil
 }
