@@ -1,7 +1,9 @@
 package scenarios
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"net/url"
@@ -431,6 +433,81 @@ func TestBlackhole(t *testing.T) {
 
 	if err := testTCPConn(serverPort2, 1024, time.Second*5)(); err == nil {
 		t.Error("nil error")
+	}
+}
+
+func TestSTUNSniffing(t *testing.T) {
+	bindingRequest, err := hex.DecodeString("000100002112a44224b1a025d0c180c484341306")
+	common.Must(err)
+	bindingResponse, err := hex.DecodeString("010100002112a44224b1a025d0c180c484341306")
+	common.Must(err)
+
+	udpServer := udp.Server{
+		MsgProcessor: func([]byte) []byte { return bindingResponse },
+	}
+	dest, err := udpServer.Start()
+	common.Must(err)
+	defer udpServer.Close()
+
+	port := udp.PickPort()
+	config := &core.Config{
+		Inbound: []*core.InboundHandlerConfig{
+			{
+				ReceiverSettings: serial.ToTypedMessage(&proxyman.ReceiverConfig{
+					PortList: &net.PortList{Range: []*net.PortRange{net.SinglePortRange(port)}},
+					Listen:   net.NewIPOrDomain(net.LocalHostIP),
+					SniffingSettings: &proxyman.SniffingConfig{
+						Enabled:             true,
+						DestinationOverride: []string{"stun"},
+					},
+				}),
+				ProxySettings: serial.ToTypedMessage(&dokodemo.Config{
+					RewriteAddress:  net.NewIPOrDomain(dest.Address),
+					RewritePort:     uint32(dest.Port),
+					AllowedNetworks: []net.Network{net.Network_UDP},
+				}),
+			},
+		},
+		Outbound: []*core.OutboundHandlerConfig{
+			{
+				Tag:           "blocked",
+				ProxySettings: serial.ToTypedMessage(&blackhole.Config{}),
+			},
+			{
+				Tag:           "direct",
+				ProxySettings: serial.ToTypedMessage(&freedom.Config{FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}}}),
+			},
+		},
+		App: []*serial.TypedMessage{
+			serial.ToTypedMessage(&router.Config{
+				Rule: []*router.RoutingRule{
+					{
+						TargetTag: &router.RoutingRule_Tag{
+							Tag: "direct",
+						},
+						Protocol: []string{"stun"},
+					},
+				},
+			}),
+		},
+	}
+
+	servers, err := InitializeServerConfigs(config)
+	common.Must(err)
+	defer CloseAllServers(servers)
+
+	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: []byte{127, 0, 0, 1}, Port: int(port)})
+	common.Must(err)
+	defer conn.Close()
+
+	common.Must2(conn.Write(bindingRequest))
+	common.Must(conn.SetReadDeadline(time.Now().Add(5 * time.Second)))
+	response := make([]byte, len(bindingResponse))
+	if _, err := io.ReadFull(conn, response); err != nil {
+		t.Fatal("stun packet was not routed by protocol: ", err)
+	}
+	if !bytes.Equal(response, bindingResponse) {
+		t.Fatal("unexpected response: ", hex.EncodeToString(response))
 	}
 }
 
