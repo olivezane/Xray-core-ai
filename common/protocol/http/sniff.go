@@ -39,19 +39,23 @@ func (h *SniffHeader) Domain() string {
 }
 
 var (
-	methods = [...]string{"get", "post", "head", "put", "delete", "options", "connect"}
+	methods = [...]string{"get", "post", "head", "put", "delete", "options", "connect", "patch", "trace"}
 
 	errNotHTTPMethod = errors.New("not an HTTP method")
 )
 
 func beginWithHTTPMethod(b []byte) error {
 	for _, m := range &methods {
-		if len(b) >= len(m) && strings.EqualFold(string(b[:len(m)]), m) {
-			return nil
+		if len(b) < len(m) {
+			// Only ask for more data when the buffer is still a prefix of this method.
+			if strings.EqualFold(string(b), m[:len(b)]) {
+				return common.ErrNoClue
+			}
+			continue
 		}
 
-		if len(b) < len(m) {
-			return common.ErrNoClue
+		if strings.EqualFold(string(b[:len(m)]), m) {
+			return nil
 		}
 	}
 
@@ -76,7 +80,8 @@ func SniffHTTP(b []byte, c context.Context) (*SniffHeader, error) {
 
 	headers := bytes.Split(b, []byte{'\n'})
 	for i := 1; i < len(headers); i++ {
-		header := headers[i]
+		// A CRLF-terminated empty line ends the header section, RFC 9112 Section 2.2.
+		header := bytes.TrimSuffix(headers[i], []byte{'\r'})
 		if len(header) == 0 {
 			break
 		}

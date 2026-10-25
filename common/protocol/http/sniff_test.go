@@ -86,6 +86,20 @@ first_name=John&last_name=Doe&action=Submit`,
 			domain: "",
 			err:    true,
 		},
+		{
+			// The header section ends at the first empty line, so a Host in the body is not a header (RFC 9112 Section 6).
+			input:  "POST /x HTTP/1.1\r\nHost: good.com\r\nContent-Length: 15\r\n\r\nhost: evil.com\r\n",
+			domain: "good.com",
+		},
+		{
+			// PATCH is defined by RFC 5789, TRACE by RFC 9110 Section 9.3.8.
+			input:  "PATCH /x HTTP/1.1\r\nHost: patch.com\r\n\r\n",
+			domain: "patch.com",
+		},
+		{
+			input:  "TRACE /x HTTP/1.1\r\nHost: trace.com\r\n\r\n",
+			domain: "trace.com",
+		},
 	}
 
 	for _, test := range cases {
