@@ -106,11 +106,18 @@ func SniffHTTP(b []byte, c context.Context) (*SniffHeader, error) {
 	// Parse request line
 	// Request line is like this
 	// "GET /homo/114514 HTTP/1.1"
-	if len(headers) > 0 && ShouldSniffAttr {
-		RequestLineParts := bytes.Split(headers[0], []byte{' '})
+	if len(headers) > 0 {
+		RequestLineParts := bytes.Split(bytes.TrimSuffix(headers[0], []byte{'\r'}), []byte{' '})
 		if len(RequestLineParts) == 3 {
-			content.SetAttribute(":method", string(RequestLineParts[0]))
-			content.SetAttribute(":path", string(RequestLineParts[1]))
+			if ShouldSniffAttr {
+				content.SetAttribute(":method", string(RequestLineParts[0]))
+				content.SetAttribute(":path", string(RequestLineParts[1]))
+			}
+			// RFC 9112 §3.2: the authority of an absolute-form target replaces the
+			// Host field (§3.2.2), CONNECT carries it in the target itself (§3.2.3).
+			if host, ok := targetAuthority(RequestLineParts[0], RequestLineParts[1]); ok {
+				sh.host = host
+			}
 		}
 	}
 
@@ -119,4 +126,28 @@ func SniffHTTP(b []byte, c context.Context) (*SniffHeader, error) {
 	}
 
 	return nil, common.ErrNoClue
+}
+
+// targetAuthority returns the host of an absolute-form request-target
+// (RFC 9112 §3.2.2) or of the authority-form target of a CONNECT request
+// (§3.2.3). The Host field is only a fallback for the other forms, so ok is
+// false when the target carries no authority at all.
+func targetAuthority(method, target []byte) (string, bool) {
+	authority := []byte(nil)
+	if bytes.EqualFold(method, []byte("connect")) {
+		authority = target
+	} else if _, after, found := bytes.Cut(target, []byte("://")); found {
+		authority = after
+		if i := bytes.IndexAny(authority, "/#?"); i >= 0 {
+			authority = authority[:i]
+		}
+	}
+	if len(authority) == 0 {
+		return "", false
+	}
+	dest, err := ParseHost(strings.ToLower(string(authority)), net.Port(80))
+	if err != nil || dest.Address == nil || len(dest.Address.String()) == 0 {
+		return "", false
+	}
+	return dest.Address.String(), true
 }

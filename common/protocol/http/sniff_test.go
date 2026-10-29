@@ -100,6 +100,17 @@ first_name=John&last_name=Doe&action=Submit`,
 			input:  "TRACE /x HTTP/1.1\r\nHost: trace.com\r\n\r\n",
 			domain: "trace.com",
 		},
+		{
+			// RFC 9112 §3.2.2: an absolute-form target carries the authority and it
+			// overrides the Host field.
+			input:  "GET http://target.com/x HTTP/1.1\r\nHost: other.com\r\n\r\n",
+			domain: "target.com",
+		},
+		{
+			// RFC 9112 §3.2.3: CONNECT uses the authority-form, so Host is optional.
+			input:  "CONNECT connect.com:443 HTTP/1.1\r\n\r\n",
+			domain: "connect.com",
+		},
 	}
 
 	for _, test := range cases {

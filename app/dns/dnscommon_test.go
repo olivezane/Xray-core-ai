@@ -133,6 +133,20 @@ func Test_parseResponseQueryMatching(t *testing.T) {
 			t.Error(c.name, " accepted: ", rec)
 		}
 	}
+
+	// RFC1035 §4.1.1: only the answer to a standard query (opcode 0) is used,
+	// the same wire format serves UPDATE, NOTIFY and friends.
+	notify := new(dns.Msg)
+	notify.SetQuestion("example.com.", dns.TypeA)
+	notify.Id = 42
+	notify.Response = true
+	notify.Opcode = dns.OpcodeNotify
+	notify.Answer = append(notify.Answer, common.Must2(dns.NewRR("example.com. 60 IN A 192.0.2.53")))
+	if rec, err := parseResponse(common.Must2(notify.Pack()), req); err == nil {
+		t.Error("response with opcode NOTIFY accepted: ", rec)
+	} else if !strings.Contains(err.Error(), "opcode") {
+		t.Error("unexpected error: ", err)
+	}
 }
 
 func Test_buildReqMsgs(t *testing.T) {

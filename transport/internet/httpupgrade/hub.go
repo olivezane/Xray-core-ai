@@ -68,9 +68,7 @@ func (s *server) upgrade(conn net.Conn) (stat.Connection, error) {
 		}
 	}
 
-	connection := strings.ToLower(req.Header.Get("Connection"))
-	upgrade := strings.ToLower(req.Header.Get("Upgrade"))
-	if connection != "upgrade" || upgrade != "websocket" {
+	if !headerHasToken(req.Header, "Connection", "upgrade") || !headerHasToken(req.Header, "Upgrade", "websocket") {
 		return nil, errors.New("unrecognized request")
 	}
 	resp := &http.Response{

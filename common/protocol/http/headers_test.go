@@ -54,6 +54,8 @@ Foo: foo
 Bar: bar
 Proxy-Connection: keep-alive
 Proxy-Authenticate: abc
+Keep-Alive: timeout=5
+Trailer: Foo
 Accept-Encoding: gzip
 Accept-Charset: ISO-8859-1,UTF-8;q=0.7,*;q=0.7
 Cache-Control: no-cache
@@ -87,6 +89,14 @@ Accept-Language: de,en;q=0.7,en-us;q=0.3
 			Key:   "Proxy-Authenticate",
 			Value: "abc",
 		},
+		{
+			Key:   "Keep-Alive",
+			Value: "timeout=5",
+		},
+		{
+			Key:   "Trailer",
+			Value: "Foo",
+		},
 	}
 	for _, header := range headers {
 		if v := req.Header.Get(header.Key); v != header.Value {
@@ -96,7 +106,7 @@ Accept-Language: de,en;q=0.7,en-us;q=0.3
 
 	RemoveHopByHopHeaders(req.Header)
 
-	for _, header := range []string{"Connection", "Foo", "Bar", "Proxy-Connection", "Proxy-Authenticate"} {
+	for _, header := range []string{"Connection", "Foo", "Bar", "Proxy-Connection", "Proxy-Authenticate", "Keep-Alive", "Trailer"} {
 		if v := req.Header.Get(header); v != "" {
 			t.Error("header ", header, " = ", v)
 		}

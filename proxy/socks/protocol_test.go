@@ -2,6 +2,7 @@ package socks_test
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -119,5 +120,22 @@ func BenchmarkReadUsernamePassword(b *testing.B) {
 		common.Must(err)
 		buffer.Clear()
 		buffer.Extend(int32(len(input)))
+	}
+}
+
+func TestClientHandshakeReplyVersion(t *testing.T) {
+	// RFC 1928 §6: a reply starts with VER, which has to be 0x05.
+	reply := []byte{
+		0x05, 0x00, // method selection: no auth required
+		0x04, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x1f, 0x90, // SUCCEEDED, but with a bogus VER
+	}
+	request := &protocol.RequestHeader{
+		Command: protocol.RequestCommandTCP,
+		Address: net.DomainAddress("example.com"),
+		Port:    443,
+	}
+
+	if _, err := ClientHandshake(request, bytes.NewReader(reply), io.Discard); err == nil {
+		t.Error("reply with VER 0x04 accepted")
 	}
 }

@@ -509,6 +509,10 @@ func ClientHandshake(request *protocol.RequestHeader, reader io.Reader, writer i
 		return nil, err
 	}
 
+	if b.Byte(0) != socks5Version { // RFC 1928 §6: VER, REP, RSV
+		return nil, errors.New("unexpected server version in reply: ", b.Byte(0))
+	}
+
 	resp := b.Byte(1)
 	if resp != 0x00 {
 		return nil, errors.New("server rejects request: ", resp)

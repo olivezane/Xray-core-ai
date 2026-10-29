@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
@@ -35,8 +34,8 @@ func (c *ConnRF) Read(b []byte) (int, error) {
 			return 0, err
 		}
 		if resp.Status != "101 Switching Protocols" ||
-			strings.ToLower(resp.Header.Get("Upgrade")) != "websocket" ||
-			strings.ToLower(resp.Header.Get("Connection")) != "upgrade" {
+			!headerHasToken(resp.Header, "Upgrade", "websocket") ||
+			!headerHasToken(resp.Header, "Connection", "upgrade") {
 			return 0, errors.New("unrecognized reply")
 		}
 		// drain remaining bufreader

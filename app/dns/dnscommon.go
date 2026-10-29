@@ -277,6 +277,9 @@ func matchQuestion(parser *dnsmessage.Parser, h *dnsmessage.Header, req *dnsRequ
 	if !h.Response {
 		return errors.New("invalid DNS response: QR bit not set")
 	}
+	if h.OpCode != 0 { // RFC1035 §4.1.1: only a standard query (opcode 0) carries an answer for us.
+		return errors.New("invalid DNS response: unexpected opcode ", h.OpCode)
+	}
 	if h.ID != req.msg.ID {
 		return errors.New("invalid DNS response: ID mismatch")
 	}

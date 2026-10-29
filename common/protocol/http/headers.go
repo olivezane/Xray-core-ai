@@ -40,17 +40,19 @@ func ApplyTrustedXForwardedFor(header http.Header, trusted []string, remoteAddr 
 
 // RemoveHopByHopHeaders removes hop by hop headers in http header list.
 func RemoveHopByHopHeaders(header http.Header) {
-	// Strip hop-by-hop header based on RFC:
-	// http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html#sec13.5.1
+	// Strip the hop-by-hop fields listed by RFC 9110 §7.6.1 (RFC 2616 §13.5.1 is
+	// obsolete and called "Trailer" by its old name "Trailers"), plus the
+	// non-standard Proxy-Connection.
 	// https://www.mnot.net/blog/2011/07/11/what_proxies_must_do
 
 	header.Del("Proxy-Connection")
 	header.Del("Proxy-Authenticate")
 	header.Del("Proxy-Authorization")
 	header.Del("TE")
-	header.Del("Trailers")
+	header.Del("Trailer")
 	header.Del("Transfer-Encoding")
 	header.Del("Upgrade")
+	header.Del("Keep-Alive")
 
 	connections := header.Get("Connection")
 	header.Del("Connection")

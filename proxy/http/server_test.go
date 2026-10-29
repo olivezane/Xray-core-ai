@@ -47,3 +47,30 @@ func TestReadResponseAndHandle100ContinueForwardsAndParsesFinalResponse(t *testi
 		t.Fatalf("expected 1xx response to be forwarded, got %q", forwarded.String())
 	}
 }
+
+func TestReadResponseAndHandle100ContinueForwardsEvery1xx(t *testing.T) {
+	// RFC 9110 §15.2: one or more 1xx responses may precede the final response,
+	// and each of them has to reach the client.
+	payload := "HTTP/1.1 103 Early Hints\r\nLink: </a.css>; rel=preload\r\n\r\n" +
+		"HTTP/1.1 100 Continue\r\n\r\n" +
+		"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"
+	r := bufio.NewReader(bytes.NewReader([]byte(payload)))
+	req, err := http.NewRequest("GET", "http://example.com/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var forwarded bytes.Buffer
+	resp, err := readResponseAndHandle100Continue(r, req, &forwarded)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+	for _, want := range []string{"103 Early Hints", "Link: </a.css>; rel=preload", "100 Continue"} {
+		if !strings.Contains(forwarded.String(), want) {
+			t.Fatalf("expected %q to be forwarded, got %q", want, forwarded.String())
+		}
+	}
+}
