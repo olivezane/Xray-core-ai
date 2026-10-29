@@ -28,7 +28,10 @@ type staticHandler struct{}
 
 func (*staticHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	ans := new(dns.Msg)
-	ans.Id = r.Id
+	// RFC1035 §4.1.1: a reply sets QR and echoes the question. A bare
+	// new(dns.Msg) answers with QR unset and an empty question section, which
+	// the DNS client now rejects (RFC5452 §9.1).
+	ans.SetReply(r)
 
 	var clientIP net.IP
 

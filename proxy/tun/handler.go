@@ -136,10 +136,14 @@ func (t *Handler) Start() error {
 		if t.config.AutoOutboundsInterface == "auto" {
 			t.config.AutoOutboundsInterface = ""
 		}
-		updater = &InterfaceUpdater{tunIndex: tunIndex, fixedName: t.config.AutoOutboundsInterface}
-		updater.Update()
+		u := &InterfaceUpdater{tunIndex: tunIndex, fixedName: t.config.AutoOutboundsInterface}
+		updater = u
+		u.Update()
 		internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
-			iface := updater.Get()
+			if u.IsClosed() {
+				return nil
+			}
+			iface := u.Get()
 			if iface == nil {
 				errors.LogInfo(context.Background(), "[tun] falied to set interface > iface == nil")
 				return errors.New("iface not found")
@@ -266,9 +270,7 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 // Close implements common.Closable.
 func (t *Handler) Close() error {
 	if updater != nil {
-		updater.Lock()
-		updater.iface = nil
-		updater.Unlock()
+		updater.Close()
 	}
 	return errors.Combine(common.CloseIfExists(t.stack), common.CloseIfExists(t.tun))
 }

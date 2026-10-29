@@ -510,12 +510,15 @@ func ReshapeMultiBuffer(ctx context.Context, buffer buf.MultiBuffer) buf.MultiBu
 
 // randN returns a value in [0, n) from 4 random bytes.
 // shortcut: modulo bias instead of big.Int rejection sampling, n is a config seed
-func randN(n uint32) uint32 {
+func randN(ctx context.Context, n uint32) uint32 {
 	if n == 0 {
 		return 0
 	}
 	var b [4]byte
-	rand.Read(b[:])
+	if _, err := rand.Read(b[:]); err != nil {
+		errors.LogDebugInner(ctx, err, "failed to generate padding, using the minimum")
+		return 0
+	}
 	return binary.LittleEndian.Uint32(b[:]) % n
 }
 
@@ -527,9 +530,9 @@ func XtlsPadding(b *buf.Buffer, command byte, userUUID *[]byte, longPadding bool
 		contentLen = b.Len()
 	}
 	if contentLen < int32(testseed[0]) && longPadding {
-		paddingLen = int32(randN(testseed[1])) + int32(testseed[2]) - contentLen
+		paddingLen = int32(randN(ctx, testseed[1])) + int32(testseed[2]) - contentLen
 	} else {
-		paddingLen = int32(randN(testseed[3]))
+		paddingLen = int32(randN(ctx, testseed[3]))
 	}
 	if paddingLen > buf.Size-21-contentLen {
 		paddingLen = buf.Size - 21 - contentLen

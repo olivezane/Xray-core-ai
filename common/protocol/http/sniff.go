@@ -136,7 +136,7 @@ func targetAuthority(method, target []byte) (string, bool) {
 	authority := []byte(nil)
 	if bytes.EqualFold(method, []byte("connect")) {
 		authority = target
-	} else if _, after, found := bytes.Cut(target, []byte("://")); found {
+	} else if scheme, after, found := bytes.Cut(target, []byte("://")); found && isScheme(scheme) {
 		authority = after
 		if i := bytes.IndexAny(authority, "/#?"); i >= 0 {
 			authority = authority[:i]
@@ -150,4 +150,19 @@ func targetAuthority(method, target []byte) (string, bool) {
 		return "", false
 	}
 	return dest.Address.String(), true
+}
+
+// isScheme reports whether s is a URI scheme (RFC 3986 §3.1). Without this check
+// an origin-form target like "/r?u=http://other.com/" would pass for absolute-form
+// and let a path segment take over the destination.
+func isScheme(s []byte) bool {
+	for i, c := range s {
+		switch {
+		case c|0x20 >= 'a' && c|0x20 <= 'z':
+		case i > 0 && (c >= '0' && c <= '9' || c == '+' || c == '-' || c == '.'):
+		default:
+			return false
+		}
+	}
+	return len(s) > 0
 }

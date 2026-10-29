@@ -313,7 +313,9 @@ func (s *Server) handlePlainHTTP(ctx context.Context, request *http.Request, wri
 // it should not be processed by http proxy handler, just forward it to client
 func readResponseAndHandle100Continue(r *bufio.Reader, req *http.Request, writer io.Writer) (*http.Response, error) {
 	// RFC 9110 §15.2: one or more 1xx responses may precede the final response.
-	for {
+	// Capped: a server that never sends a final response must not keep us looping.
+	const maxInformationalResponses = 8
+	for i := 0; ; i++ {
 		// have a little look of response
 		peekBytes, err := r.Peek(56)
 		if err != nil && err != bufio.ErrBufferFull {
@@ -324,6 +326,9 @@ func readResponseAndHandle100Continue(r *bufio.Reader, req *http.Request, writer
 		// only handle 1xx response
 		if !strings.HasPrefix(status, "1") {
 			break
+		}
+		if i >= maxInformationalResponses {
+			return nil, errors.New("too many http 1xx responses")
 		}
 		ResponseHeader1xx := []byte{}
 		// read until \r\n\r\n (end of http response header)

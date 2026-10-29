@@ -111,6 +111,12 @@ first_name=John&last_name=Doe&action=Submit`,
 			input:  "CONNECT connect.com:443 HTTP/1.1\r\n\r\n",
 			domain: "connect.com",
 		},
+		{
+			// origin-form: "://" inside the path is not a scheme, it must not
+			// override the destination (a path segment pointing the proxy elsewhere).
+			input:  "GET /r?u=http://evil.com/ HTTP/1.1\r\nHost: target.com\r\n\r\n",
+			domain: "target.com",
+		},
 	}
 
 	for _, test := range cases {

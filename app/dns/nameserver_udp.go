@@ -108,10 +108,6 @@ func (s *ClassicNameServer) HandleResponse(ctx context.Context, packet *udp_prot
 
 	s.Lock()
 	req, ok := s.requests[id]
-	if ok {
-		// remove the pending request
-		delete(s.requests, id)
-	}
 	s.Unlock()
 	if !ok {
 		errors.LogError(ctx, s.Name(), " cannot find the pending request")
@@ -120,9 +116,14 @@ func (s *ClassicNameServer) HandleResponse(ctx context.Context, packet *udp_prot
 
 	ipRec, err := parseResponse(raw, &req.dnsRequest)
 	if err != nil {
+		// not our answer (RFC5452 §9.1), keep the request pending so the real one still counts
 		errors.LogErrorInner(ctx, err, s.Name(), " fail to parse responded DNS udp")
 		return
 	}
+
+	s.Lock()
+	delete(s.requests, id)
+	s.Unlock()
 
 	// if truncated, retry with EDNS0 option(udp payload size: 1350)
 	if ipRec.RawHeader.Truncated {
@@ -161,6 +162,15 @@ func (s *ClassicNameServer) newReqID() uint16 {
 
 func (s *ClassicNameServer) addPendingRequest(req *udpDnsRequest) {
 	s.Lock()
+	// The ID is random (RFC5452 §9.2), so it can collide with a request in
+	// flight: regenerate until it is free, otherwise the older request is
+	// silently dropped and only times out. The caller packs req.msg after this.
+	for {
+		if _, busy := s.requests[req.msg.ID]; !busy {
+			break
+		}
+		req.msg.ID = s.newReqID()
+	}
 	id := req.msg.ID
 	req.expire = time.Now().Add(time.Second * 8)
 	s.requests[id] = req
