@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	utls "github.com/refraction-networking/utls"
@@ -50,6 +51,8 @@ func NewDoHNameServer(url *url.URL, dispatcher routing.Dispatcher, h2c bool, dis
 		clientIP:        clientIP,
 	}
 	s.httpClient = &http.Client{
+		// RFC8484 §4.1: only the configured URI may be used, so a redirect is an error.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		Transport: &http2.Transport{
 			IdleConnTimeout: net.ConnIdleTimeout,
 			ReadIdleTimeout: net.ChromeH2KeepAlivePeriod,
@@ -202,7 +205,7 @@ func (s *DoHNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- er
 				}
 				return
 			}
-			resp, err := s.dohHTTPSContext(dnsCtx, b.Bytes())
+			resp, age, err := s.dohHTTPSContext(dnsCtx, b.Bytes())
 			if err != nil {
 				errors.LogErrorInner(ctx, err, "failed to retrieve response for ", fqdn)
 				if noResponseErrCh != nil {
@@ -210,7 +213,7 @@ func (s *DoHNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- er
 				}
 				return
 			}
-			rec, err := parseResponse(resp)
+			rec, err := parseResponse(resp, r)
 			if err != nil {
 				errors.LogErrorInner(ctx, err, "failed to handle DOH response for ", fqdn)
 				if noResponseErrCh != nil {
@@ -218,16 +221,23 @@ func (s *DoHNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- er
 				}
 				return
 			}
+			// RFC8484 §5.1: the TTL has to be reduced by the time a cache held the response.
+			if age > 0 {
+				rec.Expire = rec.Expire.Add(-age)
+				if earliest := time.Now().Add(time.Second); rec.Expire.Before(earliest) {
+					rec.Expire = earliest
+				}
+			}
 			s.cacheController.updateRecord(r, rec)
 		}(req)
 	}
 }
 
-func (s *DoHNameServer) dohHTTPSContext(ctx context.Context, b []byte) ([]byte, error) {
+func (s *DoHNameServer) dohHTTPSContext(ctx context.Context, b []byte) ([]byte, time.Duration, error) {
 	body := bytes.NewBuffer(b)
 	req, err := http.NewRequest("POST", s.dohURL, body)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	req.Header.Add("Accept", "application/dns-message")
@@ -239,16 +249,28 @@ func (s *DoHNameServer) dohHTTPSContext(ctx context.Context, b []byte) ([]byte, 
 
 	resp, err := hc.Do(req.WithContext(ctx))
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		io.Copy(io.Discard, resp.Body) // flush resp.Body so that the conn is reusable
-		return nil, fmt.Errorf("DOH server returned code %d", resp.StatusCode)
+		return nil, 0, fmt.Errorf("DOH server returned code %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	// RFC8484 §5.1: Age tells how long an intermediary cache held the response.
+	var age time.Duration
+	if v := resp.Header.Get("Age"); v != "" {
+		if secs, err := strconv.Atoi(v); err == nil && secs > 0 {
+			age = time.Duration(secs) * time.Second
+		}
+	}
+
+	dnsMessage, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+	return dnsMessage, age, nil
 }
 
 // QueryIP implements Server.

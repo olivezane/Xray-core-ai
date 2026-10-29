@@ -27,6 +27,8 @@ type staticHandler struct{}
 func (*staticHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	ans := new(dns.Msg)
 	ans.Id = r.Id
+	ans.Response = true
+	ans.Question = r.Question
 
 	var clientIP net.IP
 

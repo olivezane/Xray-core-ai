@@ -21,7 +21,7 @@ import (
 )
 
 // NextProtoDQ - During connection establishment, DNS/QUIC support is indicated
-// by selecting the ALPN token "dq" in the crypto handshake.
+// by selecting the ALPN token "doq" (RFC9250 §4.1.1).
 const NextProtoDQ = "doq"
 
 const handshakeTimeout = time.Second * 8
@@ -167,28 +167,14 @@ func (s *QUICNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- e
 
 			_ = conn.Close()
 
-			respBuf := buf.New()
-			defer respBuf.Release()
-			n, err := respBuf.ReadFullFrom(conn, 2)
-			if err != nil && n == 0 {
-				errors.LogErrorInner(ctx, err, "failed to read response length")
-				if noResponseErrCh != nil {
-					noResponseErrCh <- err
-				}
-				return
-			}
+			lenBuf := buf.New()
+			n, err := lenBuf.ReadFullFrom(conn, 2)
 			var length uint16
-			err = binary.Read(bytes.NewReader(respBuf.Bytes()), binary.BigEndian, &length)
-			if err != nil {
-				errors.LogErrorInner(ctx, err, "failed to parse response length")
-				if noResponseErrCh != nil {
-					noResponseErrCh <- err
-				}
-				return
+			if err == nil {
+				err = binary.Read(bytes.NewReader(lenBuf.Bytes()), binary.BigEndian, &length)
 			}
-			respBuf.Clear()
-			n, err = respBuf.ReadFullFrom(conn, int32(length))
-			if err != nil && n == 0 {
+			lenBuf.Release()
+			if err != nil || n == 0 {
 				errors.LogErrorInner(ctx, err, "failed to read response length")
 				if noResponseErrCh != nil {
 					noResponseErrCh <- err
@@ -196,7 +182,18 @@ func (s *QUICNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- e
 				return
 			}
 
-			rec, err := parseResponse(respBuf.Bytes())
+			// RFC9250 §4.2: each stream carries a 2-octet length field, up to 65535 bytes.
+			respBuf := buf.NewWithSize(int32(length))
+			defer respBuf.Release()
+			if _, err := respBuf.ReadFullFrom(conn, int32(length)); err != nil {
+				errors.LogErrorInner(ctx, err, "failed to read response")
+				if noResponseErrCh != nil {
+					noResponseErrCh <- err
+				}
+				return
+			}
+
+			rec, err := parseResponse(respBuf.Bytes(), r)
 			if err != nil {
 				errors.LogErrorInner(ctx, err, "failed to handle response")
 				if noResponseErrCh != nil {

@@ -183,15 +183,30 @@ func buildReqMsgs(domain string, option dns_feature.IPOption, reqIDGen func() ui
 	return reqs, nil
 }
 
-// parseResponse parses DNS answers from the returned payload
-func parseResponse(payload []byte) (*IPRecord, error) {
+// peekID returns the ID of a raw DNS message (RFC1035 §4.1.1) without parsing it.
+func peekID(payload []byte) (uint16, error) {
+	if len(payload) < 12 {
+		return 0, errors.New("DNS message too short: ", len(payload))
+	}
+	return binary.BigEndian.Uint16(payload[:2]), nil
+}
+
+// parseResponse parses DNS answers from the returned payload.
+// When req is not nil the response has to answer exactly that query, otherwise
+// it is dropped: RFC5452 §9.1 (query IDs, names, classes and types MUST match)
+// and RFC7766 §7 (QNAME/QCLASS/QTYPE MUST match).
+func parseResponse(payload []byte, req *dnsRequest) (*IPRecord, error) {
 	var parser dnsmessage.Parser
 	h, err := parser.Start(payload)
 	if err != nil {
 		return nil, errors.New("failed to parse DNS response").Base(err)
 	}
-	if err := parser.SkipAllQuestions(); err != nil {
-		return nil, errors.New("failed to skip questions in DNS response").Base(err)
+	if req == nil {
+		if err := parser.SkipAllQuestions(); err != nil {
+			return nil, errors.New("failed to skip questions in DNS response").Base(err)
+		}
+	} else if err := matchQuestion(&parser, &h, req); err != nil {
+		return nil, err
 	}
 
 	now := time.Now()
@@ -254,6 +269,29 @@ L:
 	}
 
 	return ipRecord, nil
+}
+
+// matchQuestion consumes the question section and verifies the response belongs
+// to the query in req.
+func matchQuestion(parser *dnsmessage.Parser, h *dnsmessage.Header, req *dnsRequest) error {
+	if !h.Response {
+		return errors.New("invalid DNS response: QR bit not set")
+	}
+	if h.ID != req.msg.ID {
+		return errors.New("invalid DNS response: ID mismatch")
+	}
+	q, err := parser.Question()
+	if err != nil {
+		return errors.New("failed to parse question in DNS response").Base(err)
+	}
+	expected := req.msg.Questions[0]
+	if q.Type != expected.Type || q.Class != expected.Class || !strings.EqualFold(q.Name.String(), expected.Name.String()) {
+		return errors.New("invalid DNS response: question mismatch, want ", expected.Name.String(), " ", expected.Type, " got ", q.Name.String(), " ", q.Type)
+	}
+	if err := parser.SkipAllQuestions(); err != nil {
+		return errors.New("failed to skip questions in DNS response").Base(err)
+	}
+	return nil
 }
 
 // toDnsContext create a new background context with parent inbound, session and dns log

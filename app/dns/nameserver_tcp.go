@@ -35,7 +35,7 @@ func NewTCPNameServer(
 	disableCache bool, serveStale bool, serveExpiredTTL uint32,
 	clientIP net.IP,
 ) (*TCPNameServer, error) {
-	s, err := baseTCPNameServer(url, "TCP", disableCache, serveStale, serveExpiredTTL, clientIP)
+	s, err := baseTCPNameServer(url, "TCP", net.Port(53), disableCache, serveStale, serveExpiredTTL, clientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func NewTCPNameServer(
 
 // NewTCPLocalNameServer creates DNS over TCP client object for local resolving
 func NewTCPLocalNameServer(url *url.URL, disableCache bool, serveStale bool, serveExpiredTTL uint32, clientIP net.IP) (*TCPNameServer, error) {
-	s, err := baseTCPNameServer(url, "TCPL", disableCache, serveStale, serveExpiredTTL, clientIP)
+	s, err := baseTCPNameServer(url, "TCPL", net.Port(53), disableCache, serveStale, serveExpiredTTL, clientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -71,8 +71,8 @@ func NewTCPLocalNameServer(url *url.URL, disableCache bool, serveStale bool, ser
 	return s, nil
 }
 
-func baseTCPNameServer(url *url.URL, prefix string, disableCache bool, serveStale bool, serveExpiredTTL uint32, clientIP net.IP) (*TCPNameServer, error) {
-	port := net.Port(53)
+func baseTCPNameServer(url *url.URL, prefix string, defaultPort net.Port, disableCache bool, serveStale bool, serveExpiredTTL uint32, clientIP net.IP) (*TCPNameServer, error) {
+	port := defaultPort
 	if url.Port() != "" {
 		var err error
 		if port, err = net.PortFromString(url.Port()); err != nil {
@@ -198,28 +198,14 @@ func (s *TCPNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- er
 			}
 			dnsReqBuf.Release()
 
-			respBuf := buf.New()
-			defer respBuf.Release()
-			n, err := respBuf.ReadFullFrom(conn, 2)
-			if err != nil && n == 0 {
-				errors.LogErrorInner(ctx, err, "failed to read response length")
-				if noResponseErrCh != nil {
-					noResponseErrCh <- err
-				}
-				return
-			}
+			lenBuf := buf.New()
+			n, err := lenBuf.ReadFullFrom(conn, 2)
 			var length uint16
-			err = binary.Read(bytes.NewReader(respBuf.Bytes()), binary.BigEndian, &length)
-			if err != nil {
-				errors.LogErrorInner(ctx, err, "failed to parse response length")
-				if noResponseErrCh != nil {
-					noResponseErrCh <- err
-				}
-				return
+			if err == nil {
+				err = binary.Read(bytes.NewReader(lenBuf.Bytes()), binary.BigEndian, &length)
 			}
-			respBuf.Clear()
-			n, err = respBuf.ReadFullFrom(conn, int32(length))
-			if err != nil && n == 0 {
+			lenBuf.Release()
+			if err != nil || n == 0 {
 				errors.LogErrorInner(ctx, err, "failed to read response length")
 				if noResponseErrCh != nil {
 					noResponseErrCh <- err
@@ -227,7 +213,18 @@ func (s *TCPNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- er
 				return
 			}
 
-			rec, err := parseResponse(respBuf.Bytes())
+			// RFC1035 §4.2.2: the two-octet length field allows messages up to 65535 bytes.
+			respBuf := buf.NewWithSize(int32(length))
+			defer respBuf.Release()
+			if _, err := respBuf.ReadFullFrom(conn, int32(length)); err != nil {
+				errors.LogErrorInner(ctx, err, "failed to read response")
+				if noResponseErrCh != nil {
+					noResponseErrCh <- err
+				}
+				return
+			}
+
+			rec, err := parseResponse(respBuf.Bytes(), r)
 			if err != nil {
 				errors.LogErrorInner(ctx, err, "failed to parse DNS over TCP response")
 				if noResponseErrCh != nil {

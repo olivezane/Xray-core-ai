@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -95,15 +97,16 @@ func (s *ClassicNameServer) RequestsCleanup() error {
 // HandleResponse handles udp response packet from remote DNS server.
 func (s *ClassicNameServer) HandleResponse(ctx context.Context, packet *udp_proto.Packet) {
 	payload := packet.Payload
-	ipRec, err := parseResponse(payload.Bytes())
-	payload.Release()
+	raw := payload.Bytes()
+	defer payload.Release()
+
+	id, err := peekID(raw)
 	if err != nil {
 		errors.LogErrorInner(ctx, err, s.Name(), " fail to parse responded DNS udp")
 		return
 	}
 
 	s.Lock()
-	id := ipRec.ReqID
 	req, ok := s.requests[id]
 	if ok {
 		// remove the pending request
@@ -111,36 +114,49 @@ func (s *ClassicNameServer) HandleResponse(ctx context.Context, packet *udp_prot
 	}
 	s.Unlock()
 	if !ok {
-		errors.LogErrorInner(ctx, err, s.Name(), " cannot find the pending request")
+		errors.LogError(ctx, s.Name(), " cannot find the pending request")
+		return
+	}
+
+	ipRec, err := parseResponse(raw, &req.dnsRequest)
+	if err != nil {
+		errors.LogErrorInner(ctx, err, s.Name(), " fail to parse responded DNS udp")
 		return
 	}
 
 	// if truncated, retry with EDNS0 option(udp payload size: 1350)
 	if ipRec.RawHeader.Truncated {
-		// if already has EDNS0 option, no need to retry
-		if len(req.msg.Additionals) == 0 {
-			// copy necessary meta data from original request
-			// and add EDNS0 option
-			opt := new(dnsmessage.Resource)
-			common.Must(opt.Header.SetEDNS0(1350, 0xfe00, true))
-			opt.Body = &dnsmessage.OPTResource{}
-			newMsg := *req.msg
-			newReq := *req
-			newMsg.Additionals = append(newMsg.Additionals, *opt)
-			newMsg.ID = s.newReqID()
-			newReq.msg = &newMsg
-			s.addPendingRequest(&newReq)
-			b, _ := dns.PackMessage(newReq.msg)
-			s.udpServer.Dispatch(toDnsContext(newReq.ctx, s.address.String()), *s.address, b)
+		if len(req.msg.Additionals) != 0 {
+			// RFC1035 §4.1.1: TC means the answer was cut off, so it is not cached as is.
+			errors.LogError(ctx, s.Name(), " still truncated with EDNS0, discarding response for ", req.domain)
 			return
 		}
+		// copy necessary meta data from original request
+		// and add EDNS0 option
+		opt := new(dnsmessage.Resource)
+		common.Must(opt.Header.SetEDNS0(1350, 0xfe00, true))
+		opt.Body = &dnsmessage.OPTResource{}
+		newMsg := *req.msg
+		newReq := *req
+		newMsg.Additionals = append(newMsg.Additionals, *opt)
+		newMsg.ID = s.newReqID()
+		newReq.msg = &newMsg
+		s.addPendingRequest(&newReq)
+		b, _ := dns.PackMessage(newReq.msg)
+		s.udpServer.Dispatch(toDnsContext(newReq.ctx, s.address.String()), *s.address, b)
+		return
 	}
 
 	s.cacheController.updateRecord(&req.dnsRequest, ipRec)
 }
 
 func (s *ClassicNameServer) newReqID() uint16 {
-	return uint16(atomic.AddUint32(&s.reqID, 1))
+	// RFC5452 §9.2: the query ID has to be unpredictable.
+	var b [2]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return uint16(atomic.AddUint32(&s.reqID, 1))
+	}
+	return binary.BigEndian.Uint16(b[:])
 }
 
 func (s *ClassicNameServer) addPendingRequest(req *udpDnsRequest) {

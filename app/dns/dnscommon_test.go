@@ -81,7 +81,7 @@ func Test_parseResponse(t *testing.T) {
 	}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseResponse(p[i])
+			got, err := parseResponse(p[i], nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("handleResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -97,6 +97,41 @@ func Test_parseResponse(t *testing.T) {
 				// t.Errorf("handleResponse() = %#v, want %#v", got, tt.want)
 			}
 		})
+	}
+}
+
+func Test_parseResponseQueryMatching(t *testing.T) {
+	reqs, err := buildReqMsgs("example.com.", dns_feature.IPOption{IPv4Enable: true}, func() uint16 { return 42 }, nil)
+	common.Must(err)
+	req := reqs[0]
+
+	answer := func(id uint16, name string, qtype uint16) []byte {
+		msg := new(dns.Msg)
+		msg.SetQuestion(name, qtype)
+		msg.Id = id // SetQuestion generates a random ID
+		msg.Response = true
+		msg.Answer = append(msg.Answer, common.Must2(dns.NewRR(name+" 60 IN A 192.0.2.53")))
+		return common.Must2(msg.Pack())
+	}
+
+	// the matching answer is accepted
+	if _, err := parseResponse(answer(42, "example.com.", dns.TypeA), req); err != nil {
+		t.Error("matching response rejected: ", err)
+	}
+
+	// RFC5452 §9.1 / RFC7766 §7: mismatching responses must be dropped
+	cases := []struct {
+		name string
+		raw  []byte
+	}{
+		{"wrong id", answer(43, "example.com.", dns.TypeA)},
+		{"wrong name", answer(42, "example.net.", dns.TypeA)},
+		{"wrong type", answer(42, "example.com.", dns.TypeAAAA)},
+	}
+	for _, c := range cases {
+		if rec, err := parseResponse(c.raw, req); err == nil {
+			t.Error(c.name, " accepted: ", rec)
+		}
 	}
 }
 
