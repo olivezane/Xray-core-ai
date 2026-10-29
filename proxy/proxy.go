@@ -9,8 +9,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"io"
-	"math/big"
 	"runtime"
 	"strconv"
 	"time"
@@ -410,56 +410,70 @@ func (w *VisionWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 
 // IsCompleteRecord Is complete tls data record
 func IsCompleteRecord(buffer buf.MultiBuffer) bool {
-	b := make([]byte, buffer.Len())
-	if buffer.Copy(b) != int(buffer.Len()) {
-		panic("impossible bytes allocation")
-	}
 	var headerLen int = 5
 	var recordLen int
 
-	totalLen := len(b)
-	i := 0
-	for i < totalLen {
-		// record header: 0x17 0x3 0x3 + 2 bytes length
-		if headerLen > 0 {
-			data := b[i]
-			i++
-			switch headerLen {
-			case 5:
-				if data != 0x17 {
-					return false
+	for _, b := range buffer {
+		data := b.Bytes()
+		i := 0
+		for i < len(data) {
+			// record header: 0x17 0x3 0x3 + 2 bytes length
+			if headerLen > 0 {
+				d := data[i]
+				i++
+				switch headerLen {
+				case 5:
+					if d != 0x17 {
+						return false
+					}
+				case 4:
+					if d != 0x03 {
+						return false
+					}
+				case 3:
+					if d != 0x03 {
+						return false
+					}
+				case 2:
+					recordLen = int(d) << 8
+				case 1:
+					recordLen = recordLen | int(d)
 				}
-			case 4:
-				if data != 0x03 {
-					return false
+				headerLen--
+			} else if recordLen > 0 {
+				// a record body may span several buffers, keep the remainder
+				remaining := len(data) - i
+				if remaining < recordLen {
+					recordLen -= remaining
+					i = len(data)
+				} else {
+					i += recordLen
+					recordLen = 0
+					headerLen = 5
 				}
-			case 3:
-				if data != 0x03 {
-					return false
-				}
-			case 2:
-				recordLen = int(data) << 8
-			case 1:
-				recordLen = recordLen | int(data)
-			}
-			headerLen--
-		} else if recordLen > 0 {
-			remaining := totalLen - i
-			if remaining < recordLen {
-				return false
 			} else {
-				i += recordLen
-				recordLen = 0
-				headerLen = 5
+				return false
 			}
-		} else {
-			return false
 		}
 	}
-	if headerLen == 5 && recordLen == 0 {
-		return true
+	return headerLen == 5 && recordLen == 0
+}
+
+// lastTLSRecordStart returns the index of the last TLS application data record
+// header in b, or -1. Same result as bytes.LastIndex for TlsApplicationDataStart,
+// but a forward byte scan of the 3-byte pattern is several times slower.
+func lastTLSRecordStart(b []byte) int {
+	for i := len(b) - len(TlsApplicationDataStart); i >= 0; {
+		j := bytes.LastIndexByte(b[:i+1], TlsApplicationDataStart[0])
+		if j < 0 {
+			return -1
+		}
+		if j+2 < len(b) && b[j+1] == TlsApplicationDataStart[1] && b[j+2] == TlsApplicationDataStart[2] {
+			return j
+		}
+		i = j - 1
 	}
-	return false
+	return -1
 }
 
 // ReshapeMultiBuffer prepare multi buffer for padding structure (max 21 bytes)
@@ -474,10 +488,9 @@ func ReshapeMultiBuffer(ctx context.Context, buffer buf.MultiBuffer) buf.MultiBu
 		return buffer
 	}
 	mb2 := make(buf.MultiBuffer, 0, len(buffer)+needReshape)
-	toPrint := ""
 	for i, buffer1 := range buffer {
 		if buffer1.Len() >= buf.Size-21 {
-			index := int32(bytes.LastIndex(buffer1.Bytes(), TlsApplicationDataStart))
+			index := int32(lastTLSRecordStart(buffer1.Bytes()))
 			if index < 21 || index > buf.Size-21 {
 				index = buf.Size / 2
 			}
@@ -485,16 +498,25 @@ func ReshapeMultiBuffer(ctx context.Context, buffer buf.MultiBuffer) buf.MultiBu
 			buffer2.Write(buffer1.BytesFrom(index))
 			buffer1.Resize(0, index)
 			mb2 = append(mb2, buffer1, buffer2)
-			toPrint += " " + strconv.Itoa(int(buffer1.Len())) + " " + strconv.Itoa(int(buffer2.Len()))
 		} else {
 			mb2 = append(mb2, buffer1)
-			toPrint += " " + strconv.Itoa(int(buffer1.Len()))
 		}
 		buffer[i] = nil
 	}
+	errors.LogDebug(ctx, "ReshapeMultiBuffer ", len(buffer), " buffers, ", needReshape, " reshaped")
 	buffer = buffer[:0]
-	errors.LogDebug(ctx, "ReshapeMultiBuffer ", toPrint)
 	return mb2
+}
+
+// randN returns a value in [0, n) from 4 random bytes.
+// shortcut: modulo bias instead of big.Int rejection sampling, n is a config seed
+func randN(n uint32) uint32 {
+	if n == 0 {
+		return 0
+	}
+	var b [4]byte
+	rand.Read(b[:])
+	return binary.LittleEndian.Uint32(b[:]) % n
 }
 
 // XtlsPadding add padding to eliminate length signature during tls handshake
@@ -505,17 +527,9 @@ func XtlsPadding(b *buf.Buffer, command byte, userUUID *[]byte, longPadding bool
 		contentLen = b.Len()
 	}
 	if contentLen < int32(testseed[0]) && longPadding {
-		l, err := rand.Int(rand.Reader, big.NewInt(int64(testseed[1])))
-		if err != nil {
-			errors.LogDebugInner(ctx, err, "failed to generate padding")
-		}
-		paddingLen = int32(l.Int64()) + int32(testseed[2]) - contentLen
+		paddingLen = int32(randN(testseed[1])) + int32(testseed[2]) - contentLen
 	} else {
-		l, err := rand.Int(rand.Reader, big.NewInt(int64(testseed[3])))
-		if err != nil {
-			errors.LogDebugInner(ctx, err, "failed to generate padding")
-		}
-		paddingLen = int32(l.Int64())
+		paddingLen = int32(randN(testseed[3]))
 	}
 	if paddingLen > buf.Size-21-contentLen {
 		paddingLen = buf.Size - 21 - contentLen

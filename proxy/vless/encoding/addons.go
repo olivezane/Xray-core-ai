@@ -97,24 +97,26 @@ type MultiLengthPacketWriter struct {
 func (w *MultiLengthPacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 	defer buf.ReleaseMulti(mb)
 	mb2Write := make(buf.MultiBuffer, 0, len(mb)+1)
+	// Pack the frames of this batch into as few buffers as possible: the writer
+	// below emits one TLS record per buffer, and every record costs 29 bytes.
+	// shortcut: no batching across WriteMultiBuffer calls (that needs a flush
+	// timer), so frames only coalesce when the caller hands us several at once.
+	var eb *buf.Buffer
 	for _, b := range mb {
 		length := b.Len()
 		if length == 0 || length+2 > buf.Size {
 			continue
 		}
-		eb := buf.New()
-		if err := eb.WriteByte(byte(length >> 8)); err != nil {
-			eb.Release()
-			continue
+		if eb == nil || eb.Len()+2+length > buf.Size {
+			if eb != nil {
+				mb2Write = append(mb2Write, eb)
+			}
+			eb = buf.New()
 		}
-		if err := eb.WriteByte(byte(length)); err != nil {
-			eb.Release()
-			continue
-		}
-		if _, err := eb.Write(b.Bytes()); err != nil {
-			eb.Release()
-			continue
-		}
+		eb.Write([]byte{byte(length >> 8), byte(length)})
+		eb.Write(b.Bytes())
+	}
+	if eb != nil {
 		mb2Write = append(mb2Write, eb)
 	}
 	if mb2Write.IsEmpty() {

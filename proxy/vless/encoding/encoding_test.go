@@ -131,3 +131,32 @@ func TestMuxRequest(t *testing.T) {
 		t.Error(r)
 	}
 }
+
+func TestMultiLengthPacketWriterCoalesce(t *testing.T) {
+	var m buf.MultiBufferContainer
+	writer := NewMultiLengthPacketWriter(&m)
+
+	payloads := []string{"a", "bb", "ccc"}
+	mb := make(buf.MultiBuffer, 0, len(payloads))
+	for _, p := range payloads {
+		b := buf.New()
+		b.Write([]byte(p))
+		mb = append(mb, b)
+	}
+	common.Must(writer.WriteMultiBuffer(mb))
+
+	// all frames of one batch must land in a single buffer: one TLS record
+	if len(m.MultiBuffer) != 1 {
+		t.Fatalf("expected 1 buffer, got %d", len(m.MultiBuffer))
+	}
+
+	reader := NewLengthPacketReader(&m)
+	for _, p := range payloads {
+		rb, err := reader.ReadMultiBuffer()
+		common.Must(err)
+		if got := string(rb[0].Bytes()); got != p {
+			t.Errorf("expected %q, got %q", p, got)
+		}
+		buf.ReleaseMulti(rb)
+	}
+}

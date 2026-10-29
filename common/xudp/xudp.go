@@ -92,16 +92,31 @@ type PacketWriter struct {
 	GlobalID [8]byte
 }
 
+// maxHeaderSize covers meta data (4) + flags (3) + a 255-byte domain address with
+// its type/length/port (259) + GlobalID (8) + payload length (2).
+const maxHeaderSize = 276
+
 func (w *PacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 	defer buf.ReleaseMulti(mb)
 	mb2Write := make(buf.MultiBuffer, 0, len(mb))
+	// Pack the frames of this batch into as few buffers as possible: the writer
+	// below emits one TLS record per buffer, and every record costs 29 bytes.
+	// shortcut: no batching across WriteMultiBuffer calls (that needs a flush
+	// timer), so frames only coalesce when the caller hands us several at once.
+	var eb *buf.Buffer
 	for _, b := range mb {
 		length := b.Len()
 		if length == 0 || length+666 > buf.Size {
 			continue
 		}
 
-		eb := buf.New()
+		if eb == nil || eb.Len()+maxHeaderSize > buf.Size {
+			if eb != nil {
+				mb2Write = append(mb2Write, eb)
+			}
+			eb = buf.New()
+		}
+		mark := eb.Len()
 		eb.Write([]byte{0, 0, 0, 0}) // Meta data length; Mux Session ID
 		if w.Dest.Network == net.Network_UDP {
 			eb.WriteByte(1) // New
@@ -120,13 +135,18 @@ func (w *PacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 				AddrParser.WriteAddressPort(eb, b.UDP.Address, b.UDP.Port)
 			}
 		}
-		l := eb.Len() - 2
-		eb.SetByte(0, byte(l>>8))
-		eb.SetByte(1, byte(l))
+		l := eb.Len() - mark - 2
+		eb.SetByte(mark, byte(l>>8))
+		eb.SetByte(mark+1, byte(l))
 		eb.WriteByte(byte(length >> 8))
 		eb.WriteByte(byte(length))
+		if eb.Len()+length > buf.Size { // a frame may straddle buffers, readers are stream based
+			mb2Write = append(mb2Write, eb)
+			eb = buf.New()
+		}
 		eb.Write(b.Bytes())
-
+	}
+	if eb != nil {
 		mb2Write = append(mb2Write, eb)
 	}
 	if mb2Write.IsEmpty() {
