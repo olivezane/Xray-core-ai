@@ -221,16 +221,12 @@ func (c *ClientSession) DecodeResponseHeader(reader io.Reader) (*protocol.Respon
 	}
 
 	if buffer.Byte(2) != 0 {
-		cmdID := buffer.Byte(2)
+		// Response commands are not implemented; skip the payload in case a peer still sends one.
 		dataLen := int32(buffer.Byte(3))
 
 		buffer.Clear()
 		if _, err := buffer.ReadFullFrom(c.responseReader, dataLen); err != nil {
 			return nil, errors.New("failed to read response command").Base(err)
-		}
-		command, err := UnmarshalCommand(cmdID, buffer.Bytes())
-		if err == nil {
-			header.Command = command
 		}
 	}
 	aesStream := crypto.NewAesDecryptionStream(c.responseBodyKey[:], c.responseBodyIV[:])

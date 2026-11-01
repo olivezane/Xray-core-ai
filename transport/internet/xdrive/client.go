@@ -365,11 +365,10 @@ type connPool struct {
 }
 
 func newConnPool(config *splithttp.XmuxConfig, newClient func(connCtx context.Context) *http.Client) *connPool {
-	var xmuxConfig splithttp.XmuxConfig
-	if config != nil {
-		xmuxConfig = *config
+	if config == nil {
+		config = new(splithttp.XmuxConfig)
 	}
-	return &connPool{xmux: splithttp.NewXmuxManager(xmuxConfig, func() splithttp.XmuxConn {
+	return &connPool{xmux: splithttp.NewXmuxManager(config, func() splithttp.XmuxConn {
 		ctx, cancel := context.WithCancel(context.Background())
 		return &poolConn{next: newClient(ctx).Transport, cancel: cancel}
 	})}

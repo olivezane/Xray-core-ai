@@ -476,5 +476,8 @@ func procDefaultInterface(tunIndex int) *net.Interface {
 			return iface
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		errors.LogDebug(context.Background(), "[tun] android: failed to read /proc/net/route: ", err)
+	}
 	return nil
 }

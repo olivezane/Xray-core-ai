@@ -325,10 +325,8 @@ func (s *ServerSession) EncodeResponseHeader(header *protocol.ResponseHeader, wr
 	encryptionWriter = aeadEncryptedHeaderBuffer
 
 	common.Must2(encryptionWriter.Write([]byte{s.responseHeader, byte(header.Option)}))
-	err := MarshalCommand(header.Command, encryptionWriter)
-	if err != nil {
-		common.Must2(encryptionWriter.Write([]byte{0x00, 0x00}))
-	}
+	// Response commands are not implemented; the two zero bytes are the no-command marker.
+	common.Must2(encryptionWriter.Write([]byte{0x00, 0x00}))
 
 	aeadResponseHeaderLengthEncryptionKey := vmessaead.KDF16(s.responseBodyKey[:], vmessaead.KDFSaltConstAEADRespHeaderLenKey)
 	aeadResponseHeaderLengthEncryptionIV := vmessaead.KDF(s.responseBodyIV[:], vmessaead.KDFSaltConstAEADRespHeaderLenIV)[:12]

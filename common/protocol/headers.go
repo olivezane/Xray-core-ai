@@ -63,11 +63,8 @@ const (
 	ResponseOptionConnectionReuse bitmask.Byte = 0x01
 )
 
-type ResponseCommand interface{}
-
 type ResponseHeader struct {
-	Option  bitmask.Byte
-	Command ResponseCommand
+	Option bitmask.Byte
 }
 
 var (

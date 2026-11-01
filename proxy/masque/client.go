@@ -97,7 +97,7 @@ func NewClient(ctx context.Context, config *ClientConfig) (*Client, error) {
 	if xmuxConfig == nil {
 		xmuxConfig = &splithttp.XmuxConfig{}
 	}
-	c.xmux = splithttp.NewXmuxManager(*xmuxConfig, c.newXmuxConn)
+	c.xmux = splithttp.NewXmuxManager(xmuxConfig, c.newXmuxConn)
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	return c, nil
 }

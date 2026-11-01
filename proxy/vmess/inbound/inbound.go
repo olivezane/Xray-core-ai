@@ -303,9 +303,7 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 		writer := buf.NewBufferedWriter(buf.NewWriter(connection))
 		defer writer.Flush()
 
-		response := &protocol.ResponseHeader{
-			Command: h.generateCommand(ctx, request),
-		}
+		response := &protocol.ResponseHeader{}
 		return transferResponse(timer, svrSession, request, response, link.Reader, writer)
 	}
 
@@ -316,11 +314,6 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 		return errors.New("connection ends").Base(err)
 	}
 
-	return nil
-}
-
-// Stub command generator
-func (h *Handler) generateCommand(ctx context.Context, request *protocol.RequestHeader) protocol.ResponseCommand {
 	return nil
 }
 

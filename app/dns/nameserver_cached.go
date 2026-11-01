@@ -70,13 +70,13 @@ func fetch(ctx context.Context, s CachedNameserver, fqdn string, option dns.IPOp
 	})
 	ret := v.(result)
 
-	return ret.ips, ret.ttl, ret.error
+	return ret.ips, ret.ttl, ret.err
 }
 
 type result struct {
 	ips []net.IP
 	ttl uint32
-	error
+	err error
 }
 
 func doFetch(ctx context.Context, s CachedNameserver, fqdn string, option dns.IPOption) result {
