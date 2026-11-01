@@ -316,8 +316,9 @@ func readResponseAndHandle100Continue(r *bufio.Reader, req *http.Request, writer
 	// Capped: a server that never sends a final response must not keep us looping.
 	const maxInformationalResponses = 8
 	for i := 0; ; i++ {
-		// have a little look of response
-		peekBytes, err := r.Peek(56)
+		// Wait for the HTTP/1.x status prefix before inspecting the buffered response.
+		r.Peek(12)
+		peekBytes, err := r.Peek(min(56, r.Buffered()))
 		if err != nil && err != bufio.ErrBufferFull {
 			break
 		}
