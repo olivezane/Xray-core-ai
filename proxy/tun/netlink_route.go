@@ -11,7 +11,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// The helpers here are pure, so they live outside the android build tag and are
+// The helpers here keep the kernel out (androidDefaultInterface only reads the
+// interface list), so they live outside the android build tag and are
 // covered by netlink_route_test.go. Android implies the linux tag.
 
 // androidRoutes returns routes on a custom routing table.
@@ -19,14 +20,10 @@ import (
 func androidRoutes(cidrs []string, table, linkIndex int) ([]netlink.Route, error) {
 	var routes []netlink.Route
 	for _, cidr := range cidrs {
-		prefix, err := netip.ParsePrefix(cidr)
+		// ParseCIDR masks the network already, e.g. 10.0.0.1/8 -> 10.0.0.0/8
+		_, ipNet, err := net.ParseCIDR(cidr)
 		if err != nil {
 			return nil, errors.New("invalid route ", cidr).Base(err)
-		}
-		prefix = prefix.Masked()
-		_, ipNet, err := net.ParseCIDR(prefix.String())
-		if err != nil {
-			return nil, errors.New("invalid CIDR ", prefix.String()).Base(err)
 		}
 		routes = append(routes, netlink.Route{
 			Dst:       ipNet,

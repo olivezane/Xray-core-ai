@@ -110,7 +110,8 @@ func (w *PacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 			continue
 		}
 
-		if eb == nil || eb.Len()+maxHeaderSize > buf.Size {
+		// length+666 <= buf.Size, so a frame always fits a fresh buffer and never straddles two
+		if eb == nil || eb.Len()+maxHeaderSize+length > buf.Size {
 			if eb != nil {
 				mb2Write = append(mb2Write, eb)
 			}
@@ -140,10 +141,6 @@ func (w *PacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 		eb.SetByte(mark+1, byte(l))
 		eb.WriteByte(byte(length >> 8))
 		eb.WriteByte(byte(length))
-		if eb.Len()+length > buf.Size { // a frame may straddle buffers, readers are stream based
-			mb2Write = append(mb2Write, eb)
-			eb = buf.New()
-		}
 		eb.Write(b.Bytes())
 	}
 	if eb != nil {

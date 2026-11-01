@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/xtls/xray-core/common"
@@ -29,13 +28,13 @@ type ClassicNameServer struct {
 	requests        map[uint16]*udpDnsRequest
 	udpServer       *udp.Dispatcher
 	requestsCleanup *task.Periodic
-	reqID           uint32
 	clientIP        net.IP
 }
 
 type udpDnsRequest struct {
 	dnsRequest
-	ctx context.Context
+	ctx   context.Context
+	errCh chan<- error // fails the waiting query at once when no usable answer comes, may be nil
 }
 
 // NewClassicNameServer creates udp server object for remote resolving.
@@ -129,7 +128,14 @@ func (s *ClassicNameServer) HandleResponse(ctx context.Context, packet *udp_prot
 	if ipRec.RawHeader.Truncated {
 		if len(req.msg.Additionals) != 0 {
 			// RFC1035 §4.1.1: TC means the answer was cut off, so it is not cached as is.
-			errors.LogError(ctx, s.Name(), " still truncated with EDNS0, discarding response for ", req.domain)
+			err := errors.New(s.Name(), " still truncated with EDNS0, discarding response for ", req.domain)
+			errors.LogError(ctx, err)
+			if req.errCh != nil {
+				select { // buffered for every request of the query, never blocks unless the waiter is gone
+				case req.errCh <- err:
+				default:
+				}
+			}
 			return
 		}
 		// copy necessary meta data from original request
@@ -152,11 +158,9 @@ func (s *ClassicNameServer) HandleResponse(ctx context.Context, packet *udp_prot
 }
 
 func (s *ClassicNameServer) newReqID() uint16 {
-	// RFC5452 §9.2: the query ID has to be unpredictable.
+	// RFC5452 §9.2: the query ID has to be unpredictable. crypto/rand.Read never fails since Go 1.24.
 	var b [2]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return uint16(atomic.AddUint32(&s.reqID, 1))
-	}
+	rand.Read(b[:])
 	return binary.BigEndian.Uint16(b[:])
 }
 
@@ -205,6 +209,7 @@ func (s *ClassicNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<
 		udpReq := &udpDnsRequest{
 			dnsRequest: *req,
 			ctx:        ctx,
+			errCh:      noResponseErrCh,
 		}
 		s.addPendingRequest(udpReq)
 		b, err := dns.PackMessage(req.msg)

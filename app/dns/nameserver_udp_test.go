@@ -11,6 +11,7 @@ import (
 	udp_proto "github.com/xtls/xray-core/common/protocol/udp"
 	"github.com/xtls/xray-core/common/task"
 	dns_feature "github.com/xtls/xray-core/features/dns"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 func newTestUDPServer() *ClassicNameServer {
@@ -78,5 +79,33 @@ func TestHandleResponseKeepsPendingOnMismatch(t *testing.T) {
 	s.HandleResponse(ctx, &udp_proto.Packet{Payload: answer("example.com.")})
 	if _, ok := s.requests[42]; ok {
 		t.Error("answered request is still pending")
+	}
+}
+
+func TestHandleResponseFailsStillTruncated(t *testing.T) {
+	s := newTestUDPServer()
+	ctx := context.Background()
+
+	reqs, err := buildReqMsgs("example.com.", dns_feature.IPOption{IPv4Enable: true}, func() uint16 { return 42 }, nil)
+	common.Must(err)
+	reqs[0].msg.Additionals = append(reqs[0].msg.Additionals, dnsmessage.Resource{}) // already retried with EDNS0
+	errCh := make(chan error, 1)
+	s.addPendingRequest(&udpDnsRequest{dnsRequest: *reqs[0], ctx: ctx, errCh: errCh})
+
+	msg := new(dns.Msg)
+	msg.SetQuestion("example.com.", dns.TypeA)
+	msg.Id = 42
+	msg.Response = true
+	msg.Truncated = true
+	s.HandleResponse(ctx, &udp_proto.Packet{Payload: buf.FromBytes(common.Must2(msg.Pack()))})
+
+	// The waiter must fail at once instead of sitting out the 8s request timeout.
+	select {
+	case <-errCh:
+	default:
+		t.Fatal("still truncated response did not fail the query")
+	}
+	if _, ok := s.requests[42]; ok {
+		t.Error("failed request is still pending")
 	}
 }

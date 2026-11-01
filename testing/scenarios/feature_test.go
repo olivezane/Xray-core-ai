@@ -454,12 +454,9 @@ func TestSTUNSniffing(t *testing.T) {
 		Inbound: []*core.InboundHandlerConfig{
 			{
 				ReceiverSettings: serial.ToTypedMessage(&proxyman.ReceiverConfig{
-					PortList: &net.PortList{Range: []*net.PortRange{net.SinglePortRange(port)}},
-					Listen:   net.NewIPOrDomain(net.LocalHostIP),
-					SniffingSettings: &proxyman.SniffingConfig{
-						Enabled:             true,
-						DestinationOverride: []string{"stun"},
-					},
+					PortList:         &net.PortList{Range: []*net.PortRange{net.SinglePortRange(port)}},
+					Listen:           net.NewIPOrDomain(net.LocalHostIP),
+					SniffingSettings: &proxyman.SniffingConfig{Enabled: true},
 				}),
 				ProxySettings: serial.ToTypedMessage(&dokodemo.Config{
 					RewriteAddress:  net.NewIPOrDomain(dest.Address),

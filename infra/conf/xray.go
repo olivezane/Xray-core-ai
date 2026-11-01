@@ -80,8 +80,6 @@ func (c *SniffingConfig) Build() (*proxyman.SniffingConfig, error) {
 			protocols = append(protocols, "tls")
 		case "quic":
 			protocols = append(protocols, "quic")
-		case "stun":
-			protocols = append(protocols, "stun")
 		case "fakedns", "fakedns+others":
 			protocols = append(protocols, "fakedns")
 		default:

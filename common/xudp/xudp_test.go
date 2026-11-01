@@ -70,7 +70,7 @@ func TestXudpWriteMultiPacketCoalesce(t *testing.T) {
 	}
 }
 
-func TestXudpWriteMultiPacketStraddle(t *testing.T) {
+func TestXudpWriteMultiPacketFull(t *testing.T) {
 	addr, _ := net.ParseDestination("tcp:127.0.0.1:1345")
 	var m buf.MultiBufferContainer
 	var arr [8]byte
@@ -86,6 +86,7 @@ func TestXudpWriteMultiPacketStraddle(t *testing.T) {
 	}
 	common.Must(writer.WriteMultiBuffer(source))
 
+	// a frame that no longer fits starts a new buffer instead of straddling two
 	if len(m.MultiBuffer) != 2 {
 		t.Fatalf("expected 2 buffers, got %d", len(m.MultiBuffer))
 	}

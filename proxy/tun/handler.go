@@ -35,6 +35,7 @@ type Handler struct {
 	sniffingRequest session.SniffingRequest
 	uplinkCounter   stats.Counter
 	downlinkCounter stats.Counter
+	updater         *InterfaceUpdater // this inbound's own, the package-global one may belong to a newer instance
 }
 
 type tunUDPStatsWriter struct {
@@ -138,6 +139,7 @@ func (t *Handler) Start() error {
 		}
 		u := &InterfaceUpdater{tunIndex: tunIndex, fixedName: t.config.AutoOutboundsInterface}
 		updater = u
+		t.updater = u
 		u.Update()
 		internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
 			if u.IsClosed() {
@@ -269,8 +271,8 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 
 // Close implements common.Closable.
 func (t *Handler) Close() error {
-	if updater != nil {
-		updater.Close()
+	if t.updater != nil {
+		t.updater.Close()
 	}
 	return errors.Combine(common.CloseIfExists(t.stack), common.CloseIfExists(t.tun))
 }

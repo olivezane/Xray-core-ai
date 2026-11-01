@@ -15,6 +15,7 @@ import (
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/stat"
 	"github.com/xtls/xray-core/transport/internet/tls"
+	"golang.org/x/net/http/httpguts"
 )
 
 type ConnRF struct {
@@ -34,8 +35,8 @@ func (c *ConnRF) Read(b []byte) (int, error) {
 			return 0, err
 		}
 		if resp.Status != "101 Switching Protocols" ||
-			!headerHasToken(resp.Header, "Upgrade", "websocket") ||
-			!headerHasToken(resp.Header, "Connection", "upgrade") {
+			!httpguts.HeaderValuesContainsToken(resp.Header.Values("Upgrade"), "websocket") ||
+			!httpguts.HeaderValuesContainsToken(resp.Header.Values("Connection"), "upgrade") {
 			return 0, errors.New("unrecognized reply")
 		}
 		// drain remaining bufreader

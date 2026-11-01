@@ -18,6 +18,7 @@ import (
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/stat"
 	v2tls "github.com/xtls/xray-core/transport/internet/tls"
+	"golang.org/x/net/http/httpguts"
 )
 
 type server struct {
@@ -68,7 +69,7 @@ func (s *server) upgrade(conn net.Conn) (stat.Connection, error) {
 		}
 	}
 
-	if !headerHasToken(req.Header, "Connection", "upgrade") || !headerHasToken(req.Header, "Upgrade", "websocket") {
+	if !httpguts.HeaderValuesContainsToken(req.Header.Values("Connection"), "upgrade") || !httpguts.HeaderValuesContainsToken(req.Header.Values("Upgrade"), "websocket") {
 		return nil, errors.New("unrecognized request")
 	}
 	resp := &http.Response{

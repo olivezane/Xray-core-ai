@@ -54,22 +54,31 @@ func (s *routingServer) OverrideBalancerTarget(ctx context.Context, request *Ove
 }
 
 func (s *routingServer) AddRule(ctx context.Context, request *AddRuleRequest) (*AddRuleResponse, error) {
-	return &AddRuleResponse{}, s.router.AddRule(request.Config, request.ShouldAppend)
+	if bo, ok := s.router.(routing.Router); ok {
+		return &AddRuleResponse{}, bo.AddRule(request.Config, request.ShouldAppend)
+	}
+	return nil, errors.New("unsupported router implementation")
 }
 
 func (s *routingServer) RemoveRule(ctx context.Context, request *RemoveRuleRequest) (*RemoveRuleResponse, error) {
-	return &RemoveRuleResponse{}, s.router.RemoveRule(request.RuleTag)
+	if bo, ok := s.router.(routing.Router); ok {
+		return &RemoveRuleResponse{}, bo.RemoveRule(request.RuleTag)
+	}
+	return nil, errors.New("unsupported router implementation")
 }
 
 func (s *routingServer) ListRule(ctx context.Context, request *ListRuleRequest) (*ListRuleResponse, error) {
-	response := &ListRuleResponse{}
-	for _, v := range s.router.ListRule() {
-		response.Rules = append(response.Rules, &ListRuleItem{
-			Tag:     v.GetOutboundTag(),
-			RuleTag: v.GetRuleTag(),
-		})
+	if bo, ok := s.router.(routing.Router); ok {
+		response := &ListRuleResponse{}
+		for _, v := range bo.ListRule() {
+			response.Rules = append(response.Rules, &ListRuleItem{
+				Tag:     v.GetOutboundTag(),
+				RuleTag: v.GetRuleTag(),
+			})
+		}
+		return response, nil
 	}
-	return response, nil
+	return nil, errors.New("unsupported router implementation")
 }
 
 // NewRoutingServer creates a statistics service with statistics manager.
@@ -89,8 +98,7 @@ func (s *routingServer) TestRoute(ctx context.Context, request *TestRouteRequest
 		return nil, err
 	}
 	if request.PublishResult && s.routingStats != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-		defer cancel()
+		ctx, _ := context.WithTimeout(context.Background(), 4*time.Second)
 		s.routingStats.Publish(ctx, route)
 	}
 	return AsProtobufMessage(request.FieldSelectors)(route), nil

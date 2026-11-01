@@ -146,7 +146,7 @@ func (t *AndroidTun) Start() error {
 	// registered before the ownsTun check so FD mode keeps refreshing too
 	if updater != nil {
 		t.routeMonitorStop = make(chan struct{})
-		go t.monitorRouteChanges()
+		go t.monitorRouteChanges(updater) // the updater Handler.Start just made for this TUN
 	}
 
 	if !t.ownsTun {
@@ -339,53 +339,56 @@ func (t *AndroidTun) unsetRules() error {
 // Route monitoring — re-find outbound interface on network changes
 // ---------------------------------------------------------------------------
 
-func (t *AndroidTun) monitorRouteChanges() {
-	routeCh := make(chan netlink.RouteUpdate, 1)
+func (t *AndroidTun) monitorRouteChanges(u *InterfaceUpdater) {
+	routeCh := make(chan netlink.RouteUpdate, 16)
 	if err := netlink.RouteSubscribe(routeCh, t.routeMonitorStop); err != nil {
 		errors.LogInfo(context.Background(), "[tun] android: failed to subscribe route changes: ", err)
-		t.pollRouteChanges()
+		t.pollRouteChanges(u)
 		return
 	}
 
-	linkCh := make(chan netlink.LinkUpdate, 1)
+	// IPv4 routes flushed with a downed link raise no route update, the link update covers them.
+	// Without it route updates still work, so a failure here only loses that case.
+	linkCh := make(chan netlink.LinkUpdate, 16)
 	if err := netlink.LinkSubscribe(linkCh, t.routeMonitorStop); err != nil {
 		errors.LogInfo(context.Background(), "[tun] android: failed to subscribe link changes: ", err)
-		t.pollRouteChanges()
-		return
+		linkCh = nil
 	}
 
+	// A network switch arrives as a burst of updates (our own setRoutes too):
+	// the first one arms the timer, the rest of the burst folds into one Update.
+	var settle <-chan time.Time
 	for {
 		select {
 		case _, ok := <-routeCh:
 			if !ok {
 				return
 			}
-			if updater != nil {
-				updater.Update()
-			}
 		case _, ok := <-linkCh:
 			if !ok {
 				return
 			}
-			if updater != nil {
-				updater.Update()
-			}
+		case <-settle:
+			settle = nil
+			u.Update()
+			continue
 		case <-t.routeMonitorStop:
 			return
+		}
+		if settle == nil {
+			settle = time.After(200 * time.Millisecond)
 		}
 	}
 }
 
 // pollRouteChanges polls /proc/net/route every 5s as fallback when netlink is banned.
-func (t *AndroidTun) pollRouteChanges() {
+func (t *AndroidTun) pollRouteChanges(u *InterfaceUpdater) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			if updater != nil {
-				updater.Update()
-			}
+			u.Update()
 		case <-t.routeMonitorStop:
 			return
 		}
