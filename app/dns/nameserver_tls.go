@@ -82,6 +82,9 @@ func baseTLSNameServer(url *url.URL, prefix string, disableCache bool, serveStal
 	// RFC8310 §3.3: the SNI carries the name of the DoT server. IP literals are not
 	// valid SNI (RFC6066 §3), crypto/tls drops them and verifies the IP SANs instead.
 	tlsConfig.ServerName = url.Hostname()
+	// The link carries TLS, not plain DNS (like "https" for DoH, "quic" for DoQ):
+	// a "dns" protocol rule would route it to a dns outbound that cannot parse it.
+	tcpServer.protocol = "tls"
 
 	return &TLSNameServer{
 		TCPNameServer: tcpServer,

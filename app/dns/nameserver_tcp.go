@@ -26,6 +26,7 @@ type TCPNameServer struct {
 	reqID           uint32
 	dial            func(context.Context) (net.Conn, error)
 	clientIP        net.IP
+	protocol        string // routing protocol of the link, the wire protocol it carries
 }
 
 // NewTCPNameServer creates DNS over TCP server object for remote resolving.
@@ -85,6 +86,7 @@ func baseTCPNameServer(url *url.URL, prefix string, defaultPort net.Port, disabl
 		cacheController: NewCacheController(prefix+"//"+dest.NetAddr(), disableCache, serveStale, serveExpiredTTL),
 		destination:     &dest,
 		clientIP:        clientIP,
+		protocol:        "dns",
 	}
 
 	return s, nil
@@ -143,7 +145,7 @@ func (s *TCPNameServer) sendQuery(ctx context.Context, noResponseErrCh chan<- er
 			}
 
 			dnsCtx = session.ContextWithContent(dnsCtx, &session.Content{
-				Protocol:       "dns",
+				Protocol:       s.protocol,
 				SkipDNSResolve: true,
 			})
 

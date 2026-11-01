@@ -17,7 +17,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
+	"github.com/xtls/xray-core/common/session"
 	dns_feature "github.com/xtls/xray-core/features/dns"
 	"golang.org/x/net/dns/dnsmessage"
 )
@@ -45,6 +47,30 @@ func TestTLSNameServerDefaultPort(t *testing.T) {
 	}
 	if got := s.destination.NetAddr(); got != "[2606:4700:4700::1111]:8853" {
 		t.Error("expect the port in the address to win, but got ", got)
+	}
+}
+
+// TestTLSNameServerProtocol keeps the DoT link out of "dns" protocol rules,
+// which would route its TLS bytes to a dns outbound.
+func TestTLSNameServerProtocol(t *testing.T) {
+	u, err := url.Parse("tls://1.1.1.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := NewTLSNameServer(u, nil, false, false, 0, net.IP(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	protocol := make(chan string, 1)
+	s.dial = func(ctx context.Context) (net.Conn, error) {
+		protocol <- session.ContentFromContext(ctx).Protocol
+		return nil, errors.New("stop")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	s.QueryIP(ctx, "example.com", dns_feature.IPOption{IPv4Enable: true})
+	cancel()
+	if got := <-protocol; got != "tls" {
+		t.Error("expect protocol tls, but got ", got)
 	}
 }
 
