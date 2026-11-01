@@ -511,6 +511,90 @@ func TestSTUNSniffing(t *testing.T) {
 	}
 }
 
+func TestDNSSniffing(t *testing.T) {
+	// example.com. A IN, bare for UDP and length-prefixed for TCP (RFC 1035 §4.2).
+	query, err := hex.DecodeString("123401000001000000000000076578616d706c6503636f6d0000010001")
+	common.Must(err)
+
+	udpServer := udp.Server{MsgProcessor: xor}
+	udpDest, err := udpServer.Start()
+	common.Must(err)
+	defer udpServer.Close()
+
+	tcpServer := tcp.Server{MsgProcessor: xor}
+	tcpDest, err := tcpServer.Start()
+	common.Must(err)
+	defer tcpServer.Close()
+
+	inbound := func(port net.Port, dest net.Destination) *core.InboundHandlerConfig {
+		return &core.InboundHandlerConfig{
+			ReceiverSettings: serial.ToTypedMessage(&proxyman.ReceiverConfig{
+				PortList:         &net.PortList{Range: []*net.PortRange{net.SinglePortRange(port)}},
+				Listen:           net.NewIPOrDomain(net.LocalHostIP),
+				SniffingSettings: &proxyman.SniffingConfig{Enabled: true},
+			}),
+			ProxySettings: serial.ToTypedMessage(&dokodemo.Config{
+				RewriteAddress:  net.NewIPOrDomain(dest.Address),
+				RewritePort:     uint32(dest.Port),
+				AllowedNetworks: []net.Network{dest.Network},
+			}),
+		}
+	}
+	udpPort, tcpPort := udp.PickPort(), tcp.PickPort()
+	config := &core.Config{
+		Inbound: []*core.InboundHandlerConfig{inbound(udpPort, udpDest), inbound(tcpPort, tcpDest)},
+		Outbound: []*core.OutboundHandlerConfig{
+			{
+				Tag:           "blocked",
+				ProxySettings: serial.ToTypedMessage(&blackhole.Config{}),
+			},
+			{
+				Tag:           "direct",
+				ProxySettings: serial.ToTypedMessage(&freedom.Config{FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}}}),
+			},
+		},
+		App: []*serial.TypedMessage{
+			serial.ToTypedMessage(&router.Config{
+				Rule: []*router.RoutingRule{
+					{
+						TargetTag: &router.RoutingRule_Tag{
+							Tag: "direct",
+						},
+						Protocol: []string{"dns"},
+					},
+				},
+			}),
+		},
+	}
+
+	servers, err := InitializeServerConfigs(config)
+	common.Must(err)
+	defer CloseAllServers(servers)
+
+	for _, c := range []struct {
+		network string
+		port    net.Port
+		payload []byte
+	}{
+		{"udp", udpPort, query},
+		{"tcp", tcpPort, append([]byte{0, byte(len(query))}, query...)},
+	} {
+		conn, err := net.Dial(c.network, "127.0.0.1:"+c.port.String())
+		common.Must(err)
+		defer conn.Close()
+
+		common.Must2(conn.Write(c.payload))
+		common.Must(conn.SetReadDeadline(time.Now().Add(5 * time.Second)))
+		response := make([]byte, len(c.payload))
+		if _, err := io.ReadFull(conn, response); err != nil {
+			t.Fatalf("%s dns query was not routed by protocol: %v", c.network, err)
+		}
+		if !bytes.Equal(response, xor(c.payload)) {
+			t.Fatalf("unexpected %s response: %x", c.network, response)
+		}
+	}
+}
+
 func TestForward(t *testing.T) {
 	tcpServer := tcp.Server{
 		MsgProcessor: xor,
