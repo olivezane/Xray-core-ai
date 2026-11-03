@@ -11,6 +11,10 @@ import (
 
 const maxIdleStates = 16
 
+// PoolContext asks Acquire and WithState to use the pool's own context. It is
+// a nil context with a name, so call sites do not look like accidental nils.
+var PoolContext context.Context
+
 // Pool lends each state to one caller at a time. It grows on contention and
 // keeps up to maxIdleStates idle states until Close. Acquire/Release callers
 // decide reusability; WithState uses its callback's error.
@@ -46,7 +50,7 @@ func NewPool(ctx context.Context, timeout time.Duration, factory LStateFactory) 
 }
 
 // Acquire returns an initialized exclusive state, growing the pool if necessary.
-// ctx is passed to the factory for state creation; nil uses the pool context.
+// ctx is passed to the factory for state creation; PoolContext uses the pool context.
 func (p *Pool) Acquire(ctx context.Context) (*glua.LState, error) {
 	p.mu.Lock()
 	if p.closed {
@@ -89,7 +93,7 @@ func (p *Pool) Acquire(ctx context.Context) (*glua.LState, error) {
 }
 
 // WithState runs work on an exclusive state and releases it afterward.
-// Nil ctx and zero timeout use pool defaults. The timeout starts after acquisition.
+// PoolContext and zero timeout use pool defaults. The timeout starts after acquisition.
 func (p *Pool) WithState(ctx context.Context, timeout time.Duration, work func(*glua.LState) error) error {
 	state, err := p.Acquire(ctx)
 	if err != nil {

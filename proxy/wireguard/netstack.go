@@ -542,7 +542,7 @@ func (tnet *Net) LookupContextHost(ctx context.Context, host string) ([]string, 
 	type result struct {
 		p      dnsmessage.Parser
 		server string
-		error
+		err    error
 	}
 	var addrsV4, addrsV6 []netip.Addr
 	lanes := 0
@@ -569,9 +569,9 @@ func (tnet *Net) LookupContextHost(ctx context.Context, host string) ([]string, 
 	ttl := uint32(300)
 	for l := 0; l < lanes; l++ {
 		result := <-lane
-		if result.error != nil {
+		if result.err != nil {
 			if lastErr == nil {
-				lastErr = result.error
+				lastErr = result.err
 			}
 			continue
 		}

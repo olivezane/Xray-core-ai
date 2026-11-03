@@ -65,7 +65,7 @@ func BenchmarkReadUint16(b *testing.B) {
 	common.Must2(reader.Write([]byte{0, 1}))
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := serial.ReadUint16(reader)
 		common.Must(err)
 		reader.Clear()
@@ -79,7 +79,7 @@ func BenchmarkWriteUint64(b *testing.B) {
 
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := serial.WriteUint64(writer, 8)
 		common.Must(err)
 		writer.Clear()

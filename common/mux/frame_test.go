@@ -18,7 +18,7 @@ func BenchmarkFrameWrite(b *testing.B) {
 	writer := buf.New()
 	defer writer.Release()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		common.Must(frame.WriteTo(writer))
 		writer.Clear()
 	}

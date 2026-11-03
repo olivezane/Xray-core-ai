@@ -203,7 +203,7 @@ func BenchmarkSplitBytes(b *testing.B) {
 	raw := make([]byte, Size)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		buffer := StackNew()
 		buffer.Extend(Size)
 		mb = append(mb, &buffer)

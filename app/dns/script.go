@@ -58,7 +58,7 @@ func (e *scriptEngine) close() {
 }
 
 func (e *scriptEngine) query(domain string, option dns.IPOption) (ips []net.IP, ttl uint32, queryErr error) {
-	if err := e.pool.WithState(nil, 0, func(L *lua.LState) error {
+	if err := e.pool.WithState(xlua.PoolContext, 0, func(L *lua.LState) error {
 		if err := callLuaQuery(L, domain, option); err != nil {
 			return err
 		}

@@ -77,7 +77,7 @@ func newScriptEngine(script string) (*scriptEngine, error) {
 func (e *scriptEngine) packets(addr string, into []scriptPacket) ([]scriptPacket, error) {
 	var noise []scriptPacket
 	var reported error
-	if err := e.pool.WithState(nil, 0, func(L *lua.LState) error {
+	if err := e.pool.WithState(xlua.PoolContext, 0, func(L *lua.LState) error {
 		var err error
 		noise, reported, err = callHook(L, addr, into)
 		return err

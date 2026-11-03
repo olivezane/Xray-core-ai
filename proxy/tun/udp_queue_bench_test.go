@@ -14,7 +14,7 @@ func BenchmarkQueueBurstChan(b *testing.B) {
 	ch := make(chan *buf.Buffer, udpQueueLimit)
 	p := &buf.Buffer{}
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		for j := 0; j < benchBatch; j++ {
 			ch <- p
 		}
@@ -28,7 +28,7 @@ func BenchmarkQueueBurstPacketQueue(b *testing.B) {
 	q := newPacketQueue(udpQueueLimit)
 	p := &buf.Buffer{}
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		for j := 0; j < benchBatch; j++ {
 			q.push(p)
 		}
@@ -51,7 +51,7 @@ func BenchmarkQueueStreamChan(b *testing.B) {
 	}()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		ch <- p
 	}
 	close(ch)
@@ -72,7 +72,7 @@ func BenchmarkQueueStreamPacketQueue(b *testing.B) {
 	}()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		for !q.push(p) {
 			runtime.Gosched()
 		}

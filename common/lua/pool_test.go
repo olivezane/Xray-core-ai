@@ -74,12 +74,12 @@ func TestPoolFactoryFailure(t *testing.T) {
 		}
 		return nil, failure
 	})
-	state, err := pool.Acquire(nil)
+	state, err := pool.Acquire(PoolContext)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Release(state, true)
-	err = pool.WithState(nil, 0, func(*glua.LState) error {
+	err = pool.WithState(PoolContext, 0, func(*glua.LState) error {
 		t.Error("work ran after factory failure")
 		return nil
 	})
@@ -101,7 +101,7 @@ func TestPoolReusesStatesAndLimitsIdle(t *testing.T) {
 		}
 	}()
 	for range maxIdleStates + 3 {
-		state, err := pool.Acquire(nil)
+		state, err := pool.Acquire(PoolContext)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,7 +125,7 @@ func TestPoolReusesStatesAndLimitsIdle(t *testing.T) {
 	if open != maxIdleStates {
 		t.Fatalf("retained %d states, want %d", open, maxIdleStates)
 	}
-	if err := pool.WithState(nil, 0, func(*glua.LState) error { return nil }); err != nil {
+	if err := pool.WithState(PoolContext, 0, func(*glua.LState) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	if created != len(states) {
@@ -194,7 +194,7 @@ func TestPoolFactoryContext(t *testing.T) {
 				contexts = append(contexts, ctx)
 				return glua.NewState(), nil
 			})
-			state, err := pool.Acquire(nil)
+			state, err := pool.Acquire(PoolContext)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -271,7 +271,7 @@ func TestPoolWithStateLifecycle(t *testing.T) {
 			if tc.reusable && (state.Context() != nil || state.GetTop() != 1 || state.Get(1) != glua.LTrue) {
 				t.Fatal("WithState did not reset the state for reuse")
 			}
-			if err := pool.WithState(nil, 0, func(L *glua.LState) error {
+			if err := pool.WithState(PoolContext, 0, func(L *glua.LState) error {
 				if (L == state) != tc.reusable {
 					t.Error("unexpected state reuse")
 				}
@@ -292,7 +292,7 @@ func TestPoolClose(t *testing.T) {
 	started, done := make(chan *glua.LState, 1), make(chan error, 1)
 	var workCtx context.Context
 	go func() {
-		done <- pool.WithState(nil, 0, func(L *glua.LState) error {
+		done <- pool.WithState(PoolContext, 0, func(L *glua.LState) error {
 			workCtx = L.Context()
 			started <- L
 			<-finishCtx.Done()
@@ -336,7 +336,7 @@ func TestPoolClose(t *testing.T) {
 	if !state.IsClosed() {
 		t.Fatal("Release returned a state to a closed pool")
 	}
-	if state, err := pool.Acquire(nil); state != nil || err == nil || errors.Is(err, context.Canceled) {
+	if state, err := pool.Acquire(PoolContext); state != nil || err == nil || errors.Is(err, context.Canceled) {
 		t.Fatalf("Acquire after Close = %v, %v; want closed pool error", state, err)
 	}
 	pool.Close()
@@ -358,14 +358,14 @@ func TestPoolCloseWaitsForFactory(t *testing.T) {
 		return nil, ctx.Err()
 	})
 	t.Cleanup(finish)
-	state, err := pool.Acquire(nil)
+	state, err := pool.Acquire(PoolContext)
 	if err != nil {
 		t.Fatal(err)
 	}
 	pool.Release(state, false)
 	acquireDone := make(chan error, 1)
 	go func() {
-		_, err := pool.Acquire(nil)
+		_, err := pool.Acquire(PoolContext)
 		acquireDone <- err
 	}()
 	select {
@@ -456,8 +456,8 @@ func BenchmarkPoolAcquireRelease(b *testing.B) {
 	})
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		state, err := pool.Acquire(nil)
+	for b.Loop() {
+		state, err := pool.Acquire(PoolContext)
 		if err != nil {
 			b.Fatal(err)
 		}

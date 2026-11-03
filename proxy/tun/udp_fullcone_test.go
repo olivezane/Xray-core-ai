@@ -20,7 +20,7 @@ func BenchmarkUDPNewSession(b *testing.B) {
 	dst := xnet.UDPDestination(xnet.ParseAddress("1.1.1.1"), 443)
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		src := xnet.UDPDestination(xnet.IPAddress([]byte{10, byte(i >> 16), byte(i >> 8), byte(i)}), xnet.Port(1024+i%60000))
 		u.HandlePacket(src, dst, &buf.Buffer{})
 	}

@@ -86,7 +86,7 @@ func TestReader1(t *testing.T) {
 			target = append(target, buf[:n]...)
 			buf = make([]byte, bufLen)
 		}
-		if err != nil && err != io.EOF {
+		if err != io.EOF {
 			t.Error("error: ", err)
 		}
 		if string(target) != testCase.output {

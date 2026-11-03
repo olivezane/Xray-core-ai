@@ -63,7 +63,7 @@ func (e *scriptEngine) pickRoute(ctx routing.Context) (routing.Route, error) {
 	var outboundTag, ruleTag string
 	var routeErr error
 
-	if err := e.pool.WithState(nil, 0, func(L *lua.LState) error {
+	if err := e.pool.WithState(xlua.PoolContext, 0, func(L *lua.LState) error {
 		if err := callLuaRoute(L, ctx); err != nil {
 			return err
 		}

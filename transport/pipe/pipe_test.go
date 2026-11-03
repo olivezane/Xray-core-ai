@@ -144,7 +144,7 @@ func BenchmarkPipeReadWrite(b *testing.B) {
 	c := buf.MultiBuffer{a}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		common.Must(writer.WriteMultiBuffer(c))
 		d, err := reader.ReadMultiBuffer()
 		common.Must(err)

@@ -63,7 +63,7 @@ end
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := callLuaRoute(L, ctx); err != nil {
 			b.Fatal(err)
 		}

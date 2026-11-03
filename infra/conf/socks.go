@@ -99,39 +99,37 @@ func (v *SocksClientConfig) Build() (proto.Message, error) {
 	if len(v.Servers) != 1 {
 		return nil, errors.New(`SOCKS settings: "servers" should have one and only one member. Multiple endpoints in "servers" should use multiple SOCKS outbounds and routing balancer instead`)
 	}
-	for _, serverConfig := range v.Servers {
-		if len(serverConfig.Users) > 1 {
-			return nil, errors.New(`SOCKS servers: "users" should have one member at most. Multiple members in "users" should use multiple SOCKS outbounds and routing balancer instead`)
-		}
-		server := &protocol.ServerEndpoint{
-			Address: serverConfig.Address.Build(),
-			Port:    uint32(serverConfig.Port),
-		}
-		for _, rawUser := range serverConfig.Users {
-			user := new(protocol.User)
-			if v.Address != nil {
-				user.Level = v.Level
-				user.Email = v.Email
-			} else {
-				if err := json.Unmarshal(rawUser, user); err != nil {
-					return nil, errors.New("failed to parse Socks user").Base(err)
-				}
-			}
-			account := new(SocksAccount)
-			if v.Address != nil {
-				account.Username = v.Username
-				account.Password = v.Password
-			} else {
-				if err := json.Unmarshal(rawUser, account); err != nil {
-					return nil, errors.New("failed to parse socks account").Base(err)
-				}
-			}
-			user.Account = serial.ToTypedMessage(account.Build())
-			server.User = user
-			break
-		}
-		config.Server = server
-		break
+	serverConfig := v.Servers[0]
+	if len(serverConfig.Users) > 1 {
+		return nil, errors.New(`SOCKS servers: "users" should have one member at most. Multiple members in "users" should use multiple SOCKS outbounds and routing balancer instead`)
 	}
+	server := &protocol.ServerEndpoint{
+		Address: serverConfig.Address.Build(),
+		Port:    uint32(serverConfig.Port),
+	}
+	if len(serverConfig.Users) == 1 {
+		rawUser := serverConfig.Users[0]
+		user := new(protocol.User)
+		if v.Address != nil {
+			user.Level = v.Level
+			user.Email = v.Email
+		} else {
+			if err := json.Unmarshal(rawUser, user); err != nil {
+				return nil, errors.New("failed to parse Socks user").Base(err)
+			}
+		}
+		account := new(SocksAccount)
+		if v.Address != nil {
+			account.Username = v.Username
+			account.Password = v.Password
+		} else {
+			if err := json.Unmarshal(rawUser, account); err != nil {
+				return nil, errors.New("failed to parse socks account").Base(err)
+			}
+		}
+		user.Account = serial.ToTypedMessage(account.Build())
+		server.User = user
+	}
+	config.Server = server
 	return config, nil
 }

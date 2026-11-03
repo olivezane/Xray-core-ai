@@ -64,7 +64,7 @@ func BenchmarkCopy(b *testing.B) {
 	writer := buf.Discard
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = buf.Copy(reader, writer)
 	}
 }

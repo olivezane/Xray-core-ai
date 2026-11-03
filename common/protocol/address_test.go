@@ -154,7 +154,7 @@ func BenchmarkAddressReadingIPv4(b *testing.B) {
 	payload.Write(raw)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _, err := parser.ReadAddressPort(cache, payload)
 		common.Must(err)
 		cache.Clear()
@@ -175,7 +175,7 @@ func BenchmarkAddressReadingIPv6(b *testing.B) {
 	payload.Write(raw)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _, err := parser.ReadAddressPort(cache, payload)
 		common.Must(err)
 		cache.Clear()
@@ -196,7 +196,7 @@ func BenchmarkAddressReadingDomain(b *testing.B) {
 	payload.Write(raw)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _, err := parser.ReadAddressPort(cache, payload)
 		common.Must(err)
 		cache.Clear()
@@ -211,7 +211,7 @@ func BenchmarkAddressWritingIPv4(b *testing.B) {
 	defer writer.Release()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		common.Must(parser.WriteAddressPort(writer, net.LocalHostIP, net.Port(80)))
 		writer.Clear()
 	}
@@ -223,7 +223,7 @@ func BenchmarkAddressWritingIPv6(b *testing.B) {
 	defer writer.Release()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		common.Must(parser.WriteAddressPort(writer, net.LocalHostIPv6, net.Port(80)))
 		writer.Clear()
 	}
@@ -235,7 +235,7 @@ func BenchmarkAddressWritingDomain(b *testing.B) {
 	defer writer.Release()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		common.Must(parser.WriteAddressPort(writer, net.DomainAddress("www.example.com"), net.Port(80)))
 		writer.Clear()
 	}

@@ -69,7 +69,7 @@ func TestFinalMaskFilter(t *testing.T) {
 	}
 	for _, field := range []string{"blockedSourceIPs", "allowedSourceIPs"} {
 		var config Filter
-		if err := json.Unmarshal([]byte(fmt.Sprintf(`{"%s":["192.0.2.0/33"]}`, field)), &config); err != nil {
+		if err := json.Unmarshal(fmt.Appendf(nil, `{"%s":["192.0.2.0/33"]}`, field), &config); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := config.Build(); err == nil || !strings.Contains(err.Error(), field) {

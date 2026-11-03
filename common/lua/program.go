@@ -35,7 +35,7 @@ func Compile(script string) (*Program, error) {
 	if strings.HasPrefix(script, base64.GzipPrefix) || strings.HasPrefix(script, base64.Prefix) {
 		// TODO: Restore inline script support and re-enable the related tests.
 		return nil, errors.New("currently unavailable")
-		code, err = base64.Decode(script)
+		// code, err = base64.Decode(script)
 	} else if name, err = filesystem.ResolveLuaFile(script); err == nil {
 		code, err = os.ReadFile(name)
 		// TODO: Restore privileged signature authorization and re-enable the related tests and CLI entries.

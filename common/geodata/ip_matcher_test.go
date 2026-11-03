@@ -418,7 +418,7 @@ func BenchmarkIPMatcher4CN(b *testing.B) {
 
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = matcher.Match(ip)
 	}
 }
@@ -431,7 +431,7 @@ func BenchmarkIPMatcher6RU(b *testing.B) {
 
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = matcher.Match(ip)
 	}
 }

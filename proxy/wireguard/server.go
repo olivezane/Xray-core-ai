@@ -143,16 +143,16 @@ func (s *Server) AddUser(ctx context.Context, user *protocol.MemoryUser) error {
 		return errors.New("invalid public key")
 	}
 	var sb strings.Builder
-	sb.WriteString("public_key=" + hex.EncodeToString(peer.Pub[:]) + "\n")
+	fmt.Fprintf(&sb, "public_key=%s\n", hex.EncodeToString(peer.Pub[:]))
 	sb.WriteString("replace_allowed_ips=true\n")
 	for i := range peer.AllowedIPs {
-		sb.WriteString("allowed_ip=" + peer.AllowedIPs[i].String() + "\n")
+		fmt.Fprintf(&sb, "allowed_ip=%s\n", peer.AllowedIPs[i].String())
 	}
 	if peer.PreSharedKey != "" {
-		sb.WriteString("preshared_key=" + peer.PreSharedKey + "\n")
+		fmt.Fprintf(&sb, "preshared_key=%s\n", peer.PreSharedKey)
 	}
 	if peer.KeepAlive != "" {
-		sb.WriteString("persistent_keepalive_interval=" + peer.KeepAlive + "\n")
+		fmt.Fprintf(&sb, "persistent_keepalive_interval=%s\n", peer.KeepAlive)
 	}
 	err := s.dev.IpcSet(sb.String())
 	if err != nil {
@@ -294,18 +294,18 @@ func (s *Server) Start() error {
 	}
 	dev := device.NewDevice(s.tun, bind, logger)
 	var cfg strings.Builder
-	cfg.WriteString("private_key=" + s.conf.SecretKey + "\n")
+	fmt.Fprintf(&cfg, "private_key=%s\n", s.conf.SecretKey)
 	s.users.Range(func(key, value any) bool {
 		peer := value.(*protocol.MemoryUser).Account.(*MemoryAccount)
-		cfg.WriteString("public_key=" + hex.EncodeToString(peer.Pub[:]) + "\n")
+		fmt.Fprintf(&cfg, "public_key=%s\n", hex.EncodeToString(peer.Pub[:]))
 		for i := range peer.AllowedIPs {
-			cfg.WriteString("allowed_ip=" + peer.AllowedIPs[i].String() + "\n")
+			fmt.Fprintf(&cfg, "allowed_ip=%s\n", peer.AllowedIPs[i].String())
 		}
 		if peer.PreSharedKey != "" {
-			cfg.WriteString("preshared_key=" + peer.PreSharedKey + "\n")
+			fmt.Fprintf(&cfg, "preshared_key=%s\n", peer.PreSharedKey)
 		}
 		if peer.KeepAlive != "" {
-			cfg.WriteString("persistent_keepalive_interval=" + peer.KeepAlive + "\n")
+			fmt.Fprintf(&cfg, "persistent_keepalive_interval=%s\n", peer.KeepAlive)
 		}
 		return true
 	})

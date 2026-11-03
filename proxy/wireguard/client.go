@@ -178,18 +178,18 @@ func NewClient(ctx context.Context, conf *DeviceConfig) (*Handler, error) {
 	bind.downFunc = dev.Down
 	bind.reserved = conf.Reserved
 	var cfg strings.Builder
-	cfg.WriteString("private_key=" + conf.SecretKey + "\n")
+	fmt.Fprintf(&cfg, "private_key=%s\n", conf.SecretKey)
 	for _, peer := range conf.Peers {
-		cfg.WriteString("public_key=" + peer.PublicKey + "\n")
+		fmt.Fprintf(&cfg, "public_key=%s\n", peer.PublicKey)
 		if peer.PreSharedKey != "" {
-			cfg.WriteString("preshared_key=" + peer.PreSharedKey + "\n")
+			fmt.Fprintf(&cfg, "preshared_key=%s\n", peer.PreSharedKey)
 		}
-		cfg.WriteString("endpoint=" + peer.Endpoint + "\n")
+		fmt.Fprintf(&cfg, "endpoint=%s\n", peer.Endpoint)
 		for _, ip := range peer.AllowedIps {
-			cfg.WriteString("allowed_ip=" + ip + "\n")
+			fmt.Fprintf(&cfg, "allowed_ip=%s\n", ip)
 		}
 		if peer.KeepAlive != "" {
-			cfg.WriteString("persistent_keepalive_interval=" + peer.KeepAlive + "\n")
+			fmt.Fprintf(&cfg, "persistent_keepalive_interval=%s\n", peer.KeepAlive)
 		}
 	}
 

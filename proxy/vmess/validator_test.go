@@ -16,7 +16,7 @@ func toAccount(a *Account) protocol.Account {
 }
 
 func BenchmarkUserValidator(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		v := NewTimedUserValidator()
 
 		for j := 0; j < 1500; j++ {
