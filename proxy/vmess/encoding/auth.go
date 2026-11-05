@@ -65,8 +65,10 @@ func (s *ShakeSizeParser) NextPaddingLen() uint16 {
 	return s.next() % 64
 }
 
+// MaxPaddingLen reports the longest padding NextPaddingLen can return: it draws
+// next()%64, so 63 is reachable and 64 is not.
 func (s *ShakeSizeParser) MaxPaddingLen() uint16 {
-	return 64
+	return 63
 }
 
 type AEADSizeParser struct {

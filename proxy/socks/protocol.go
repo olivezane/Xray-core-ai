@@ -284,6 +284,11 @@ func ReadUsernamePassword(reader io.Reader) (string, string, error) {
 	return username, password, nil
 }
 
+// maxSocks4StringLen is the longest user id or socks4a domain accepted. The
+// limit used to be implied by buf.StackNew()'s 8 KiB buffer, which meant a
+// change to buf.Size silently changed what this handshake accepts.
+const maxSocks4StringLen = buf.Size - 1
+
 // ReadUntilNull reads content from given reader, until a null (0x00) byte.
 func ReadUntilNull(reader io.Reader) (string, error) {
 	b := buf.StackNew()
@@ -298,7 +303,7 @@ func ReadUntilNull(reader io.Reader) (string, error) {
 			b.Resize(0, b.Len()-1)
 			return b.String(), nil
 		}
-		if b.IsFull() {
+		if b.Len() > maxSocks4StringLen || b.IsFull() {
 			return "", errors.New("buffer overrun")
 		}
 	}
