@@ -611,6 +611,12 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 		return errors.New("failed to encode response header").Base(err)
 	}
 	clientWriter := encoding.EncodeBodyAddons(bufferWriter, request, requestAddons, trafficState, false, ctx, connection, nil)
+	// Flush the response header now instead of deferring it to the first
+	// downlink byte: a client that waits for the header before sending its
+	// request body would otherwise wait for data it has not sent yet.
+	if err := bufferWriter.Flush(); err != nil {
+		return errors.New("failed to flush response header").Base(err)
+	}
 	bufferWriter.SetFlushNext()
 
 	if request.Command == protocol.RequestCommandRvs {

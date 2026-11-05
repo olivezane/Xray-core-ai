@@ -192,6 +192,12 @@ func transferResponse(timer signal.ActivityUpdater, session *encoding.ServerSess
 	if err != nil {
 		return errors.New("failed to start decoding response").Base(err)
 	}
+	// Send the response header before reading any downlink data: a client that
+	// waits for the header before sending its request body would otherwise
+	// wait for data it has not sent yet.
+	if err := output.Flush(); err != nil {
+		return errors.New("failed to flush response header").Base(err)
+	}
 	{
 		// Optimize for small response packet
 		data, err := input.ReadMultiBuffer()
