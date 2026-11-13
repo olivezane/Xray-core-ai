@@ -47,5 +47,8 @@ func (f *FakeDNSServer) QueryIP(ctx context.Context, domain string, opt dns.IPOp
 	if len(netIP) > 0 {
 		return netIP, 1, nil // fakeIP ttl is 1
 	}
-	return nil, 0, dns.ErrEmptyResponse
+	// An enabled family without a pool is an authoritative empty answer.
+	// Falling back would resolve the name to a real address and bypass the
+	// fake IP routing.
+	return nil, 0, dns.ErrNoRecords
 }

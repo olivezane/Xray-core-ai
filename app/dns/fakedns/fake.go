@@ -2,8 +2,8 @@ package fakedns
 
 import (
 	"context"
-	"math"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,18 +85,63 @@ func (fkdns *Holder) initialize(ipPoolCidr string, lruSize int) error {
 
 	ones, bits := ipRange.Mask.Size()
 	rooms := bits - ones
-	if math.Log2(float64(lruSize)) >= float64(rooms) {
-		return errors.New("LRU size is bigger than subnet size")
+	if rooms < 3 {
+		return errors.New("fake DNS pool is too small")
+	}
+	if rooms < 64 {
+		size := uint64(1) << rooms
+		usable := size - 5
+		// Leave a free address, or allocation loops forever once the pool is full.
+		if uint64(lruSize) > usable-1 {
+			return errors.New("LRU size is bigger than the fake DNS pool")
+		}
 	}
 	fkdns.domainToIP = cache.NewLru(lruSize)
 	fkdns.ipRange = ipRange
 	return nil
 }
 
+// IsReservedIP reports whether ip is one of the addresses the pool never hands
+// out: the network address, the next three addresses and the broadcast
+// address. A TUN's own address and DNS address usually sit at the start of the
+// pool, and a fake IP equal to them never reaches the TUN.
+func IsReservedIP(ipRange *net.IPNet, ip net.IP) bool {
+	ones, bits := ipRange.Mask.Size()
+	rooms := bits - ones
+	if rooms < 3 || !ipRange.Contains(ip) {
+		return false
+	}
+	base := ipRange.IP
+	if v4 := base.To4(); v4 != nil {
+		ip = ip.To4()
+		if ip == nil {
+			return false
+		}
+		base = v4
+	} else {
+		ip = ip.To16()
+		base = base.To16()
+		if ip == nil || base == nil {
+			return false
+		}
+	}
+	offset := new(big.Int).Sub(new(big.Int).SetBytes(ip), new(big.Int).SetBytes(base))
+	if !offset.IsUint64() {
+		return false
+	}
+	v := offset.Uint64()
+	if v < 4 {
+		return true
+	}
+	return rooms < 64 && v == (uint64(1)<<rooms)-1
+}
+
 // GetFakeIPForDomain checks and generates a fake IP for a domain name
 func (fkdns *Holder) GetFakeIPForDomain(domain string) []net.Address {
 	fkdns.mu.Lock()
 	defer fkdns.mu.Unlock()
+	// Domain names are case-insensitive (RFC 4343).
+	domain = strings.ToLower(domain)
 	if v, ok := fkdns.domainToIP.Get(domain); ok {
 		return []net.Address{v.(net.Address)}
 	}
@@ -112,9 +157,13 @@ func (fkdns *Holder) GetFakeIPForDomain(domain string) []net.Address {
 	for {
 		ip = net.IPAddress(bigIntIP.Bytes())
 
-		// if we run for a long time, we may go back to beginning and start seeing the IP in use
-		if _, ok := fkdns.domainToIP.PeekKeyFromValue(ip); !ok {
-			break
+		// The TUN interface and its DNS server usually sit at the start of the
+		// pool; handing one out would make connections to it unusable.
+		if !IsReservedIP(fkdns.ipRange, ip.IP()) {
+			// if we run for a long time, we may go back to beginning and start seeing the IP in use
+			if _, ok := fkdns.domainToIP.PeekKeyFromValue(ip); !ok {
+				break
+			}
 		}
 
 		bigIntIP = bigIntIP.Add(bigIntIP, big.NewInt(1))

@@ -416,6 +416,10 @@ func (s *DNS) serialQuery(domain string, option dns.IPOption) ([]net.IP, uint32,
 			return ips, ttl, nil
 		}
 
+		if go_errors.Is(err, dns.ErrNoRecords) {
+			return nil, 0, dns.ErrEmptyResponse
+		}
+
 		errors.LogInfoInner(s.ctx, err, "failed to lookup ip for domain ", domain, " at server ", client.Name(), " in serial query mode")
 		if err == nil {
 			err = dns.ErrEmptyResponse
@@ -460,6 +464,13 @@ func (s *DNS) parallelQuery(domain string, option dns.IPOption) ([]net.IP, uint3
 			// current group is incomplete and no one success -> continue pending
 			if pending[nextGroup] > 0 {
 				break
+			}
+
+			// a server was authoritative that the type does not exist -> do not ask the next group
+			for j := g.start; j <= g.end; j++ {
+				if go_errors.Is(results[j].err, dns.ErrNoRecords) {
+					return nil, 0, dns.ErrEmptyResponse
+				}
 			}
 
 			// all failed -> log and continue next group

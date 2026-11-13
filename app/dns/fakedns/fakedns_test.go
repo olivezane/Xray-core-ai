@@ -1,6 +1,8 @@
 package fakedns
 
 import (
+	gonet "net"
+	"net/netip"
 	"strconv"
 	"testing"
 
@@ -203,4 +205,71 @@ func TestFakeDNSMulti(t *testing.T) {
 			assert.True(t, address[1].Family().IsIPv6())
 		})
 	})
+}
+
+func TestFakeDNSReservedAddresses(t *testing.T) {
+	// The pool has 8 addresses, usable ones are 198.18.0.4-.6: the network
+	// address, .1-.3 and the broadcast stay free.
+	fkdns, err := NewFakeDNSHolderConfigOnly(&FakeDnsPool{IpPool: "198.18.0.0/29", LruSize: 2})
+	common.Must(err)
+	common.Must(fkdns.Start())
+
+	usable := map[netip.Addr]bool{
+		netip.MustParseAddr("198.18.0.4"): true,
+		netip.MustParseAddr("198.18.0.5"): true,
+		netip.MustParseAddr("198.18.0.6"): true,
+	}
+	for i := 0; i < 50; i++ {
+		domain := "reserved" + strconv.Itoa(i) + ".example.com"
+		addr := fkdns.GetFakeIPForDomain(domain)
+		if !assert.Len(t, addr, 1) {
+			return
+		}
+		ip, ok := netip.AddrFromSlice(addr[0].IP())
+		assert.True(t, ok)
+		assert.True(t, usable[ip], "reserved address %s handed out for %s", ip, domain)
+	}
+}
+
+func TestFakeDNSRejectsOversizedPool(t *testing.T) {
+	fkdns, err := NewFakeDNSHolderConfigOnly(&FakeDnsPool{IpPool: "198.18.0.0/29", LruSize: 5})
+	common.Must(err)
+	assert.Error(t, fkdns.Start())
+}
+
+func TestFakeDNSDomainCase(t *testing.T) {
+	fkdns, err := NewFakeDNSHolderConfigOnly(&FakeDnsPool{IpPool: "198.18.0.0/15", LruSize: 4})
+	common.Must(err)
+	common.Must(fkdns.Start())
+
+	upper := fkdns.GetFakeIPForDomain("Example.COM")
+	if !assert.Len(t, upper, 1) {
+		return
+	}
+	lower := fkdns.GetFakeIPForDomain("example.com")
+	if !assert.Len(t, lower, 1) {
+		return
+	}
+	assert.Equal(t, upper[0].IP(), lower[0].IP())
+	assert.Equal(t, "example.com", fkdns.GetDomainFromFakeDNS(upper[0]))
+}
+
+func TestIsReservedIP(t *testing.T) {
+	_, ipRange, err := gonet.ParseCIDR("198.18.0.0/24")
+	common.Must(err)
+	for _, tc := range []struct {
+		ip   string
+		want bool
+	}{
+		{"198.18.0.0", true},
+		{"198.18.0.1", true},
+		{"198.18.0.2", true},
+		{"198.18.0.3", true},
+		{"198.18.0.4", false},
+		{"198.18.0.254", false},
+		{"198.18.0.255", true},
+		{"198.18.1.0", false},
+	} {
+		assert.Equal(t, tc.want, IsReservedIP(ipRange, gonet.ParseIP(tc.ip)), tc.ip)
+	}
 }

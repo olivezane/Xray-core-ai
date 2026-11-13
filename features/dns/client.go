@@ -34,6 +34,11 @@ func ClientType() interface{} {
 // ErrEmptyResponse indicates that DNS query succeeded but no answer was returned.
 var ErrEmptyResponse = errors.New("empty response")
 
+// ErrNoRecords indicates that the server is authoritative for the name and has
+// no records of the requested type. Unlike ErrEmptyResponse, it stops the
+// fallback to the next server instead of asking it.
+var ErrNoRecords = errors.New("no records of the requested type")
+
 const DefaultTTL = 300
 
 type RCodeError uint16
