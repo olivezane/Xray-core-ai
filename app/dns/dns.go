@@ -105,7 +105,7 @@ func New(ctx context.Context, config *Config) (*DNS, error) {
 				for _, rule := range localTLDsAndDotlessDomainsRules {
 					matcherInfos = append(matcherInfos, &DomainMatcherInfo{
 						clientIdx:  uint16(clientIdx),
-						domainRule: rule.String(),
+						domainRule: geodata.FormatDomainRule(rule),
 					})
 				}
 			}
@@ -114,7 +114,7 @@ func New(ctx context.Context, config *Config) (*DNS, error) {
 			for _, rule := range ns.Domain {
 				matcherInfos = append(matcherInfos, &DomainMatcherInfo{
 					clientIdx:  uint16(clientIdx),
-					domainRule: rule.String(),
+					domainRule: geodata.FormatDomainRule(rule),
 				})
 			}
 		}
@@ -307,6 +307,26 @@ func (s *DNS) LookupIP(domain string, option dns.IPOption) ([]net.IP, uint32, er
 }
 
 func (s *DNS) sortClients(domain string) []*Client {
+	clients, _, _ := s.sortClientsWithReasons(domain)
+	return clients
+}
+
+// Explain reports how a domain would be resolved by this config: the static
+// hosts result, the name server domain rules that matched, and the name servers
+// in query order.
+func (s *DNS) Explain(domain string) (hosts []net.Address, domainRules, nameServers []string) {
+	domain = strings.TrimSuffix(domain, ".")
+	if s.hosts != nil {
+		hosts, _ = s.hosts.Lookup(domain, *s.ipOption)
+	}
+	clients, domainRules, _ := s.sortClientsWithReasons(domain)
+	for _, client := range clients {
+		nameServers = append(nameServers, client.Describe())
+	}
+	return
+}
+
+func (s *DNS) sortClientsWithReasons(domain string) ([]*Client, []string, []string) {
 	clients := make([]*Client, 0, len(s.clients))
 	clientUsed := make([]bool, len(s.clients))
 	clientNames := make([]string, 0, len(s.clients))
@@ -333,7 +353,7 @@ func (s *DNS) sortClients(domain string) []*Client {
 			hasMatch = true
 			if client.finalQuery {
 				logDecision(s.ctx, domain, domainRules, clientNames)
-				return clients
+				return clients, domainRules, clientNames
 			}
 		}
 	}
@@ -349,7 +369,7 @@ func (s *DNS) sortClients(domain string) []*Client {
 			clientNames = append(clientNames, client.Name())
 			if client.finalQuery {
 				logDecision(s.ctx, domain, domainRules, clientNames)
-				return clients
+				return clients, domainRules, clientNames
 			}
 		}
 	}
@@ -366,7 +386,7 @@ func (s *DNS) sortClients(domain string) []*Client {
 		}
 	}
 
-	return clients
+	return clients, domainRules, clientNames
 }
 
 func logDecision(ctx context.Context, domain string, domainRules []string, clientNames []string) {

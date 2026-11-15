@@ -36,6 +36,7 @@ type Route struct {
 	outboundGroupTags []string
 	outboundTag       string
 	ruleTag           string
+	ruleIndex         int
 }
 
 // Init initializes the Router.
@@ -66,7 +67,7 @@ func (r *Router) PickRoute(ctx routing.Context) (routing.Route, error) {
 	}
 
 	originalCtx := ctx
-	rule, ctx, err := r.pickRouteInternal(ctx)
+	rule, ctx, index, err := r.pickRouteInternal(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +78,7 @@ func (r *Router) PickRoute(ctx routing.Context) (routing.Route, error) {
 	if rule.Webhook != nil {
 		rule.Webhook.Fire(originalCtx, tag)
 	}
-	return &Route{Context: ctx, outboundTag: tag, ruleTag: rule.RuleTag}, nil
+	return &Route{Context: ctx, outboundTag: tag, ruleTag: rule.RuleTag, ruleIndex: index}, nil
 }
 
 // AddRule implements routing.Router.
@@ -193,12 +194,13 @@ func (r *Router) ListRule() []routing.Route {
 		ruleList = append(ruleList, &Route{
 			outboundTag: rule.Tag,
 			ruleTag:     rule.RuleTag,
+			ruleIndex:   -1,
 		})
 	}
 	return ruleList
 }
 
-func (r *Router) pickRouteInternal(ctx routing.Context) (*Rule, routing.Context, error) {
+func (r *Router) pickRouteInternal(ctx routing.Context) (*Rule, routing.Context, int, error) {
 	// SkipDNSResolve is set from DNS module.
 	// the DOH remote server maybe a domain name,
 	// this prevents cycle resolving dead loop
@@ -210,26 +212,26 @@ func (r *Router) pickRouteInternal(ctx routing.Context) (*Rule, routing.Context,
 
 	rules := *r.rules.Load()
 
-	for _, rule := range rules {
+	for i, rule := range rules {
 		if rule.Apply(ctx) {
-			return rule, ctx, nil
+			return rule, ctx, i, nil
 		}
 	}
 
 	if r.domainStrategy != Config_IpIfNonMatch || len(ctx.GetTargetDomain()) == 0 || skipDNSResolve {
-		return nil, ctx, common.ErrNoClue
+		return nil, ctx, -1, common.ErrNoClue
 	}
 
 	ctx = routing_dns.ContextWithDNSClient(ctx, r.dns)
 
 	// Try applying rules again if we have IPs.
-	for _, rule := range rules {
+	for i, rule := range rules {
 		if rule.Apply(ctx) {
-			return rule, ctx, nil
+			return rule, ctx, i, nil
 		}
 	}
 
-	return nil, ctx, common.ErrNoClue
+	return nil, ctx, -1, common.ErrNoClue
 }
 
 // Start implements common.Runnable.
@@ -279,6 +281,12 @@ func (r *Route) GetOutboundTag() string {
 
 func (r *Route) GetRuleTag() string {
 	return r.ruleTag
+}
+
+// GetRuleIndex returns the index of the matched rule in the router's current
+// rule list, or -1 when no rule matched.
+func (r *Route) GetRuleIndex() int {
+	return r.ruleIndex
 }
 
 func init() {

@@ -42,6 +42,7 @@ type Client struct {
 	ipOption      *dns.IPOption
 	checkSystem   bool
 	policyID      uint32
+	detail        string
 }
 
 // NewServer creates a name server object according to the network destination url.
@@ -102,7 +103,7 @@ func NewClient(
 	ipOption dns.IPOption,
 	updateRules func(bool),
 ) (*Client, error) {
-	client := &Client{id: ns.Id}
+	client := &Client{id: ns.Id, detail: describeNameServer(ns)}
 	err := core.RequireFeatures(ctx, func(dispatcher routing.Dispatcher) error {
 		// Create a new server for each client for now
 		server, err := NewServer(ctx, ns.Address.AsDestination(), dispatcher, disableCache, serveStale, serveExpiredTTL, clientIP)
@@ -162,6 +163,47 @@ func NewClient(
 		return nil
 	})
 	return client, err
+}
+
+// describeNameServer renders the config knobs that change how this client
+// answers, so tools can show why a domain picks it or falls back past it.
+func describeNameServer(ns *NameServer) string {
+	var parts []string
+	if len(ns.Tag) > 0 {
+		parts = append(parts, "tag="+ns.Tag)
+	}
+	if len(ns.ExpectedIp) > 0 {
+		parts = append(parts, "expectIPs="+joinIPRules(ns.ExpectedIp))
+	}
+	if len(ns.UnexpectedIp) > 0 {
+		parts = append(parts, "unexpectIPs="+joinIPRules(ns.UnexpectedIp))
+	}
+	if ns.SkipFallback {
+		parts = append(parts, "skipFallback")
+	}
+	if ns.FinalQuery {
+		parts = append(parts, "finalQuery")
+	}
+	if ns.QueryStrategy != QueryStrategy_USE_IP {
+		parts = append(parts, "queryStrategy="+ns.QueryStrategy.String())
+	}
+	return strings.Join(parts, " ")
+}
+
+func joinIPRules(rules []*geodata.IPRule) string {
+	ss := make([]string, len(rules))
+	for i, rule := range rules {
+		ss[i] = geodata.FormatIPRule(rule)
+	}
+	return strings.Join(ss, ",")
+}
+
+// Describe returns the client name with its config knobs, if any.
+func (c *Client) Describe() string {
+	if c.detail == "" {
+		return c.Name()
+	}
+	return c.Name() + " (" + c.detail + ")"
 }
 
 // Name returns the server name the client manages.

@@ -80,5 +80,5 @@ func (e *scriptEngine) pickRoute(ctx routing.Context) (routing.Route, error) {
 		return nil, common.ErrNoClue
 	}
 
-	return &Route{Context: ctx, outboundTag: outboundTag, ruleTag: ruleTag}, nil
+	return &Route{Context: ctx, outboundTag: outboundTag, ruleTag: ruleTag, ruleIndex: -1}, nil
 }

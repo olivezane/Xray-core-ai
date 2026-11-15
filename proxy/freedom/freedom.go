@@ -166,17 +166,64 @@ func getDefaultFinalRule(inbound *session.Inbound) *FinalRule {
 	if inbound == nil {
 		return nil
 	}
-	switch inbound.Name {
+	return defaultFinalRule(inbound.Name)
+}
+
+// defaultFinalRule is the implicit final rule an inbound protocol brings: a
+// proxied inbound must not let freedom reach private addresses.
+func defaultFinalRule(inboundName string) *FinalRule {
+	switch inboundName {
 	case "vless-reverse":
 		return defaultBlockAllRule
 	case "vless", "vmess", "trojan", "hysteria", "wireguard", "masque":
 		return defaultBlockPrivateRule
 	default:
-		if strings.HasPrefix(inbound.Name, "shadowsocks") {
+		if strings.HasPrefix(inboundName, "shadowsocks") {
 			return defaultBlockPrivateRule
 		}
 	}
 	return nil
+}
+
+// HasImplicitFinalRule reports whether an inbound protocol brings its own
+// block rule for freedom, even with no finalRules configured.
+func HasImplicitFinalRule(inboundName string) bool {
+	return defaultFinalRule(inboundName) != nil
+}
+
+// FinalVerdict is the final rule a connection to a destination meets.
+type FinalVerdict struct {
+	// Index of the matched rule, -1 when none matched.
+	Index   int
+	Block   bool
+	Total   int
+	Default bool // matched the implicit rule of the inbound protocol
+}
+
+// FinalRuleVerdict reports which final rule acts on a connection to this
+// destination, for tools that explain a routing decision without dialing.
+// inboundName is the protocol of the inbound carrying the connection (e.g.
+// "vless"); it decides the implicit block rule, which is why it cannot be
+// inferred from the outbound alone.
+func FinalRuleVerdict(config *Config, inboundName string, network net.Network, address net.Address, port net.Port) FinalVerdict {
+	verdict := FinalVerdict{Index: -1}
+	for i, rc := range config.GetFinalRules() {
+		rule, err := buildFinalRule(rc)
+		if err != nil {
+			continue
+		}
+		verdict.Total++
+		if rule.Apply(network, address, port) {
+			verdict.Index = i
+			verdict.Block = rule.action == RuleAction_Block
+			return verdict
+		}
+	}
+	if rule := defaultFinalRule(inboundName); rule != nil && rule.Apply(network, address, port) {
+		verdict.Block = rule.action == RuleAction_Block
+		verdict.Default = true
+	}
+	return verdict
 }
 
 func (h *Handler) matchFinalRule(network net.Network, address net.Address, port net.Port, defaultRule *FinalRule) *FinalRule {
