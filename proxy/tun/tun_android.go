@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netlink/nl"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/platform"
 	"golang.org/x/sys/unix"
@@ -355,6 +356,15 @@ func (t *AndroidTun) monitorRouteChanges(u *InterfaceUpdater) {
 		linkCh = nil
 	}
 
+	// netd moves the default network by rewriting ip rules, not routes: a
+	// handoff to mobile data that was already up changes no route and no link,
+	// so the rules are what raises the switch.
+	ruleCh := make(chan struct{}, 1)
+	if err := subscribeRuleChanges(ruleCh, t.routeMonitorStop); err != nil {
+		errors.LogInfo(context.Background(), "[tun] android: failed to subscribe rule changes: ", err)
+		ruleCh = nil
+	}
+
 	// A network switch arrives as a burst of updates (our own setRoutes too):
 	// the first one arms the timer, the rest of the burst folds into one Update.
 	var settle <-chan time.Time
@@ -368,6 +378,7 @@ func (t *AndroidTun) monitorRouteChanges(u *InterfaceUpdater) {
 			if !ok {
 				return
 			}
+		case <-ruleCh:
 		case <-settle:
 			settle = nil
 			u.Update()
@@ -379,6 +390,31 @@ func (t *AndroidTun) monitorRouteChanges(u *InterfaceUpdater) {
 			settle = time.After(200 * time.Millisecond)
 		}
 	}
+}
+
+// subscribeRuleChanges reports every ip rule change on ch, one notification at
+// a time: the caller only needs to know that something moved.
+func subscribeRuleChanges(ch chan<- struct{}, done <-chan struct{}) error {
+	s, err := nl.Subscribe(unix.NETLINK_ROUTE, unix.RTNLGRP_IPV4_RULE, unix.RTNLGRP_IPV6_RULE)
+	if err != nil {
+		return err
+	}
+	go func() {
+		<-done
+		s.Close()
+	}()
+	go func() {
+		for {
+			if _, _, err := s.Receive(); err != nil {
+				return // socket closed with done, or the receive failed
+			}
+			select {
+			case ch <- struct{}{}:
+			default: // one pending notification is enough
+			}
+		}
+	}()
+	return nil
 }
 
 // pollRouteChanges polls /proc/net/route every 5s as fallback when netlink is banned.

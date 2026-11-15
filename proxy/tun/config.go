@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/xtls/xray-core/common/errors"
 )
@@ -14,12 +15,30 @@ type InterfaceUpdater struct {
 	tunIndex  int
 	fixedName string
 	iface     *net.Interface
+	retriedAt time.Time
 	closed    bool
 }
 
 var updater *InterfaceUpdater
 
+// Get returns the interface outbound sockets bind to, looking it up again when
+// nothing is resolved: an update that lands between two networks leaves it nil,
+// and the next event that would fix it may be seconds away, or never come.
 func (updater *InterfaceUpdater) Get() *net.Interface {
+	updater.Lock()
+	iface := updater.iface
+	retry := iface == nil && !updater.closed && time.Since(updater.retriedAt) >= time.Second
+	if retry {
+		updater.retriedAt = time.Now()
+	}
+	updater.Unlock()
+
+	if !retry {
+		return iface
+	}
+
+	updater.Update()
+
 	updater.Lock()
 	defer updater.Unlock()
 
