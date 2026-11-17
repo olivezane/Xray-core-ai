@@ -243,11 +243,11 @@ func (s *DoHNameServer) dohHTTPSContext(ctx context.Context, b []byte) ([]byte, 
 	req.Header.Add("Accept", "application/dns-message")
 	req.Header.Add("Content-Type", "application/dns-message")
 	utils.TryDefaultHeadersWith(req.Header, "fetch")
-	req.Header.Set("X-Padding", utils.H2Base62Pad(crypto.RandBetween(100, 1000)))
+	utils.SetH2Padding(req.Header)
 
 	hc := s.httpClient
 
-	resp, err := hc.Do(req.WithContext(ctx))
+	resp, err := utils.DoWithH2Padding(hc, req.WithContext(ctx))
 	if err != nil {
 		return nil, 0, err
 	}

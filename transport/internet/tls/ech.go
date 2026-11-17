@@ -228,12 +228,15 @@ func dnsQuery(server string, domain string, sockopt *internet.SocketConfig) ([]b
 				},
 			}
 			c := &http.Client{
-				Timeout:   30 * time.Second,
 				Transport: tr,
 			}
 			client, _ = clientForECHDOH.LoadOrStore(serverKey, c)
 		}
-		req, err := http.NewRequest("POST", server, bytes.NewReader(msg))
+		// One deadline for the whole query: DoWithH2Padding may retry, and the
+		// ECH lookup blocks the handshake, so per-attempt timeouts can double the wait.
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, "POST", server, bytes.NewReader(msg))
 		if err != nil {
 			return nil, 0, err
 		}
@@ -243,9 +246,9 @@ func dnsQuery(server string, domain string, sockopt *internet.SocketConfig) ([]b
 		req.Header.Set("Accept", "application/dns-message")
 		req.Header.Set("Content-Type", "application/dns-message")
 		utils.TryDefaultHeadersWith(req.Header, "fetch")
-		req.Header.Set("X-Padding", utils.H2Base62Pad(crypto.RandBetween(100, 1000)))
+		utils.SetH2Padding(req.Header)
 
-		resp, err := client.Do(req)
+		resp, err := utils.DoWithH2Padding(client, req)
 		if err != nil {
 			return nil, 0, err
 		}
