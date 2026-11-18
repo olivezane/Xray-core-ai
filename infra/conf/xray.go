@@ -460,15 +460,15 @@ type Config struct {
 	OutboundConfigs []OutboundDetourConfig `json:"outbounds"`
 	Policy          *PolicyConfig          `json:"policy"`
 	API             *APIConfig             `json:"api"`
-	// Deprecated: both blocks are gone, "api" collects statistics and serves /debug/vars + /debug/pprof.
-	Metrics          json.RawMessage         `json:"metrics"`
-	Stats            json.RawMessage         `json:"stats"`
-	Reverse          *ReverseConfig          `json:"reverse"`
-	FakeDNS          *FakeDNSConfig          `json:"fakeDns"`
-	Observatory      *ObservatoryConfig      `json:"observatory"`
-	BurstObservatory *BurstObservatoryConfig `json:"burstObservatory"`
-	Version          *VersionConfig          `json:"version"`
-	Geodata          *GeodataConfig          `json:"geodata"`
+	Reverse         *ReverseConfig         `json:"reverse"`
+	FakeDNS         *FakeDNSConfig         `json:"fakeDns"`
+	// Deprecated: removed blocks, kept only to warn.
+	Metrics          json.RawMessage `json:"metrics"`
+	Stats            json.RawMessage `json:"stats"`
+	Observatory      json.RawMessage `json:"observatory"`
+	BurstObservatory json.RawMessage `json:"burstObservatory"`
+	Version          *VersionConfig  `json:"version"`
+	Geodata          *GeodataConfig  `json:"geodata"`
 }
 
 func (c *Config) findInboundTag(tag string) int {
@@ -527,14 +527,6 @@ func (c *Config) Override(o *Config, fn string) {
 
 	if o.FakeDNS != nil {
 		c.FakeDNS = o.FakeDNS
-	}
-
-	if o.Observatory != nil {
-		c.Observatory = o.Observatory
-	}
-
-	if o.BurstObservatory != nil {
-		c.BurstObservatory = o.BurstObservatory
 	}
 
 	if o.Version != nil {
@@ -604,6 +596,9 @@ func (c *Config) Build() (*core.Config, error) {
 	if len(c.Metrics) > 0 || len(c.Stats) > 0 {
 		errors.LogWarning(context.Background(), `The "metrics" and "stats" blocks have been removed. "api" now collects statistics and serves /debug/vars + /debug/pprof.`)
 	}
+	if len(c.Observatory) > 0 || len(c.BurstObservatory) > 0 {
+		errors.LogWarning(context.Background(), `The "observatory" and "burstObservatory" blocks have been removed. Move them into the "api" block.`)
+	}
 	// The gRPC stats service and the /debug/vars endpoint both read the stats manager.
 	if c.API != nil {
 		config.App = append(config.App, serial.ToTypedMessage(&stats.Config{}))
@@ -612,6 +607,20 @@ func (c *Config) Build() (*core.Config, error) {
 			return nil, errors.New("failed to build API configuration").Base(err)
 		}
 		config.App = append(config.App, serial.ToTypedMessage(apiConf))
+		if c.API.Observatory != nil {
+			r, err := c.API.Observatory.Build()
+			if err != nil {
+				return nil, errors.New("failed to build observatory configuration").Base(err)
+			}
+			config.App = append(config.App, serial.ToTypedMessage(r))
+		}
+		if c.API.BurstObservatory != nil {
+			r, err := c.API.BurstObservatory.Build()
+			if err != nil {
+				return nil, errors.New("failed to build burst observatory configuration").Base(err)
+			}
+			config.App = append(config.App, serial.ToTypedMessage(r))
+		}
 	}
 
 	var logConfMsg *serial.TypedMessage
@@ -658,22 +667,6 @@ func (c *Config) Build() (*core.Config, error) {
 			return nil, errors.New("failed to build fake DNS configuration").Base(err)
 		}
 		config.App = append([]*serial.TypedMessage{serial.ToTypedMessage(r)}, config.App...)
-	}
-
-	if c.Observatory != nil {
-		r, err := c.Observatory.Build()
-		if err != nil {
-			return nil, errors.New("failed to build observatory configuration").Base(err)
-		}
-		config.App = append(config.App, serial.ToTypedMessage(r))
-	}
-
-	if c.BurstObservatory != nil {
-		r, err := c.BurstObservatory.Build()
-		if err != nil {
-			return nil, errors.New("failed to build burst observatory configuration").Base(err)
-		}
-		config.App = append(config.App, serial.ToTypedMessage(r))
 	}
 
 	if c.Version != nil {

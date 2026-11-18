@@ -6,6 +6,8 @@ import (
 
 	"github.com/xtls/xray-core/app/commander"
 	"github.com/xtls/xray-core/app/metrics"
+	"github.com/xtls/xray-core/app/observatory"
+	"github.com/xtls/xray-core/app/observatory/burst"
 	"github.com/xtls/xray-core/app/stats"
 	statsservice "github.com/xtls/xray-core/app/stats/command"
 	. "github.com/xtls/xray-core/infra/conf"
@@ -13,28 +15,52 @@ import (
 
 func TestAPIConfigBuildsStatsAndCommander(t *testing.T) {
 	tests := []struct {
-		name     string
-		raw      string
-		api      bool
-		services int
+		name        string
+		raw         string
+		api         bool
+		services    int
+		observatory bool
+		burst       bool
 	}{
 		{
 			"api block",
 			`{"api":{"listen":"127.0.0.1:10085"}}`,
 			true,
 			1,
+			false,
+			false,
 		},
 		{
 			"api block with explicit services",
 			`{"api":{"tag":"api","services":["HandlerService"]}}`,
 			true,
 			2,
+			false,
+			false,
+		},
+		{
+			"api block with observatory",
+			`{"api":{"listen":"127.0.0.1:10085","observatory":{"subjectSelector":["direct"],"probeURL":"https://www.google.com/generate_204","probeInterval":"10s"}}}`,
+			true,
+			1,
+			true,
+			false,
+		},
+		{
+			"api block with burst observatory",
+			`{"api":{"listen":"127.0.0.1:10085","burstObservatory":{"subjectSelector":["direct"],"pingConfig":{"destination":"https://www.google.com/generate_204","interval":"1m","sampling":3,"timeout":"5s"}}}}`,
+			true,
+			1,
+			false,
+			true,
 		},
 		{
 			"removed legacy blocks",
-			`{"metrics":{"listen":"127.0.0.1:8080"},"stats":{}}`,
+			`{"metrics":{"listen":"127.0.0.1:8080"},"stats":{},"observatory":{"subjectSelector":["direct"]}}`,
 			false,
 			0,
+			false,
+			false,
 		},
 	}
 
@@ -50,9 +76,11 @@ func TestAPIConfigBuildsStatsAndCommander(t *testing.T) {
 			}
 
 			var (
-				commanderConf *commander.Config
-				metricsConf   *metrics.Config
-				hasStats      bool
+				commanderConf   *commander.Config
+				metricsConf     *metrics.Config
+				observatoryConf *observatory.Config
+				burstConf       *burst.Config
+				hasStats        bool
 			)
 			for _, app := range built.App {
 				instance, err := app.GetInstance()
@@ -66,6 +94,10 @@ func TestAPIConfigBuildsStatsAndCommander(t *testing.T) {
 					metricsConf = v
 				case *stats.Config:
 					hasStats = true
+				case *observatory.Config:
+					observatoryConf = v
+				case *burst.Config:
+					burstConf = v
 				}
 			}
 
@@ -77,6 +109,12 @@ func TestAPIConfigBuildsStatsAndCommander(t *testing.T) {
 			}
 			if metricsConf != nil {
 				t.Error("metrics app must not be built")
+			}
+			if got := observatoryConf != nil; got != tt.observatory {
+				t.Errorf("observatory app built = %v, want %v", got, tt.observatory)
+			}
+			if got := burstConf != nil; got != tt.burst {
+				t.Errorf("burst observatory app built = %v, want %v", got, tt.burst)
 			}
 			if !tt.api {
 				return

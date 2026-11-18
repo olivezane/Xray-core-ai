@@ -20,6 +20,9 @@ type APIConfig struct {
 	Tag      string   `json:"tag"`
 	Listen   string   `json:"listen"`
 	Services []string `json:"services"`
+	// Outbound health checks, previously the top-level observatory blocks.
+	Observatory      *ObservatoryConfig      `json:"observatory"`
+	BurstObservatory *BurstObservatoryConfig `json:"burstObservatory"`
 }
 
 func (c *APIConfig) Build() (*commander.Config, error) {
