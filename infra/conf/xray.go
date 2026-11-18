@@ -459,13 +459,13 @@ type Config struct {
 	OutboundConfigs []OutboundDetourConfig `json:"outbounds"`
 	Policy          *PolicyConfig          `json:"policy"`
 	API             *APIConfig             `json:"api"`
-	Reverse         *ReverseConfig         `json:"reverse"`
 	// Deprecated: removed blocks, kept only to warn.
 	Metrics          json.RawMessage `json:"metrics"`
 	Stats            json.RawMessage `json:"stats"`
 	Observatory      json.RawMessage `json:"observatory"`
 	BurstObservatory json.RawMessage `json:"burstObservatory"`
 	FakeDNS          json.RawMessage `json:"fakeDns"`
+	Reverse          json.RawMessage `json:"reverse"`
 	Version          *VersionConfig  `json:"version"`
 	Geodata          *GeodataConfig  `json:"geodata"`
 }
@@ -517,10 +517,6 @@ func (c *Config) Override(o *Config, fn string) {
 	if o.API != nil {
 		c.API = o.API
 	}
-	if o.Reverse != nil {
-		c.Reverse = o.Reverse
-	}
-
 	if o.Version != nil {
 		c.Version = o.Version
 	}
@@ -652,10 +648,6 @@ func (c *Config) Build() (*core.Config, error) {
 		config.App = append(config.App, serial.ToTypedMessage(pc))
 	}
 
-	if c.Reverse != nil {
-		return nil, errors.PrintRemovedFeatureError(`"legacy reverse"`, `"VLESS Reverse Proxy"`)
-	}
-
 	if c.DNSConfig != nil && c.DNSConfig.FakeDNS != nil {
 		r, err := c.DNSConfig.FakeDNS.Build()
 		if err != nil {
@@ -691,6 +683,10 @@ func (c *Config) Build() (*core.Config, error) {
 
 	if len(c.Transport) > 0 {
 		return nil, errors.PrintRemovedFeatureError("Global transport config", "streamSettings in inbounds and outbounds")
+	}
+
+	if len(c.Reverse) > 0 {
+		return nil, errors.PrintRemovedFeatureError(`"legacy reverse"`, `"VLESS Reverse Proxy"`)
 	}
 
 	for _, rawInboundConfig := range inbounds {

@@ -9,94 +9,11 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/common/signal"
-	"github.com/xtls/xray-core/common/task"
 	"github.com/xtls/xray-core/features/routing"
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/pipe"
 	"google.golang.org/protobuf/proto"
 )
-
-// Bridge is a component in reverse proxy, that relays connections from Portal to local address.
-type Bridge struct {
-	dispatcher  routing.Dispatcher
-	tag         string
-	domain      string
-	workers     []*BridgeWorker
-	monitorTask *task.Periodic
-}
-
-// NewBridge creates a new Bridge instance.
-func NewBridge(config *BridgeConfig, dispatcher routing.Dispatcher) (*Bridge, error) {
-	if config.Tag == "" {
-		return nil, errors.New("bridge tag is empty")
-	}
-	if config.Domain == "" {
-		return nil, errors.New("bridge domain is empty")
-	}
-
-	b := &Bridge{
-		dispatcher: dispatcher,
-		tag:        config.Tag,
-		domain:     config.Domain,
-	}
-	b.monitorTask = &task.Periodic{
-		Execute:  b.monitor,
-		Interval: time.Second * 2,
-	}
-	return b, nil
-}
-
-func (b *Bridge) cleanup() {
-	var activeWorkers []*BridgeWorker
-
-	for _, w := range b.workers {
-		if w.IsActive() {
-			activeWorkers = append(activeWorkers, w)
-		}
-		if w.Closed() {
-			if w.Timer != nil {
-				w.Timer.SetTimeout(0)
-			}
-		}
-	}
-
-	if len(activeWorkers) != len(b.workers) {
-		b.workers = activeWorkers
-	}
-}
-
-func (b *Bridge) monitor() error {
-	b.cleanup()
-
-	var numConnections uint32
-	var numWorker uint32
-
-	for _, w := range b.workers {
-		if w.IsActive() {
-			numConnections += w.Connections()
-			numWorker++
-		}
-	}
-
-	if numWorker == 0 || numConnections/numWorker > 16 {
-		worker, err := NewBridgeWorker(b.domain, b.tag, b.dispatcher)
-		if err != nil {
-			errors.LogWarningInner(context.Background(), err, "failed to create bridge worker")
-			return nil
-		}
-		b.workers = append(b.workers, worker)
-	}
-
-	return nil
-}
-
-func (b *Bridge) Start() error {
-	return b.monitorTask.Start()
-}
-
-func (b *Bridge) Close() error {
-	return b.monitorTask.Close()
-}
 
 type BridgeWorker struct {
 	Tag        string

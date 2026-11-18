@@ -10,131 +10,13 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/mux"
 	"github.com/xtls/xray-core/common/net"
-	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/common/signal"
 	"github.com/xtls/xray-core/common/task"
-	"github.com/xtls/xray-core/features/outbound"
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/pipe"
 	"google.golang.org/protobuf/proto"
 )
-
-type Portal struct {
-	ohm    outbound.Manager
-	tag    string
-	domain string
-	picker *StaticMuxPicker
-	client *mux.ClientManager
-}
-
-func NewPortal(config *PortalConfig, ohm outbound.Manager) (*Portal, error) {
-	if config.Tag == "" {
-		return nil, errors.New("portal tag is empty")
-	}
-
-	if config.Domain == "" {
-		return nil, errors.New("portal domain is empty")
-	}
-
-	picker, err := NewStaticMuxPicker()
-	if err != nil {
-		return nil, err
-	}
-
-	return &Portal{
-		ohm:    ohm,
-		tag:    config.Tag,
-		domain: config.Domain,
-		picker: picker,
-		client: &mux.ClientManager{
-			Picker: picker,
-		},
-	}, nil
-}
-
-func (p *Portal) Start() error {
-	return p.ohm.AddHandler(context.Background(), &Outbound{
-		portal: p,
-		tag:    p.tag,
-	})
-}
-
-func (p *Portal) Close() error {
-	return p.ohm.RemoveHandler(context.Background(), p.tag)
-}
-
-func (p *Portal) HandleConnection(ctx context.Context, link *transport.Link) error {
-	outbounds := session.OutboundsFromContext(ctx)
-	ob := outbounds[len(outbounds)-1]
-	if ob == nil {
-		return errors.New("outbound metadata not found")
-	}
-
-	if isDomain(ob.Target, p.domain) {
-		muxClient, err := mux.NewClientWorker(*link, mux.ClientStrategy{})
-		if err != nil {
-			return errors.New("failed to create mux client worker").Base(err)
-		}
-
-		worker, err := NewPortalWorker(muxClient)
-		if err != nil {
-			return errors.New("failed to create portal worker").Base(err)
-		}
-
-		p.picker.AddWorker(worker)
-
-		if _, ok := link.Reader.(*pipe.Reader); !ok {
-			select {
-			case <-ctx.Done():
-			case <-muxClient.WaitClosed():
-			}
-		}
-		return nil
-	}
-
-	if ob.Target.Network == net.Network_UDP && ob.OriginalTarget.Address != nil && ob.OriginalTarget.Address != ob.Target.Address {
-		link.Reader = &buf.EndpointOverrideReader{Reader: link.Reader, Dest: ob.Target.Address, OriginalDest: ob.OriginalTarget.Address}
-		link.Writer = &buf.EndpointOverrideWriter{Writer: link.Writer, Dest: ob.Target.Address, OriginalDest: ob.OriginalTarget.Address}
-	}
-
-	return p.client.Dispatch(ctx, link)
-}
-
-type Outbound struct {
-	portal *Portal
-	tag    string
-}
-
-func (o *Outbound) Tag() string {
-	return o.tag
-}
-
-func (o *Outbound) Dispatch(ctx context.Context, link *transport.Link) {
-	if err := o.portal.HandleConnection(ctx, link); err != nil {
-		errors.LogInfoInner(ctx, err, "failed to process reverse connection")
-		common.Interrupt(link.Writer)
-		common.Interrupt(link.Reader)
-	}
-}
-
-func (o *Outbound) Start() error {
-	return nil
-}
-
-func (o *Outbound) Close() error {
-	return nil
-}
-
-// SenderSettings implements outbound.Handler.
-func (o *Outbound) SenderSettings() *serial.TypedMessage {
-	return nil
-}
-
-// ProxySettings implements outbound.Handler.
-func (o *Outbound) ProxySettings() *serial.TypedMessage {
-	return nil
-}
 
 type StaticMuxPicker struct {
 	access  sync.Mutex

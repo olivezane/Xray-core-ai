@@ -3,6 +3,7 @@ package conf_test
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -267,6 +268,28 @@ func TestMuxConfig_Build(t *testing.T) {
 	}
 }
 
+func TestRemovedBlocks(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		input  string
+		reason string
+	}{
+		{"transport", `{"transport":{}}`, "Global transport config"},
+		{"reverse", `{"reverse":{}}`, "legacy reverse"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := new(Config)
+			if err := json.Unmarshal([]byte(test.input), config); err != nil {
+				t.Fatal(err)
+			}
+			_, err := config.Build()
+			if err == nil || !strings.Contains(err.Error(), test.reason) {
+				t.Fatalf("Build() error = %v, want one mentioning %q", err, test.reason)
+			}
+		})
+	}
+}
+
 func TestConfig_Override(t *testing.T) {
 	tests := []struct {
 		name string
@@ -284,7 +307,6 @@ func TestConfig_Override(t *testing.T) {
 				DNSConfig:    &DNSConfig{},
 				Policy:       &PolicyConfig{},
 				API:          &APIConfig{},
-				Reverse:      &ReverseConfig{},
 			},
 			"",
 			&Config{
@@ -293,7 +315,6 @@ func TestConfig_Override(t *testing.T) {
 				DNSConfig:    &DNSConfig{},
 				Policy:       &PolicyConfig{},
 				API:          &APIConfig{},
-				Reverse:      &ReverseConfig{},
 			},
 		},
 		{
