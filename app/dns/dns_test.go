@@ -150,7 +150,7 @@ func TestUDPServerSubnet(t *testing.T) {
 		Outbound: []*core.OutboundHandlerConfig{
 			{
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{
-					FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}},
+					Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}},
 				}),
 			},
 		},
@@ -212,7 +212,7 @@ func TestUDPServer(t *testing.T) {
 		Outbound: []*core.OutboundHandlerConfig{
 			{
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{
-					FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}},
+					Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}},
 				}),
 			},
 		},
@@ -352,7 +352,7 @@ func TestPrioritizedDomain(t *testing.T) {
 		Outbound: []*core.OutboundHandlerConfig{
 			{
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{
-					FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}},
+					Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}},
 				}),
 			},
 		},
@@ -423,7 +423,7 @@ func TestUDPServerIPv6(t *testing.T) {
 		Outbound: []*core.OutboundHandlerConfig{
 			{
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{
-					FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}},
+					Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}},
 				}),
 			},
 		},
@@ -492,7 +492,7 @@ func TestStaticHostDomain(t *testing.T) {
 		Outbound: []*core.OutboundHandlerConfig{
 			{
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{
-					FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}},
+					Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}},
 				}),
 			},
 		},
@@ -579,7 +579,7 @@ func TestIPMatch(t *testing.T) {
 		Outbound: []*core.OutboundHandlerConfig{
 			{
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{
-					FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}},
+					Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}},
 				}),
 			},
 		},
@@ -698,7 +698,7 @@ func TestLocalDomain(t *testing.T) {
 		Outbound: []*core.OutboundHandlerConfig{
 			{
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{
-					FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}},
+					Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}},
 				}),
 			},
 		},
@@ -955,7 +955,7 @@ func TestMultiMatchPrioritizedDomain(t *testing.T) {
 		Outbound: []*core.OutboundHandlerConfig{
 			{
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{
-					FinalRules: []*freedom.FinalRuleConfig{{Action: freedom.RuleAction_Allow}},
+					Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}},
 				}),
 			},
 		},

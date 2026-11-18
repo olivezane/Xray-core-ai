@@ -54,7 +54,7 @@ func TestLookupCommand(t *testing.T) {
 	final := filepath.Join(dir, "final.json")
 	finalBody := `{
   "routing": {"rules": [{"type": "field", "domain": ["domain:cn"], "outboundTag": "direct"}]},
-  "outbounds": [{"protocol": "freedom", "tag": "direct", "settings": {"finalRules": [
+  "outbounds": [{"protocol": "freedom", "tag": "direct", "settings": {"firewall": [
     {"action": "block", "port": "25"},
     {"action": "block", "ip": ["10.0.0.0/8"]}
   ]}}]
@@ -80,7 +80,7 @@ end`
 }`
 	untagged := filepath.Join(dir, "untagged.json")
 	untaggedBody := `{
-  "outbounds": [{"protocol": "freedom", "settings": {"finalRules": [{"action": "block", "port": "443"}]}}]
+  "outbounds": [{"protocol": "freedom", "settings": {"firewall": [{"action": "block", "port": "443"}]}}]
 }`
 	replace := filepath.Join(dir, "replace.json")
 	replaceBody := `{
@@ -171,39 +171,39 @@ end`
 			},
 		},
 		{
-			name: "freedom final rule by port",
+			name: "freedom firewall rule by port",
 			args: []string{"lookup", "-c", final, "-port", "25", "www.baidu.cn"},
 			wants: []string{
-				"final:    blocked by freedom finalRule #0",
+				"final:    blocked by freedom firewall rule #0",
 			},
 		},
 		{
-			name: "freedom final rule by ip",
+			name: "freedom firewall rule by ip",
 			args: []string{"lookup", "-c", final, "10.1.2.3"},
 			wants: []string{
 				"outbound: direct (default outbound)",
-				"final:    blocked by freedom finalRule #1",
+				"final:    blocked by freedom firewall rule #1",
 			},
 		},
 		{
-			name: "freedom final rules pass",
+			name: "freedom firewall rules pass",
 			args: []string{"lookup", "-c", final, "www.baidu.cn"},
 			wants: []string{
-				"final:    passes 2 freedom finalRules",
+				"final:    passes 2 freedom firewall",
 			},
 		},
 		{
-			name: "implicit final rule",
+			name: "implicit firewall rule",
 			args: []string{"lookup", "-c", server, "-inbound", "vless-in", "10.1.2.3"},
 			wants: []string{
-				"final:    blocked by the implicit final rule of a vless inbound (private IP)",
+				"final:    blocked by the implicit firewall rule of a vless inbound (private IP)",
 			},
 		},
 		{
-			name: "implicit final rule hint",
+			name: "implicit firewall rule hint",
 			args: []string{"lookup", "-c", server, "10.1.2.3"},
 			wants: []string{
-				"note:     inbound vless-in brings an implicit final rule, pass -inbound vless-in to apply it",
+				"note:     inbound vless-in brings an implicit firewall rule, pass -inbound vless-in to apply it",
 			},
 		},
 		{
@@ -250,7 +250,7 @@ end`
 			args: []string{"lookup", "-c", untagged, "www.example.com"},
 			wants: []string{
 				"outbound: <untagged> (default outbound)",
-				"final:    blocked by freedom finalRule #0",
+				"final:    blocked by freedom firewall rule #0",
 			},
 		},
 		{

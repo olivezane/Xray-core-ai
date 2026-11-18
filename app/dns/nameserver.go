@@ -73,6 +73,10 @@ func NewServer(ctx context.Context, dest net.Destination, dispatcher routing.Dis
 			return NewTLSNameServer(u, dispatcher, disableCache, serveStale, serveExpiredTTL, clientIP)
 		case strings.EqualFold(u.Scheme, "tls+local"): // DNS-over-TLS Local mode
 			return NewTLSLocalNameServer(u, disableCache, serveStale, serveExpiredTTL, clientIP)
+		case strings.EqualFold(u.Scheme, "udp"): // UDP DNS Remote mode
+			return NewUDPNameServer(u, dispatcher, false, disableCache, serveStale, serveExpiredTTL, clientIP)
+		case strings.EqualFold(u.Scheme, "udp+local"): // UDP DNS Local mode
+			return NewUDPNameServer(u, dispatcher, true, disableCache, serveStale, serveExpiredTTL, clientIP)
 		case strings.EqualFold(u.String(), "fakedns"):
 			var fd dns.FakeDNSEngine
 			err = core.RequireFeatures(ctx, func(fdns dns.FakeDNSEngine) {

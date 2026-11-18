@@ -87,7 +87,7 @@ type lookupResult struct {
 	Resolved      []string      `json:"resolved,omitempty"`
 	Answers       []string      `json:"answers,omitempty"`
 	AnswerErr     string        `json:"answerError,omitempty"`
-	Final         *lookupFinal  `json:"finalRule,omitempty"`
+	Final         *lookupFinal  `json:"firewall,omitempty"`
 	DNS           *lookupDNS    `json:"dns,omitempty"`
 	PickError     string        `json:"pickError,omitempty"`
 	Notes         []string      `json:"notes,omitempty"`
@@ -415,7 +415,7 @@ func (r *lookupResult) fillFinal(c *core.Config) {
 		domainStrategy := fc.GetDomainStrategy()
 		if sc := senderConfig(ob); sc != nil {
 			if sc.GetStreamSettings().GetSocketSettings().GetDialerProxy() != "" {
-				r.Notes = append(r.Notes, "freedom is not the final outbound (dialerProxy), finalRules are ignored")
+				r.Notes = append(r.Notes, "freedom is not the final outbound (dialerProxy), the firewall is ignored")
 				return
 			}
 			// The runtime prefers the socket settings over the legacy alias.
@@ -432,7 +432,7 @@ func (r *lookupResult) fillFinal(c *core.Config) {
 		if *lookupInbound == "" {
 			for _, in := range c.Inbound {
 				if kind := inboundProtocol(c, in.GetTag()); kind != "" && freedom.HasImplicitFinalRule(kind) {
-					r.Notes = append(r.Notes, fmt.Sprintf("inbound %s brings an implicit final rule, pass -inbound %s to apply it", in.GetTag(), in.GetTag()))
+					r.Notes = append(r.Notes, fmt.Sprintf("inbound %s brings an implicit firewall rule, pass -inbound %s to apply it", in.GetTag(), in.GetTag()))
 					break
 				}
 			}
@@ -442,9 +442,9 @@ func (r *lookupResult) fillFinal(c *core.Config) {
 			r.Final = &lookupFinal{Index: verdict.Index, Block: verdict.Block, Total: verdict.Total, Default: verdict.Default, Inbound: inbound}
 		}
 		if address.Family().IsDomain() && domainStrategy != internet.DomainStrategy_AS_IS {
-			for _, rc := range fc.GetFinalRules() {
+			for _, rc := range fc.GetFirewall() {
 				if len(rc.GetIp()) > 0 {
-					r.Notes = append(r.Notes, "freedom resolves the domain before matching ip finalRules, so ip rules above are not applied here")
+					r.Notes = append(r.Notes, "freedom resolves the domain before matching ip firewall rules, so ip rules above are not applied here")
 					break
 				}
 			}
@@ -594,15 +594,15 @@ func (r *lookupResult) print() {
 	if f := r.Final; f != nil {
 		switch {
 		case f.Default && f.Inbound == "vless-reverse":
-			fmt.Println("final:    blocked by the implicit final rule of a vless-reverse inbound (all destinations)")
+			fmt.Println("final:    blocked by the implicit firewall rule of a vless-reverse inbound (all destinations)")
 		case f.Default:
-			fmt.Printf("final:    blocked by the implicit final rule of a %s inbound (private IP)\n", f.Inbound)
+			fmt.Printf("final:    blocked by the implicit firewall rule of a %s inbound (private IP)\n", f.Inbound)
 		case f.Index < 0:
-			fmt.Printf("final:    passes %d freedom finalRules\n", f.Total)
+			fmt.Printf("final:    passes %d freedom firewall rules\n", f.Total)
 		case f.Block:
-			fmt.Printf("final:    blocked by freedom finalRule #%d\n", f.Index)
+			fmt.Printf("final:    blocked by freedom firewall rule #%d\n", f.Index)
 		default:
-			fmt.Printf("final:    allowed by freedom finalRule #%d\n", f.Index)
+			fmt.Printf("final:    allowed by freedom firewall rule #%d\n", f.Index)
 		}
 	}
 	if d := r.DNS; d != nil {

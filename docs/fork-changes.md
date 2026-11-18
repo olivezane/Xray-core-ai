@@ -63,13 +63,13 @@ xray lookup -c config.json -json -f domains.txt        # 一行一个结果，�
 ```
 
 输出包含：命中规则编号与条件、balancer 与其成员、出站（含 "tag 不存在 = 连接被关闭"、
-"没匹配则走默认出站"）、freedom finalRules 的最终判决、DNS 命中规则与查询顺序、
+"没匹配则走默认出站"）、freedom firewall 的最终判决、DNS 命中规则与查询顺序、
 静态 hosts 覆盖，以及 `note:` 提示（哪些规则 lookup 没法模拟：process / localOS /
 sourcePort / localPort / vlessRoute；routing.script 或 dns.script 存在时结果可能不适用；
 入站嗅探会在路由前改写目标）。
 
 与真实运行一致的部分：配置加载方式（`-c` / `-confdir` / `-format` 照旧）、
-规则求值、balancer 选择、freedom 隐式 finalRules。`-json` 模式把日志赶到 stderr，
+规则求值、balancer 选择、freedom 隐式 firewall。`-json` 模式把日志赶到 stderr，
 stdout 只有 JSON。
 
 ## 3. TUN（仅 Android 行为变化）
