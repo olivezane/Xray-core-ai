@@ -1,0 +1,95 @@
+package commander_test
+
+import (
+	"context"
+	"io"
+	stdnet "net"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/xtls/xray-core/app/commander"
+	"github.com/xtls/xray-core/app/dispatcher"
+	"github.com/xtls/xray-core/app/proxyman"
+	_ "github.com/xtls/xray-core/app/proxyman/inbound"
+	_ "github.com/xtls/xray-core/app/proxyman/outbound"
+	appstats "github.com/xtls/xray-core/app/stats"
+	statsservice "github.com/xtls/xray-core/app/stats/command"
+	"github.com/xtls/xray-core/common/serial"
+	"github.com/xtls/xray-core/core"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+)
+
+func TestCommanderServesGRPCAndMetricsOnOnePort(t *testing.T) {
+	listen := pickListenAddress(t)
+
+	server, err := core.New(&core.Config{
+		App: []*serial.TypedMessage{
+			serial.ToTypedMessage(&dispatcher.Config{}),
+			serial.ToTypedMessage(&proxyman.InboundConfig{}),
+			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
+			serial.ToTypedMessage(&appstats.Config{}),
+			serial.ToTypedMessage(&commander.Config{
+				Listen:  listen,
+				Service: []*serial.TypedMessage{serial.ToTypedMessage(&statsservice.Config{})},
+			}),
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create instance: %v", err)
+	}
+	if err := server.Start(); err != nil {
+		_ = server.Close()
+		t.Fatalf("failed to start instance: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = server.Close()
+	})
+
+	conn, err := grpc.NewClient(listen, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("failed to dial api server: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = conn.Close()
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := statsservice.NewStatsServiceClient(conn).QueryStats(ctx, &statsservice.QueryStatsRequest{}); err != nil {
+		t.Fatalf("gRPC call on the api port failed: %v", err)
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+listen+"/debug/vars", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("HTTP request on the api port failed: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected status: %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "\"stats\"") {
+		t.Fatalf("metrics body missing stats: %s", body)
+	}
+}
+
+func pickListenAddress(t *testing.T) string {
+	t.Helper()
+
+	listener, err := stdnet.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to pick listen address: %v", err)
+	}
+	defer listener.Close()
+	return listener.Addr().String()
+}

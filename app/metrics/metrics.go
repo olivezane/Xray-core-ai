@@ -32,6 +32,18 @@ type MetricsHandler struct {
 	server       *http.Server
 }
 
+// NewDebugHandler returns the /debug/vars and /debug/pprof handler of the running instance,
+// for management endpoints that share their port with other protocols.
+func NewDebugHandler(ctx context.Context) (http.Handler, error) {
+	p := &MetricsHandler{ctx: ctx}
+	if err := core.RequireFeatures(ctx, func(sm feature_stats.Manager) {
+		p.statsManager = sm
+	}); err != nil {
+		return nil, err
+	}
+	return p.httpHandler(), nil
+}
+
 // NewMetricsHandler creates a new MetricsHandler based on the given config.
 func NewMetricsHandler(ctx context.Context, config *Config) (*MetricsHandler, error) {
 	c := &MetricsHandler{

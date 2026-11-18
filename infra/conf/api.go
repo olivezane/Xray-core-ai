@@ -13,14 +13,13 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 )
 
-// APIConfig is the single management block: gRPC control service (tag/listen/services)
-// and the HTTP /debug/vars + /debug/pprof service (metrics).
+// APIConfig is the single management block. Its one port serves both the gRPC
+// control service and the HTTP /debug/vars + /debug/pprof endpoints.
 // Statistics collection is implied, so the stats app never needs a block of its own.
 type APIConfig struct {
-	Tag      string         `json:"tag"`
-	Listen   string         `json:"listen"`
-	Services []string       `json:"services"`
-	Metrics  *MetricsConfig `json:"metrics"`
+	Tag      string   `json:"tag"`
+	Listen   string   `json:"listen"`
+	Services []string `json:"services"`
 }
 
 func (c *APIConfig) Build() (*commander.Config, error) {

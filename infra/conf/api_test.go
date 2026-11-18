@@ -13,22 +13,32 @@ import (
 
 func TestAPIConfigBuildsStatsAndMetrics(t *testing.T) {
 	tests := []struct {
-		name     string
-		raw      string
-		services int
-		metrics  bool
+		name      string
+		raw       string
+		commander bool
+		metrics   bool
+		services  int
 	}{
 		{
-			"api with nested metrics",
-			`{"api":{"listen":"127.0.0.1:10085","metrics":{"listen":"127.0.0.1:8080"}}}`,
-			1,
+			"api block",
+			`{"api":{"listen":"127.0.0.1:10085"}}`,
 			true,
+			false,
+			1,
 		},
 		{
-			"legacy blocks",
-			`{"api":{"tag":"api","services":["HandlerService"]},"stats":{}}`,
-			2,
+			"api block with explicit services",
+			`{"api":{"tag":"api","services":["HandlerService"]}}`,
+			true,
 			false,
+			2,
+		},
+		{
+			"legacy metrics and stats",
+			`{"metrics":{"listen":"127.0.0.1:8080"},"stats":{}}`,
+			false,
+			true,
+			0,
 		},
 	}
 
@@ -66,22 +76,24 @@ func TestAPIConfigBuildsStatsAndMetrics(t *testing.T) {
 			if !hasStats {
 				t.Error("stats app not built")
 			}
-			if commanderConf == nil {
-				t.Fatal("commander app not built")
+			if got := commanderConf != nil; got != tt.commander {
+				t.Fatalf("commander app built = %v, want %v", got, tt.commander)
+			}
+			if got := metricsConf != nil; got != tt.metrics {
+				t.Fatalf("metrics app built = %v, want %v", got, tt.metrics)
+			}
+			if !tt.commander {
+				return
 			}
 			if len(commanderConf.Service) != tt.services {
 				t.Errorf("got %d services, want %d", len(commanderConf.Service), tt.services)
 			}
-			if last, err := commanderConf.Service[len(commanderConf.Service)-1].GetInstance(); err != nil {
+			last, err := commanderConf.Service[len(commanderConf.Service)-1].GetInstance()
+			if err != nil {
 				t.Fatal(err)
-			} else if _, ok := last.(*statsservice.Config); !ok {
+			}
+			if _, ok := last.(*statsservice.Config); !ok {
 				t.Errorf("last service is %T, want stats service", last)
-			}
-			if tt.metrics && (metricsConf == nil || metricsConf.Listen != "127.0.0.1:8080") {
-				t.Errorf("metrics app = %+v", metricsConf)
-			}
-			if !tt.metrics && metricsConf != nil {
-				t.Errorf("unexpected metrics app %+v", metricsConf)
 			}
 		})
 	}

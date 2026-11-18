@@ -2,10 +2,13 @@ package commander
 
 import (
 	"context"
+	stderrors "errors"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 
+	"github.com/xtls/xray-core/app/metrics"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/signal/done"
@@ -18,11 +21,13 @@ import (
 // Commander is a Xray feature that provides gRPC methods to external clients.
 type Commander struct {
 	sync.Mutex
-	server   *grpc.Server
-	services []Service
-	ohm      outbound.Manager
-	tag      string
-	listen   string
+	server     *grpc.Server
+	httpServer *http.Server
+	services   []Service
+	ohm        outbound.Manager
+	ctx        context.Context
+	tag        string
+	listen     string
 }
 
 // NewCommander creates a new Commander based on the given config.
@@ -30,6 +35,7 @@ func NewCommander(ctx context.Context, config *Config) (*Commander, error) {
 	c := &Commander{
 		tag:    config.Tag,
 		listen: config.Listen,
+		ctx:    ctx,
 	}
 
 	common.Must(core.RequireFeatures(ctx, func(om outbound.Manager) {
@@ -63,15 +69,37 @@ func (c *Commander) Type() interface{} {
 // Start implements common.Runnable.
 func (c *Commander) Start() error {
 	c.Lock()
-	c.server = grpc.NewServer()
+	grpcServer := grpc.NewServer()
 	for _, service := range c.services {
-		service.Register(c.server)
+		service.Register(grpcServer)
 	}
+	c.server = grpcServer
+	c.Unlock()
+
+	debugHandler, err := metrics.NewDebugHandler(c.ctx)
+	if err != nil {
+		return err
+	}
+
+	// A single port serves both the gRPC API and /debug/vars + /debug/pprof.
+	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
+			grpcServer.ServeHTTP(w, r)
+			return
+		}
+		debugHandler.ServeHTTP(w, r)
+	})
+	httpServer := &http.Server{Handler: root, Protocols: new(http.Protocols)}
+	httpServer.Protocols.SetHTTP1(true)
+	httpServer.Protocols.SetUnencryptedHTTP2(true)
+
+	c.Lock()
+	c.httpServer = httpServer
 	c.Unlock()
 
 	listen := func(listener net.Listener) {
-		if err := c.server.Serve(listener); err != nil {
-			errors.LogErrorInner(context.Background(), err, "failed to start grpc server")
+		if err := httpServer.Serve(listener); err != nil && !stderrors.Is(err, http.ErrServerClosed) && !stderrors.Is(err, net.ErrClosed) {
+			errors.LogErrorInner(context.Background(), err, "failed to start api server")
 		}
 	}
 
@@ -119,6 +147,13 @@ func (c *Commander) Start() error {
 func (c *Commander) Close() error {
 	c.Lock()
 	defer c.Unlock()
+
+	if c.httpServer != nil {
+		if err := c.httpServer.Close(); err != nil && !stderrors.Is(err, http.ErrServerClosed) {
+			errors.LogInfoInner(context.Background(), err, "failed to close api server")
+		}
+		c.httpServer = nil
+	}
 
 	if c.server != nil {
 		c.server.Stop()
