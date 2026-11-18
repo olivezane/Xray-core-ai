@@ -439,13 +439,6 @@ func (c *OutboundDetourConfig) Build() (*core.OutboundHandlerConfig, error) {
 	}, nil
 }
 
-type StatsConfig struct{}
-
-// Build implements Buildable.
-func (c *StatsConfig) Build() (*stats.Config, error) {
-	return &stats.Config{}, nil
-}
-
 type EnvConfig map[string]string
 
 func (c EnvConfig) Override(o EnvConfig) {
@@ -459,16 +452,17 @@ type Config struct {
 	// left for returning error
 	Transport map[string]json.RawMessage `json:"transport"`
 
-	Env              EnvConfig               `json:"env"`
-	LogConfig        *LogConfig              `json:"log"`
-	RouterConfig     *RouterConfig           `json:"routing"`
-	DNSConfig        *DNSConfig              `json:"dns"`
-	InboundConfigs   []InboundDetourConfig   `json:"inbounds"`
-	OutboundConfigs  []OutboundDetourConfig  `json:"outbounds"`
-	Policy           *PolicyConfig           `json:"policy"`
-	API              *APIConfig              `json:"api"`
-	Metrics          *MetricsConfig          `json:"metrics"` // Deprecated: api serves the same endpoints
-	Stats            *StatsConfig            `json:"stats"`   // Deprecated: implied by api/metrics
+	Env             EnvConfig              `json:"env"`
+	LogConfig       *LogConfig             `json:"log"`
+	RouterConfig    *RouterConfig          `json:"routing"`
+	DNSConfig       *DNSConfig             `json:"dns"`
+	InboundConfigs  []InboundDetourConfig  `json:"inbounds"`
+	OutboundConfigs []OutboundDetourConfig `json:"outbounds"`
+	Policy          *PolicyConfig          `json:"policy"`
+	API             *APIConfig             `json:"api"`
+	// Deprecated: both blocks are gone, "api" collects statistics and serves /debug/vars + /debug/pprof.
+	Metrics          json.RawMessage         `json:"metrics"`
+	Stats            json.RawMessage         `json:"stats"`
 	Reverse          *ReverseConfig          `json:"reverse"`
 	FakeDNS          *FakeDNSConfig          `json:"fakeDns"`
 	Observatory      *ObservatoryConfig      `json:"observatory"`
@@ -526,12 +520,6 @@ func (c *Config) Override(o *Config, fn string) {
 	}
 	if o.API != nil {
 		c.API = o.API
-	}
-	if o.Metrics != nil {
-		c.Metrics = o.Metrics
-	}
-	if o.Stats != nil {
-		c.Stats = o.Stats
 	}
 	if o.Reverse != nil {
 		c.Reverse = o.Reverse
@@ -613,24 +601,17 @@ func (c *Config) Build() (*core.Config, error) {
 		},
 	}
 
-	// Both the gRPC stats service and the HTTP metrics endpoint read the stats manager,
-	// so enabling either one enables stats too.
-	if c.Stats != nil || c.API != nil || c.Metrics != nil {
-		config.App = append(config.App, serial.ToTypedMessage(&stats.Config{}))
+	if len(c.Metrics) > 0 || len(c.Stats) > 0 {
+		errors.LogWarning(context.Background(), `The "metrics" and "stats" blocks have been removed. "api" now collects statistics and serves /debug/vars + /debug/pprof.`)
 	}
+	// The gRPC stats service and the /debug/vars endpoint both read the stats manager.
 	if c.API != nil {
+		config.App = append(config.App, serial.ToTypedMessage(&stats.Config{}))
 		apiConf, err := c.API.Build()
 		if err != nil {
 			return nil, errors.New("failed to build API configuration").Base(err)
 		}
 		config.App = append(config.App, serial.ToTypedMessage(apiConf))
-	}
-	if c.Metrics != nil {
-		metricsConf, err := c.Metrics.Build()
-		if err != nil {
-			return nil, errors.New("failed to build metrics configuration").Base(err)
-		}
-		config.App = append(config.App, serial.ToTypedMessage(metricsConf))
 	}
 
 	var logConfMsg *serial.TypedMessage

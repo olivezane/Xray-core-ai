@@ -11,33 +11,29 @@ import (
 	. "github.com/xtls/xray-core/infra/conf"
 )
 
-func TestAPIConfigBuildsStatsAndMetrics(t *testing.T) {
+func TestAPIConfigBuildsStatsAndCommander(t *testing.T) {
 	tests := []struct {
-		name      string
-		raw       string
-		commander bool
-		metrics   bool
-		services  int
+		name     string
+		raw      string
+		api      bool
+		services int
 	}{
 		{
 			"api block",
 			`{"api":{"listen":"127.0.0.1:10085"}}`,
 			true,
-			false,
 			1,
 		},
 		{
 			"api block with explicit services",
 			`{"api":{"tag":"api","services":["HandlerService"]}}`,
 			true,
-			false,
 			2,
 		},
 		{
-			"legacy metrics and stats",
+			"removed legacy blocks",
 			`{"metrics":{"listen":"127.0.0.1:8080"},"stats":{}}`,
 			false,
-			true,
 			0,
 		},
 	}
@@ -73,16 +69,16 @@ func TestAPIConfigBuildsStatsAndMetrics(t *testing.T) {
 				}
 			}
 
-			if !hasStats {
-				t.Error("stats app not built")
+			if hasStats != tt.api {
+				t.Errorf("stats app built = %v, want %v", hasStats, tt.api)
 			}
-			if got := commanderConf != nil; got != tt.commander {
-				t.Fatalf("commander app built = %v, want %v", got, tt.commander)
+			if got := commanderConf != nil; got != tt.api {
+				t.Fatalf("commander app built = %v, want %v", got, tt.api)
 			}
-			if got := metricsConf != nil; got != tt.metrics {
-				t.Fatalf("metrics app built = %v, want %v", got, tt.metrics)
+			if metricsConf != nil {
+				t.Error("metrics app must not be built")
 			}
-			if !tt.commander {
+			if !tt.api {
 				return
 			}
 			if len(commanderConf.Service) != tt.services {
