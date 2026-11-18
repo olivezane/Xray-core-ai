@@ -21,7 +21,7 @@ func postProcessFakeDNS(t *testing.T, input string) (*Config, error) {
 
 func fakeDNSPools(t *testing.T, config *Config) []string {
 	t.Helper()
-	multi, err := config.FakeDNS.Build()
+	multi, err := config.DNSConfig.FakeDNS.Build()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,6 +30,16 @@ func fakeDNSPools(t *testing.T, config *Config) []string {
 		pools = append(pools, pool.IpPool)
 	}
 	return pools
+}
+
+func TestFakeDNSFromDNSBlock(t *testing.T) {
+	config, err := postProcessFakeDNS(t, `{"dns":{"servers":[{"address":"fakedns"}],"fakeDns":{"ipPool":"198.18.0.0/15","poolSize":100}}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fakeDNSPools(t, config); len(got) != 1 || got[0] != "198.18.0.0/15" {
+		t.Fatalf("pools %v, want [198.18.0.0/15]", got)
+	}
 }
 
 func TestFakeDNSAutoPoolsWithTun(t *testing.T) {

@@ -175,6 +175,7 @@ type DNSConfig struct {
 	DisableFallbackIfMatch bool                `json:"disableFallbackIfMatch"`
 	EnableParallelQuery    bool                `json:"enableParallelQuery"`
 	UseSystemHosts         bool                `json:"useSystemHosts"`
+	FakeDNS                *FakeDNSConfig      `json:"fakeDns"`
 }
 
 type HostAddress struct {

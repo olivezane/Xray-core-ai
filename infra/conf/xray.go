@@ -448,9 +448,8 @@ func (c EnvConfig) Override(o EnvConfig) {
 }
 
 type Config struct {
-	// Deprecated: Global transport config is no longer used
-	// left for returning error
-	Transport map[string]json.RawMessage `json:"transport"`
+	// Deprecated: global transport config moved to streamSettings, its presence is an error.
+	Transport json.RawMessage `json:"transport"`
 
 	Env             EnvConfig              `json:"env"`
 	LogConfig       *LogConfig             `json:"log"`
@@ -461,12 +460,12 @@ type Config struct {
 	Policy          *PolicyConfig          `json:"policy"`
 	API             *APIConfig             `json:"api"`
 	Reverse         *ReverseConfig         `json:"reverse"`
-	FakeDNS         *FakeDNSConfig         `json:"fakeDns"`
 	// Deprecated: removed blocks, kept only to warn.
 	Metrics          json.RawMessage `json:"metrics"`
 	Stats            json.RawMessage `json:"stats"`
 	Observatory      json.RawMessage `json:"observatory"`
 	BurstObservatory json.RawMessage `json:"burstObservatory"`
+	FakeDNS          json.RawMessage `json:"fakeDns"`
 	Version          *VersionConfig  `json:"version"`
 	Geodata          *GeodataConfig  `json:"geodata"`
 }
@@ -506,9 +505,6 @@ func (c *Config) Override(o *Config, fn string) {
 	if o.DNSConfig != nil {
 		c.DNSConfig = o.DNSConfig
 	}
-	if o.Transport != nil {
-		c.Transport = o.Transport
-	}
 	if o.Env != nil {
 		if c.Env == nil {
 			c.Env = EnvConfig{}
@@ -523,10 +519,6 @@ func (c *Config) Override(o *Config, fn string) {
 	}
 	if o.Reverse != nil {
 		c.Reverse = o.Reverse
-	}
-
-	if o.FakeDNS != nil {
-		c.FakeDNS = o.FakeDNS
 	}
 
 	if o.Version != nil {
@@ -599,6 +591,9 @@ func (c *Config) Build() (*core.Config, error) {
 	if len(c.Observatory) > 0 || len(c.BurstObservatory) > 0 {
 		errors.LogWarning(context.Background(), `The "observatory" and "burstObservatory" blocks have been removed. Move them into the "api" block.`)
 	}
+	if len(c.FakeDNS) > 0 {
+		errors.LogWarning(context.Background(), `The "fakeDns" block has been removed. Move it into the "dns" block.`)
+	}
 	// The gRPC stats service and the /debug/vars endpoint both read the stats manager.
 	if c.API != nil {
 		config.App = append(config.App, serial.ToTypedMessage(&stats.Config{}))
@@ -661,8 +656,8 @@ func (c *Config) Build() (*core.Config, error) {
 		return nil, errors.PrintRemovedFeatureError(`"legacy reverse"`, `"VLESS Reverse Proxy"`)
 	}
 
-	if c.FakeDNS != nil {
-		r, err := c.FakeDNS.Build()
+	if c.DNSConfig != nil && c.DNSConfig.FakeDNS != nil {
+		r, err := c.DNSConfig.FakeDNS.Build()
 		if err != nil {
 			return nil, errors.New("failed to build fake DNS configuration").Base(err)
 		}

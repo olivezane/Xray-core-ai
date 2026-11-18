@@ -104,11 +104,11 @@ func (FakeDNSPostProcessingStage) Process(config *Config) error {
 		}
 
 		// Add a Fake DNS Config if there is none
-		if config.FakeDNS == nil {
-			config.FakeDNS = &FakeDNSConfig{}
+		if config.DNSConfig.FakeDNS == nil {
+			config.DNSConfig.FakeDNS = &FakeDNSConfig{}
 			switch {
 			case isIPv4Enable && isIPv6Enable:
-				config.FakeDNS.pools = []*FakeDNSPoolElementConfig{
+				config.DNSConfig.FakeDNS.pools = []*FakeDNSPoolElementConfig{
 					{
 						IPPool:  dns.FakeIPv4Pool,
 						LRUSize: 32768,
@@ -119,19 +119,19 @@ func (FakeDNSPostProcessingStage) Process(config *Config) error {
 					},
 				}
 			case !isIPv4Enable && isIPv6Enable:
-				config.FakeDNS.pool = &FakeDNSPoolElementConfig{
+				config.DNSConfig.FakeDNS.pool = &FakeDNSPoolElementConfig{
 					IPPool:  dns.FakeIPv6Pool,
 					LRUSize: 65535,
 				}
 			case isIPv4Enable && !isIPv6Enable:
-				config.FakeDNS.pool = &FakeDNSPoolElementConfig{
+				config.DNSConfig.FakeDNS.pool = &FakeDNSPoolElementConfig{
 					IPPool:  dns.FakeIPv4Pool,
 					LRUSize: 65535,
 				}
 			}
 		}
 
-		if err := validateFakeDNSPools(config.FakeDNS, tunConfigs); err != nil {
+		if err := validateFakeDNSPools(config.DNSConfig.FakeDNS, tunConfigs); err != nil {
 			return err
 		}
 
