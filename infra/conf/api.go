@@ -13,18 +13,23 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 )
 
+// APIConfig is the single management block: gRPC control service (tag/listen/services)
+// and the HTTP /debug/vars + /debug/pprof service (metrics).
+// Statistics collection is implied, so the stats app never needs a block of its own.
 type APIConfig struct {
-	Tag      string   `json:"tag"`
-	Listen   string   `json:"listen"`
-	Services []string `json:"services"`
+	Tag      string         `json:"tag"`
+	Listen   string         `json:"listen"`
+	Services []string       `json:"services"`
+	Metrics  *MetricsConfig `json:"metrics"`
 }
 
 func (c *APIConfig) Build() (*commander.Config, error) {
-	if c.Tag == "" {
-		return nil, errors.New("API tag can't be empty.")
+	if c.Tag == "" && c.Listen == "" {
+		return nil, errors.New("API must have a tag or listen address.")
 	}
 
 	services := make([]*serial.TypedMessage, 0, 16)
+	hasStatsService := false
 	for _, s := range c.Services {
 		switch strings.ToLower(s) {
 		case "reflectionservice":
@@ -34,12 +39,18 @@ func (c *APIConfig) Build() (*commander.Config, error) {
 		case "loggerservice":
 			services = append(services, serial.ToTypedMessage(&loggerservice.Config{}))
 		case "statsservice":
+			hasStatsService = true
 			services = append(services, serial.ToTypedMessage(&statsservice.Config{}))
 		case "observatoryservice":
 			services = append(services, serial.ToTypedMessage(&observatoryservice.Config{}))
 		case "routingservice":
 			services = append(services, serial.ToTypedMessage(&routerservice.Config{}))
 		}
+	}
+
+	// stats is always collected for the API, so expose it without extra configuration.
+	if !hasStatsService {
+		services = append(services, serial.ToTypedMessage(&statsservice.Config{}))
 	}
 
 	return &commander.Config{

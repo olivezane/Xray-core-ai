@@ -467,8 +467,8 @@ type Config struct {
 	OutboundConfigs  []OutboundDetourConfig  `json:"outbounds"`
 	Policy           *PolicyConfig           `json:"policy"`
 	API              *APIConfig              `json:"api"`
-	Metrics          *MetricsConfig          `json:"metrics"`
-	Stats            *StatsConfig            `json:"stats"`
+	Metrics          *MetricsConfig          `json:"metrics"` // Deprecated: use api.metrics
+	Stats            *StatsConfig            `json:"stats"`   // Deprecated: implied by api/metrics
 	Reverse          *ReverseConfig          `json:"reverse"`
 	FakeDNS          *FakeDNSConfig          `json:"fakeDns"`
 	Observatory      *ObservatoryConfig      `json:"observatory"`
@@ -613,6 +613,16 @@ func (c *Config) Build() (*core.Config, error) {
 		},
 	}
 
+	metricsConf := c.Metrics
+	if c.API != nil && c.API.Metrics != nil {
+		metricsConf = c.API.Metrics
+	}
+
+	// Both the gRPC stats service and the HTTP metrics endpoint read the stats manager,
+	// so enabling either one enables stats too.
+	if c.Stats != nil || c.API != nil || metricsConf != nil {
+		config.App = append(config.App, serial.ToTypedMessage(&stats.Config{}))
+	}
 	if c.API != nil {
 		apiConf, err := c.API.Build()
 		if err != nil {
@@ -620,19 +630,12 @@ func (c *Config) Build() (*core.Config, error) {
 		}
 		config.App = append(config.App, serial.ToTypedMessage(apiConf))
 	}
-	if c.Metrics != nil {
-		metricsConf, err := c.Metrics.Build()
+	if metricsConf != nil {
+		metricsAppConf, err := metricsConf.Build()
 		if err != nil {
 			return nil, errors.New("failed to build metrics configuration").Base(err)
 		}
-		config.App = append(config.App, serial.ToTypedMessage(metricsConf))
-	}
-	if c.Stats != nil {
-		statsConf, err := c.Stats.Build()
-		if err != nil {
-			return nil, errors.New("failed to build stats configuration").Base(err)
-		}
-		config.App = append(config.App, serial.ToTypedMessage(statsConf))
+		config.App = append(config.App, serial.ToTypedMessage(metricsAppConf))
 	}
 
 	var logConfMsg *serial.TypedMessage
