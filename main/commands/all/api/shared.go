@@ -40,7 +40,7 @@ func setSharedFlags(cmd *base.Command) {
 
 func dialAPIServer() (conn *grpc.ClientConn, ctx context.Context, close func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(apiTimeout)*time.Second)
-	conn, err := grpc.DialContext(ctx, apiServerAddrPtr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, apiTarget(apiServerAddrPtr), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		base.Fatalf("failed to dial %s", apiServerAddrPtr)
 	}
@@ -49,6 +49,18 @@ func dialAPIServer() (conn *grpc.ClientConn, ctx context.Context, close func()) 
 		conn.Close()
 	}
 	return
+}
+
+// apiTarget maps the unix socket forms api.listen accepts (a path or @abstract)
+// to the schemes grpc resolves.
+func apiTarget(server string) string {
+	switch {
+	case strings.HasPrefix(server, "/"):
+		return "unix://" + server
+	case strings.HasPrefix(server, "@"):
+		return "unix-abstract:" + strings.TrimPrefix(server, "@")
+	}
+	return server
 }
 
 // loadArg loads one arg, maybe an remote url, or local file path

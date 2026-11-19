@@ -174,7 +174,7 @@ end`
 			name: "freedom firewall rule by port",
 			args: []string{"lookup", "-c", final, "-port", "25", "www.baidu.cn"},
 			wants: []string{
-				"final:    blocked by freedom firewall rule #0",
+				"final:    blocked by firewall rule #0 of outbound direct",
 			},
 		},
 		{
@@ -182,14 +182,14 @@ end`
 			args: []string{"lookup", "-c", final, "10.1.2.3"},
 			wants: []string{
 				"outbound: direct (default outbound)",
-				"final:    blocked by freedom firewall rule #1",
+				"final:    blocked by firewall rule #1 of outbound direct",
 			},
 		},
 		{
 			name: "freedom firewall rules pass",
 			args: []string{"lookup", "-c", final, "www.baidu.cn"},
 			wants: []string{
-				"final:    passes 2 freedom firewall",
+				"final:    passes 2 firewall rules",
 			},
 		},
 		{
@@ -250,7 +250,7 @@ end`
 			args: []string{"lookup", "-c", untagged, "www.example.com"},
 			wants: []string{
 				"outbound: <untagged> (default outbound)",
-				"final:    blocked by freedom firewall rule #0",
+				"final:    blocked by firewall rule #0",
 			},
 		},
 		{

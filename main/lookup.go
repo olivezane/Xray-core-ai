@@ -396,6 +396,9 @@ func allIPs(values []string) bool {
 	return true
 }
 
+// fillFinal reports the freedom firewall rule acting on the connection. A
+// balancer rule already resolves to the member picked at dial time, so this
+// needs nothing beyond the outbound tag.
 func (r *lookupResult) fillFinal(c *core.Config) {
 	for _, ob := range c.Outbound {
 		if ob.GetTag() != r.Outbound {
@@ -415,7 +418,7 @@ func (r *lookupResult) fillFinal(c *core.Config) {
 		domainStrategy := fc.GetDomainStrategy()
 		if sc := senderConfig(ob); sc != nil {
 			if sc.GetStreamSettings().GetSocketSettings().GetDialerProxy() != "" {
-				r.Notes = append(r.Notes, "freedom is not the final outbound (dialerProxy), the firewall is ignored")
+				r.note("freedom is not the final outbound (dialerProxy), the firewall is ignored")
 				return
 			}
 			// The runtime prefers the socket settings over the legacy alias.
@@ -432,7 +435,7 @@ func (r *lookupResult) fillFinal(c *core.Config) {
 		if *lookupInbound == "" {
 			for _, in := range c.Inbound {
 				if kind := inboundProtocol(c, in.GetTag()); kind != "" && freedom.HasImplicitFinalRule(kind) {
-					r.Notes = append(r.Notes, fmt.Sprintf("inbound %s brings an implicit firewall rule, pass -inbound %s to apply it", in.GetTag(), in.GetTag()))
+					r.note(fmt.Sprintf("inbound %s brings an implicit firewall rule, pass -inbound %s to apply it", in.GetTag(), in.GetTag()))
 					break
 				}
 			}
@@ -441,16 +444,35 @@ func (r *lookupResult) fillFinal(c *core.Config) {
 		if verdict.Total > 0 || verdict.Default {
 			r.Final = &lookupFinal{Index: verdict.Index, Block: verdict.Block, Total: verdict.Total, Default: verdict.Default, Inbound: inbound}
 		}
+		if r.Final != nil && r.Final.Block && verdict.Index >= 0 && unconditionalFirewallRule(fc.GetFirewall()[verdict.Index]) {
+			// A block rule without any condition is what a legacy "blackhole" outbound builds.
+			r.note("the blocking rule has no condition: it is a catch-all firewall, as a legacy blackhole outbound builds")
+		}
 		if address.Family().IsDomain() && domainStrategy != internet.DomainStrategy_AS_IS {
 			for _, rc := range fc.GetFirewall() {
 				if len(rc.GetIp()) > 0 {
-					r.Notes = append(r.Notes, "freedom resolves the domain before matching ip firewall rules, so ip rules above are not applied here")
+					r.note("freedom resolves the domain before matching ip firewall rules, so ip rules above are not applied here")
 					break
 				}
 			}
 		}
 		return
 	}
+}
+
+// unconditionalFirewallRule reports whether a block rule matches every destination.
+func unconditionalFirewallRule(rc *freedom.FirewallConfig) bool {
+	return rc != nil && len(rc.GetNetworks()) == 0 && rc.GetPortList() == nil && len(rc.GetIp()) == 0
+}
+
+// note appends a note once.
+func (r *lookupResult) note(note string) {
+	for _, existing := range r.Notes {
+		if existing == note {
+			return
+		}
+	}
+	r.Notes = append(r.Notes, note)
 }
 
 func (r *lookupResult) fillDNS(inst *core.Instance, c *core.Config, domain string) {
@@ -598,11 +620,11 @@ func (r *lookupResult) print() {
 		case f.Default:
 			fmt.Printf("final:    blocked by the implicit firewall rule of a %s inbound (private IP)\n", f.Inbound)
 		case f.Index < 0:
-			fmt.Printf("final:    passes %d freedom firewall rules\n", f.Total)
+			fmt.Printf("final:    passes %d firewall rules\n", f.Total)
 		case f.Block:
-			fmt.Printf("final:    blocked by freedom firewall rule #%d\n", f.Index)
+			fmt.Printf("final:    blocked by firewall rule #%d%s\n", f.Index, ofOutbound(r.Outbound))
 		default:
-			fmt.Printf("final:    allowed by freedom firewall rule #%d\n", f.Index)
+			fmt.Printf("final:    allowed by firewall rule #%d%s\n", f.Index, ofOutbound(r.Outbound))
 		}
 	}
 	if d := r.DNS; d != nil {
@@ -634,6 +656,14 @@ func (r *lookupResult) print() {
 	for _, note := range r.Notes {
 		fmt.Println("note:     " + note)
 	}
+}
+
+// ofOutbound names the outbound owning a firewall rule, when it is known.
+func ofOutbound(tag string) string {
+	if tag == "" {
+		return ""
+	}
+	return " of outbound " + tag
 }
 
 func pickRoute(inst *core.Instance, ctx *routercommand.RoutingContext) (routing.Route, error) {

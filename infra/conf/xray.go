@@ -504,6 +504,11 @@ func (c *Config) findOutboundTag(tag string) int {
 // Override method accepts another Config overrides the current attribute
 func (c *Config) Override(o *Config, fn string) {
 	// only process the non-deprecated members
+	if len(o.Transport) > 0 || len(o.Metrics) > 0 || len(o.Stats) > 0 || len(o.Observatory) > 0 ||
+		len(o.BurstObservatory) > 0 || len(o.FakeDNS) > 0 || len(o.Reverse) > 0 {
+		// These blocks are not merged, and Build only warns about the merged result.
+		errors.LogWarning(context.Background(), fn, ` has a removed block ("transport", "metrics", "stats", "observatory", "burstObservatory", "fakeDns" or "reverse"), it is not merged`)
+	}
 
 	if o.LogConfig != nil {
 		c.LogConfig = o.LogConfig
@@ -592,6 +597,10 @@ func (c *Config) Build() (*core.Config, error) {
 
 	if len(c.Metrics) > 0 || len(c.Stats) > 0 {
 		errors.LogWarning(context.Background(), `The "metrics" and "stats" blocks have been removed. "api" now collects statistics and serves /debug/vars + /debug/pprof.`)
+		if c.API == nil {
+			// Nothing exposes the counters, so the policy stats switches would only idle.
+			errors.LogWarning(context.Background(), `No "api" block: statistics are not collected at all, add "api": {"listen": "127.0.0.1:10085"}`)
+		}
 	}
 	if len(c.Observatory) > 0 || len(c.BurstObservatory) > 0 {
 		errors.LogWarning(context.Background(), `The "observatory" and "burstObservatory" blocks have been removed. Move them into the "api" block.`)

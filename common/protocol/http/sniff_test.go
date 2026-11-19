@@ -117,6 +117,16 @@ first_name=John&last_name=Doe&action=Submit`,
 			input:  "GET /r?u=http://evil.com/ HTTP/1.1\r\nHost: target.com\r\n\r\n",
 			domain: "target.com",
 		},
+		{
+			// The target authority wins even when the Host field does not parse (RFC 9112 §3.2.2).
+			input:  "GET http://target.com/x HTTP/1.1\r\nHost: bad.example:notaport\r\n\r\n",
+			domain: "target.com",
+		},
+		{
+			// Without a target authority, a malformed Host is still an error.
+			input: "GET /x HTTP/1.1\r\nHost: bad.example:notaport\r\n\r\n",
+			err:   true,
+		},
 	}
 
 	for _, test := range cases {

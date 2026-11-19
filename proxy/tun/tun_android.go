@@ -36,6 +36,7 @@ type AndroidTun struct {
 
 	ifAddrs []netlink.Addr
 	routes  []netlink.Route
+	updater *InterfaceUpdater // this inbound's own, set by the handler before Start
 
 	routeMonitorStop chan struct{}
 	routeMonitorOnce sync.Once
@@ -145,9 +146,9 @@ func openTun(name string) (int, netlink.Link, error) {
 // In FD mode the external App is expected to handle setup.
 func (t *AndroidTun) Start() error {
 	// registered before the ownsTun check so FD mode keeps refreshing too
-	if updater != nil {
+	if t.updater != nil {
 		t.routeMonitorStop = make(chan struct{})
-		go t.monitorRouteChanges(updater) // the updater Handler.Start just made for this TUN
+		go t.monitorRouteChanges(t.updater)
 	}
 
 	if !t.ownsTun {
@@ -196,6 +197,11 @@ func (t *AndroidTun) Close() error {
 }
 
 // Name returns the TUN interface name.
+// setUpdater hands this TUN the updater of its own inbound, see Handler.Start.
+func (t *AndroidTun) setUpdater(u *InterfaceUpdater) {
+	t.updater = u
+}
+
 func (t *AndroidTun) Name() (string, error) {
 	if t.tunLink != nil {
 		return t.tunLink.Attrs().Name, nil

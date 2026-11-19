@@ -140,6 +140,11 @@ func (t *Handler) Start() error {
 		u := &InterfaceUpdater{tunIndex: tunIndex, fixedName: t.config.AutoOutboundsInterface}
 		updater = u
 		t.updater = u
+		// A platform that monitors route changes must watch its own updater, not the
+		// package one a second tun inbound may overwrite.
+		if su, ok := tunInterface.(interface{ setUpdater(*InterfaceUpdater) }); ok {
+			su.setUpdater(u)
+		}
 		u.Update()
 		internet.RegisterDialerController(func(network, address string, c syscall.RawConn) error {
 			if u.IsClosed() {

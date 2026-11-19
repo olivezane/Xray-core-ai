@@ -78,6 +78,7 @@ func SniffHTTP(b []byte, c context.Context) (*SniffHeader, error) {
 		version: HTTP1,
 	}
 
+	var hostErr error
 	headers := bytes.Split(b, []byte{'\n'})
 	for i := 1; i < len(headers); i++ {
 		// A CRLF-terminated empty line ends the header section, RFC 9112 Section 2.2.
@@ -98,7 +99,9 @@ func SniffHTTP(b []byte, c context.Context) (*SniffHeader, error) {
 			rawHost := strings.ToLower(value)
 			dest, err := ParseHost(rawHost, net.Port(80))
 			if err != nil {
-				return nil, err
+				// The target may carry the authority and override Host (RFC 9112 §3.2.2).
+				hostErr = err
+				continue
 			}
 			sh.host = dest.Address.String()
 		}
@@ -121,6 +124,9 @@ func SniffHTTP(b []byte, c context.Context) (*SniffHeader, error) {
 		}
 	}
 
+	if len(sh.host) == 0 && hostErr != nil {
+		return nil, hostErr
+	}
 	if len(sh.host) > 0 {
 		return sh, nil
 	}
