@@ -181,7 +181,7 @@ func checkAddressPortStrategy(ctx context.Context, dest net.Destination, sockopt
 		if len(parts) != 3 {
 			return nil, errors.New("invalid address format", dest.Address.String())
 		}
-		_, srvRecords, err := net.DefaultResolver.LookupSRV(context.Background(), parts[0][1:], parts[1][1:], parts[2])
+		_, srvRecords, err := net.DefaultResolver.LookupSRV(ctx, parts[0][1:], parts[1][1:], parts[2])
 		if err != nil {
 			return nil, errors.New("failed to lookup SRV record").Base(err)
 		}

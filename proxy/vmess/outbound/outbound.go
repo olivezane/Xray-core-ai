@@ -61,7 +61,7 @@ func New(ctx context.Context, config *Config) (*Handler, error) {
 		if !ok {
 			return nil, errors.New("VMess multiplex requires an outbound dialer")
 		}
-		poolCtx, stop := context.WithCancel(context.Background())
+		poolCtx, stop := context.WithCancel(ctx)
 		handler.stopMultiplex = stop
 		handler.multiplex = multiplex.NewClient(poolCtx, muxConfig, "", func(ctx context.Context) (context.Context, *transport.Link, error) {
 			return handler.process(ctx, nil, dialer, protocol.RequestCommandMux)

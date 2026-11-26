@@ -89,7 +89,7 @@ func New(ctx context.Context, config *Config) (*Handler, error) {
 		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
 	}
 
-	handler.ctx, handler.stop = context.WithCancel(context.Background())
+	handler.ctx, handler.stop = context.WithCancel(ctx)
 
 	if a.Encryption != "" && a.Encryption != "none" {
 		s := strings.Split(a.Encryption, ".")

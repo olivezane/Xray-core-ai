@@ -48,7 +48,7 @@ func (p *PublicEndpoint) Dispatch(ctx context.Context, link *transport.Link) {
 func (p *PublicEndpoint) Accept(ctx context.Context, link *transport.Link) error {
 	client := multiplex.NewClientWorker(ctx, *link, multiplex.ClientStrategy{})
 	target := net.UDPDestination(net.DomainAddress(internalDomain), 0)
-	controlCtx := session.ContextWithOutbounds(context.Background(), []*session.Outbound{{Target: target}})
+	controlCtx := session.ContextWithOutbounds(ctx, []*session.Outbound{{Target: target}})
 	s := multiplex.NewSession(controlCtx, &transport.Link{Writer: buf.Discard})
 	if !client.TryAdmit(controlCtx, s) {
 		client.Close()
@@ -56,7 +56,7 @@ func (p *PublicEndpoint) Accept(ctx context.Context, link *transport.Link) error
 	}
 	worker := &PublicWorker{
 		client: client,
-		timer:  signal.CancelAfterInactivity(context.Background(), func() { client.Close() }, 24*time.Hour),
+		timer:  signal.CancelAfterInactivity(ctx, func() { client.Close() }, 24*time.Hour),
 	}
 	defer func() {
 		worker.Close()
