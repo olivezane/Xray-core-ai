@@ -174,6 +174,7 @@ type udpSessionManager struct {
 	closed bool
 
 	addConn        internet.ConnHandler
+	ctx            context.Context
 	udpIdleTimeout time.Duration
 	user           *protocol.MemoryUser
 }
@@ -303,7 +304,7 @@ func (m *udpSessionManager) feed(id uint32, d []byte) {
 		}
 		udpConn.user = m.user
 		m.m[id] = udpConn
-		m.addConn(udpConn)
+		m.addConn(m.ctx, udpConn)
 	}
 
 	select {

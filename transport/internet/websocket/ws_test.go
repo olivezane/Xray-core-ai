@@ -23,7 +23,7 @@ func Test_listenWSAndDial(t *testing.T) {
 		ProtocolSettings: &Config{
 			Path: "ws",
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 
@@ -82,7 +82,7 @@ func TestDialWithRemoteAddr(t *testing.T) {
 		SocketSettings: &internet.SocketConfig{
 			TrustedXForwardedFor: []string{"X-Forwarded-For"},
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 
@@ -139,7 +139,7 @@ func Test_listenWSAndDial_TLS(t *testing.T) {
 			PinnedPeerCertSha256: [][]byte{ctHash[:]},
 		},
 	}
-	listen, err := ListenWS(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(conn stat.Connection) {
+	listen, err := ListenWS(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(_ context.Context, conn stat.Connection) {
 		go func() {
 			_ = conn.Close()
 		}()

@@ -23,7 +23,7 @@ func Test_listenHTTPUpgradeAndDial(t *testing.T) {
 		ProtocolSettings: &Config{
 			Path: "httpupgrade",
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 
@@ -82,7 +82,7 @@ func Test_listenHTTPUpgradeAndDialWithHeaders(t *testing.T) {
 				"User-Agent": "Mozilla",
 			},
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 
@@ -141,7 +141,7 @@ func TestDialWithRemoteAddr(t *testing.T) {
 		SocketSettings: &internet.SocketConfig{
 			TrustedXForwardedFor: []string{"X-Forwarded-For"},
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 
@@ -198,7 +198,7 @@ func Test_listenHTTPUpgradeAndDial_TLS(t *testing.T) {
 			PinnedPeerCertSha256: [][]byte{ctHash[:]},
 		},
 	}
-	listen, err := ListenHTTPUpgrade(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(conn stat.Connection) {
+	listen, err := ListenHTTPUpgrade(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(_ context.Context, conn stat.Connection) {
 		go func() {
 			_ = conn.Close()
 		}()

@@ -11,6 +11,8 @@ import (
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	xnet "github.com/xtls/xray-core/common/net"
+	"github.com/xtls/xray-core/common/tracker"
+	finbound "github.com/xtls/xray-core/features/inbound"
 	"github.com/xtls/xray-core/features/routing"
 	"github.com/xtls/xray-core/transport"
 )
@@ -140,6 +142,7 @@ func TestHandlerClosesTunConnectionWhenBothSidesAreDone(t *testing.T) {
 		ctx:        context.Background(),
 		config:     &Config{},
 		dispatcher: dispatcher,
+		sessions:   tracker.NewRegistry(),
 	}
 	handler.HandleConnection(conn, xnet.TCPDestination(xnet.LocalHostIP, 443))
 
@@ -163,6 +166,7 @@ func TestHandlerCountsTunConnectionTraffic(t *testing.T) {
 		dispatcher:      dispatcher,
 		uplinkCounter:   uplinkCounter,
 		downlinkCounter: downlinkCounter,
+		sessions:        tracker.NewRegistry(),
 	}
 	handler.HandleConnection(conn, xnet.TCPDestination(xnet.LocalHostIP, 443))
 
@@ -196,7 +200,7 @@ func (d *blockingDispatcher) DispatchLink(ctx context.Context, dest xnet.Destina
 // is detached from the instance's, so Close is what cancels it
 func TestHandlerCloseCancelsDispatches(t *testing.T) {
 	dispatcher := &blockingDispatcher{entered: make(chan struct{})}
-	handler := &Handler{config: &Config{}, dispatcher: dispatcher}
+	handler := &Handler{config: &Config{}, dispatcher: dispatcher, sessions: tracker.NewRegistry()}
 	handler.ctx, handler.cancel = context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -211,5 +215,42 @@ func TestHandlerCloseCancelsDispatches(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("dispatch still running after Close")
+	}
+}
+
+// The handler serves its flows itself, without a worker: they must be reported
+// and closable like the connections of a port-based inbound.
+func TestHandlerTracksFlows(t *testing.T) {
+	dispatcher := &blockingDispatcher{entered: make(chan struct{})}
+	handler := &Handler{config: &Config{}, dispatcher: dispatcher, sessions: tracker.NewRegistry()}
+	handler.ctx, handler.cancel = context.WithCancel(context.Background())
+	defer handler.Close()
+
+	done := make(chan struct{})
+	go func() {
+		handler.HandleConnection(newTestConn(nil), xnet.TCPDestination(xnet.LocalHostIP, 443))
+		close(done)
+	}()
+	<-dispatcher.entered
+
+	sessions := handler.Sessions(context.Background())
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 tracked flow, got %d: %+v", len(sessions), sessions)
+	}
+	if sessions[0].Network != xnet.Network_TCP {
+		t.Errorf("unexpected flow network: %v", sessions[0].Network)
+	}
+
+	if closed := handler.CloseSessions(context.Background(), func(finbound.Session) bool { return false }); closed != 0 {
+		t.Errorf("closed %d flows that did not match", closed)
+	}
+	if closed := handler.CloseSessions(context.Background(), func(s finbound.Session) bool { return s.Network == xnet.Network_TCP }); closed != 1 {
+		t.Fatalf("expected to close 1 flow, closed %d", closed)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("flow still running after being closed")
 	}
 }

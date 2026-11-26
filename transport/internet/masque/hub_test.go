@@ -80,7 +80,7 @@ func serve(t *testing.T, r *http.Request, handle func(*ServerConn)) *httptest.Re
 	t.Helper()
 	path, err := newPathMatcher(DefaultPath)
 	require.NoError(t, err)
-	l := &Listener{path: path, addConn: func(conn stat.Connection) {
+	l := &Listener{path: path, addConn: func(_ context.Context, conn stat.Connection) {
 		go func() {
 			handle(conn.(*ServerConn))
 			conn.Close()

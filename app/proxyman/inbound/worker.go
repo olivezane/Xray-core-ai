@@ -49,6 +49,13 @@ type tcpWorker struct {
 	hub internet.Listener
 
 	ctx context.Context
+
+	// cancel stops everything this worker started: it is the parent of the
+	// listening context and of every connection context.
+	cancel context.CancelFunc
+	// sessions tracks the connections handed to the proxy. It belongs to the
+	// inbound handler and is shared by all of its workers.
+	sessions *connRegistry
 }
 
 func getTProxyType(s *internet.MemoryStreamConfig) internet.SocketConfig_TProxyMode {
@@ -58,8 +65,15 @@ func getTProxyType(s *internet.MemoryStreamConfig) internet.SocketConfig_TProxyM
 	return s.SocketSettings.Tproxy
 }
 
-func (w *tcpWorker) callback(conn stat.Connection) {
-	ctx, cancel := context.WithCancel(w.ctx)
+func (w *tcpWorker) callback(connCtx context.Context, conn stat.Connection) {
+	if connCtx == nil {
+		connCtx = w.ctx
+	}
+	// The transport context is the parent of the connection context: values set
+	// by the transport (e.g. the HYSTERIA validator) reach the proxy, and the
+	// connection is cancelled when the transport or the worker goes away.
+	ctx, cancel := context.WithCancel(connCtx)
+	defer cancel()
 	sid := session.NewID()
 	ctx = c.ContextWithID(ctx, sid)
 
@@ -108,13 +122,19 @@ func (w *tcpWorker) callback(conn stat.Connection) {
 			WriteCounter: w.downlinkCounter,
 		}
 	}
-	ctx = session.ContextWithInbound(ctx, &session.Inbound{
+	inbound := &session.Inbound{
 		Source:  net.DestinationFromAddr(conn.RemoteAddr()),
 		Local:   net.DestinationFromAddr(conn.LocalAddr()),
 		Gateway: net.TCPDestination(w.address, w.port),
 		Tag:     w.tag,
 		Conn:    conn,
-	})
+	}
+	ctx = session.ContextWithInbound(ctx, inbound)
+	if !w.sessions.register(&connection{Inbound: inbound, Network: net.Network_TCP, Start: time.Now(), Conn: conn, Cancel: cancel}) {
+		common.CloseIfExists(conn)
+		return
+	}
+	defer w.sessions.unregister(conn)
 
 	content := new(session.Content)
 	content.SniffingRequest = w.sniffingRequest
@@ -123,8 +143,7 @@ func (w *tcpWorker) callback(conn stat.Connection) {
 	if err := w.proxy.Process(ctx, net.Network_TCP, conn, w.dispatcher); err != nil {
 		errors.LogInfoInner(ctx, err, "connection ends")
 	}
-	cancel()
-	conn.Close()
+	common.CloseIfExists(conn)
 }
 
 func (w *tcpWorker) Proxy() proxy.Inbound {
@@ -132,16 +151,18 @@ func (w *tcpWorker) Proxy() proxy.Inbound {
 }
 
 func (w *tcpWorker) Start() error {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(w.ctx)
+	w.cancel = cancel
 
 	if v, ok := w.proxy.(*hysteria_proxy.Server); ok {
 		ctx = hysteria.ContextWithValidator(ctx, v.HysteriaInboundValidator())
 	}
 
-	hub, err := internet.ListenTCP(ctx, w.address, w.port, w.stream, func(conn stat.Connection) {
-		go w.callback(conn)
+	hub, err := internet.ListenTCP(ctx, w.address, w.port, w.stream, func(connCtx context.Context, conn stat.Connection) {
+		go w.callback(connCtx, conn)
 	})
 	if err != nil {
+		cancel()
 		return errors.New("failed to listen TCP on ", w.port).Base(err)
 	}
 	w.hub = hub
@@ -150,6 +171,9 @@ func (w *tcpWorker) Start() error {
 
 func (w *tcpWorker) Close() error {
 	var errs []interface{}
+	if w.cancel != nil {
+		w.cancel()
+	}
 	if w.hub != nil {
 		if err := common.Close(w.hub); err != nil {
 			errs = append(errs, err)
@@ -274,6 +298,14 @@ type udpWorker struct {
 	activeConn map[connID]*udpConn
 
 	ctx context.Context
+
+	// connCtx is the parent context of every udpConn; cancelConns stops them.
+	connCtx     context.Context
+	cancelConns context.CancelFunc
+
+	// sessions tracks the udpConn sessions handed to the proxy. It belongs to
+	// the inbound handler and is shared by all of its workers.
+	sessions *connRegistry
 }
 
 func (w *udpWorker) getConnection(id connID) (*udpConn, bool) {
@@ -326,7 +358,7 @@ func (w *udpWorker) callback(b *buf.Buffer, source net.Destination, originalDest
 		common.Must(w.checker.Start())
 
 		go func() {
-			ctx, cancel := context.WithCancel(w.ctx)
+			ctx, cancel := context.WithCancel(w.connCtx)
 			conn.cancel = cancel
 			sid := session.NewID()
 			ctx = c.ContextWithID(ctx, sid)
@@ -345,17 +377,21 @@ func (w *udpWorker) callback(b *buf.Buffer, source net.Destination, originalDest
 				}
 			}
 
-			ctx = session.ContextWithInbound(ctx, &session.Inbound{
+			inbound := &session.Inbound{
 				Source:  source,
 				Local:   local, // Due to some limitations, in UDP connections, localIP is always equal to listen interface IP
 				Gateway: net.UDPDestination(w.address, w.port),
 				Tag:     w.tag,
-			})
+			}
+			ctx = session.ContextWithInbound(ctx, inbound)
 			content := new(session.Content)
 			content.SniffingRequest = w.sniffingRequest
 			ctx = session.ContextWithContent(ctx, content)
-			if err := w.proxy.Process(ctx, net.Network_UDP, conn, w.dispatcher); err != nil {
-				errors.LogInfoInner(ctx, err, "connection ends")
+			if w.sessions.register(&connection{Inbound: inbound, Network: net.Network_UDP, Start: time.Now(), Conn: conn, Cancel: cancel}) {
+				if err := w.proxy.Process(ctx, net.Network_UDP, conn, w.dispatcher); err != nil {
+					errors.LogInfoInner(ctx, err, "connection ends")
+				}
+				w.sessions.unregister(conn)
 			}
 			conn.Close()
 			// conn not removed by checker TODO may be lock worker here is better
@@ -408,9 +444,10 @@ func (w *udpWorker) clean() error {
 
 func (w *udpWorker) Start() error {
 	w.activeConn = make(map[connID]*udpConn, 16)
-	ctx := context.Background()
-	h, err := udp.ListenUDP(ctx, w.address, w.port, w.stream, udp.HubCapacity(256))
+	w.connCtx, w.cancelConns = context.WithCancel(w.ctx)
+	h, err := udp.ListenUDP(w.connCtx, w.address, w.port, w.stream, udp.HubCapacity(256))
 	if err != nil {
+		w.cancelConns()
 		return err
 	}
 
@@ -429,6 +466,22 @@ func (w *udpWorker) Close() error {
 	defer w.Unlock()
 
 	var errs []interface{}
+
+	if w.cancelConns != nil {
+		w.cancelConns()
+	}
+
+	// Close the sessions still being served, otherwise their pipe buffers and
+	// proxy-side goroutines outlive the worker.
+	for id, conn := range w.activeConn {
+		if !conn.inactive {
+			conn.setInactive()
+		}
+		delete(w.activeConn, id)
+		if err := conn.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
 
 	if w.hub != nil {
 		if err := w.hub.Close(); err != nil {
@@ -473,10 +526,17 @@ type dsWorker struct {
 	hub internet.Listener
 
 	ctx context.Context
+
+	cancel   context.CancelFunc
+	sessions *connRegistry
 }
 
-func (w *dsWorker) callback(conn stat.Connection) {
-	ctx, cancel := context.WithCancel(w.ctx)
+func (w *dsWorker) callback(connCtx context.Context, conn stat.Connection) {
+	if connCtx == nil {
+		connCtx = w.ctx
+	}
+	ctx, cancel := context.WithCancel(connCtx)
+	defer cancel()
 	sid := session.NewID()
 	ctx = c.ContextWithID(ctx, sid)
 
@@ -487,13 +547,19 @@ func (w *dsWorker) callback(conn stat.Connection) {
 			WriteCounter: w.downlinkCounter,
 		}
 	}
-	ctx = session.ContextWithInbound(ctx, &session.Inbound{
+	inbound := &session.Inbound{
 		Source:  net.DestinationFromAddr(conn.RemoteAddr()),
 		Local:   net.DestinationFromAddr(conn.LocalAddr()),
 		Gateway: net.UnixDestination(w.address),
 		Tag:     w.tag,
 		Conn:    conn,
-	})
+	}
+	ctx = session.ContextWithInbound(ctx, inbound)
+	if !w.sessions.register(&connection{Inbound: inbound, Network: net.Network_UNIX, Start: time.Now(), Conn: conn, Cancel: cancel}) {
+		common.CloseIfExists(conn)
+		return
+	}
+	defer w.sessions.unregister(conn)
 
 	content := new(session.Content)
 	content.SniffingRequest = w.sniffingRequest
@@ -502,7 +568,6 @@ func (w *dsWorker) callback(conn stat.Connection) {
 	if err := w.proxy.Process(ctx, net.Network_UNIX, conn, w.dispatcher); err != nil {
 		errors.LogInfoInner(ctx, err, "connection ends")
 	}
-	cancel()
 	if err := conn.Close(); err != nil {
 		errors.LogInfoInner(ctx, err, "failed to close connection")
 	}
@@ -517,11 +582,14 @@ func (w *dsWorker) Port() net.Port {
 }
 
 func (w *dsWorker) Start() error {
-	ctx := context.Background()
-	hub, err := internet.ListenUnix(ctx, w.address, w.stream, func(conn stat.Connection) {
-		go w.callback(conn)
+	ctx, cancel := context.WithCancel(w.ctx)
+	w.cancel = cancel
+
+	hub, err := internet.ListenUnix(ctx, w.address, w.stream, func(connCtx context.Context, conn stat.Connection) {
+		go w.callback(connCtx, conn)
 	})
 	if err != nil {
+		cancel()
 		return errors.New("failed to listen Unix Domain Socket on ", w.address).Base(err)
 	}
 	w.hub = hub
@@ -530,6 +598,9 @@ func (w *dsWorker) Start() error {
 
 func (w *dsWorker) Close() error {
 	var errs []interface{}
+	if w.cancel != nil {
+		w.cancel()
+	}
 	if w.hub != nil {
 		if err := common.Close(w.hub); err != nil {
 			errs = append(errs, err)

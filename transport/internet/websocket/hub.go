@@ -72,7 +72,7 @@ func (h *requestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 	}
 	remoteAddr = http_proto.ApplyTrustedXForwardedFor(request.Header, trustedXFF, remoteAddr)
 
-	h.ln.addConn(NewConnection(conn, remoteAddr, extraReader, h.ln.config.HeartbeatPeriod))
+	h.ln.addConn(h.ln.ctx, NewConnection(conn, remoteAddr, extraReader, h.ln.config.HeartbeatPeriod))
 }
 
 type Listener struct {
@@ -81,11 +81,13 @@ type Listener struct {
 	listener net.Listener
 	config   *Config
 	addConn  internet.ConnHandler
+	ctx      context.Context
 }
 
 func ListenWS(ctx context.Context, address net.Address, port net.Port, streamSettings *internet.MemoryStreamConfig, addConn internet.ConnHandler) (internet.Listener, error) {
 	l := &Listener{
 		addConn: addConn,
+		ctx:     ctx,
 	}
 	wsSettings := streamSettings.ProtocolSettings.(*Config)
 	l.config = wsSettings

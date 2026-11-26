@@ -30,14 +30,14 @@ type Listener struct {
 
 func (l Listener) Tun(server encoding.GRPCService_TunServer) error {
 	tunCtx, cancel := context.WithCancel(l.ctx)
-	l.handler(encoding.NewHunkConn(server, cancel, l.trustedXForwardedFor))
+	l.handler(tunCtx, encoding.NewHunkConn(server, cancel, l.trustedXForwardedFor))
 	<-tunCtx.Done()
 	return nil
 }
 
 func (l Listener) TunMulti(server encoding.GRPCService_TunMultiServer) error {
 	tunCtx, cancel := context.WithCancel(l.ctx)
-	l.handler(encoding.NewMultiHunkConn(server, cancel, l.trustedXForwardedFor))
+	l.handler(tunCtx, encoding.NewMultiHunkConn(server, cancel, l.trustedXForwardedFor))
 	<-tunCtx.Done()
 	return nil
 }

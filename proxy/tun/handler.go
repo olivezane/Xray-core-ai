@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
@@ -14,7 +15,9 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/session"
+	"github.com/xtls/xray-core/common/tracker"
 	"github.com/xtls/xray-core/core"
+	finbound "github.com/xtls/xray-core/features/inbound"
 	"github.com/xtls/xray-core/features/policy"
 	"github.com/xtls/xray-core/features/routing"
 	"github.com/xtls/xray-core/features/stats"
@@ -39,6 +42,10 @@ type Handler struct {
 	uplinkCounter   stats.Counter
 	downlinkCounter stats.Counter
 	updater         *InterfaceUpdater // this inbound's own, the package-global one may belong to a newer instance
+
+	// sessions tracks the flows the stack is serving, so the instance can report
+	// and close them like the connections of a port-based inbound.
+	sessions *tracker.Registry
 }
 
 type tunUDPStatsWriter struct {
@@ -103,6 +110,7 @@ func (t *Handler) Init(ctx context.Context, pm policy.Manager, dispatcher routin
 	t.ctx, t.cancel = context.WithCancel(core.ToBackgroundDetachedContext(ctx))
 	t.policyManager = pm
 	t.dispatcher = dispatcher
+	t.sessions = tracker.NewRegistry()
 
 	if len(t.tag) > 0 && pm.ForSystem().Stats.InboundUplink {
 		statsManager := core.MustFromContext(ctx).GetFeature(stats.ManagerType()).(stats.Manager)
@@ -246,6 +254,12 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 	}
 
 	ctx = session.ContextWithInbound(ctx, &inbound)
+	if !t.sessions.Register(&tracker.Entry{Inbound: &inbound, Network: destination.Network, Start: time.Now(), Conn: conn, Cancel: cancel}) {
+		// The handler closed while this flow was being accepted.
+		return
+	}
+	defer t.sessions.Unregister(conn)
+
 	ctx = session.ContextWithContent(ctx, &session.Content{
 		SniffingRequest: t.sniffingRequest,
 	})
@@ -287,8 +301,23 @@ func (t *Handler) Close() error {
 	if t.cancel != nil {
 		t.cancel()
 	}
+	if t.sessions != nil {
+		t.sessions.CloseAll()
+	}
 	return errors.Combine(common.CloseIfExists(t.stack), common.CloseIfExists(t.tun))
 }
+
+// Sessions implements inbound.SessionTracker.
+func (t *Handler) Sessions(_ context.Context) []finbound.Session {
+	return t.sessions.Sessions()
+}
+
+// CloseSessions implements inbound.SessionTracker.
+func (t *Handler) CloseSessions(_ context.Context, match func(finbound.Session) bool) int {
+	return t.sessions.CloseMatching(match)
+}
+
+var _ finbound.SessionTracker = (*Handler)(nil)
 
 // Network implements proxy.Inbound
 // and exists only to comply to proxy interface, declaring it doesn't listen on any network,

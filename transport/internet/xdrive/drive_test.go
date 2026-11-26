@@ -798,7 +798,7 @@ func TestDriveLargeAnnouncement(t *testing.T) {
 	l := &Listener{
 		ctx:            listenerCtx,
 		storage:        storage,
-		addConn:        func(c stat.Connection) { conns <- c.(*Conn) },
+		addConn:        func(_ context.Context, c stat.Connection) { conns <- c.(*Conn) },
 		params:         p,
 		active:         make(map[string]bool),
 		handled:        make(map[string]time.Time),

@@ -16,7 +16,7 @@ func announceEntry(name string) string {
 func TestAcceptPendingClientClockBehind(t *testing.T) {
 	l := newTestListener(t, t.TempDir())
 	var conns int
-	l.addConn = func(c stat.Connection) { conns++; c.Close() }
+	l.addConn = func(_ context.Context, c stat.Connection) { conns++; c.Close() }
 	ctx := context.Background()
 
 	session := "clockbehind"
@@ -45,7 +45,7 @@ func TestAcceptPendingStaleLeftoverProtectsActiveRing(t *testing.T) {
 	l := newTestListener(t, t.TempDir())
 	l.params.sessionTTL = 50 * time.Millisecond
 	var conns int
-	l.addConn = func(c stat.Connection) { conns++; c.Close() }
+	l.addConn = func(_ context.Context, c stat.Connection) { conns++; c.Close() }
 	ctx := context.Background()
 
 	session := "active"
@@ -82,7 +82,7 @@ func TestAcceptPendingTrulyLeftoverDropped(t *testing.T) {
 	l := newTestListener(t, t.TempDir())
 	l.params.sessionTTL = 50 * time.Millisecond
 	var conns int
-	l.addConn = func(c stat.Connection) { conns++; c.Close() }
+	l.addConn = func(_ context.Context, c stat.Connection) { conns++; c.Close() }
 	ctx := context.Background()
 
 	session := "leftover"
@@ -109,7 +109,7 @@ func TestAcceptPendingTrulyLeftoverDropped(t *testing.T) {
 
 func TestAcceptPendingPrunesFirstSeen(t *testing.T) {
 	l := newTestListener(t, t.TempDir())
-	l.addConn = func(c stat.Connection) { c.Close() }
+	l.addConn = func(_ context.Context, c stat.Connection) { c.Close() }
 	ctx := context.Background()
 	l.firstSeen = map[string]time.Time{"gone-entry": time.Now()}
 	if _, err := l.acceptPending(ctx); err != nil {

@@ -69,7 +69,7 @@ func Listen(ctx context.Context, address net.Address, port net.Port, streamSetti
 		addConn: handler,
 		conns:   make(map[net.Conn]struct{}),
 	}
-	l.ctx, l.cancel = context.WithCancel(context.Background())
+	l.ctx, l.cancel = context.WithCancel(ctx)
 	h2, h3 := serverVersions(tlsConfig)
 	if h3 {
 		if err := l.listenHTTP3(address, port, streamSettings, tlsConfig); err != nil {
@@ -289,7 +289,7 @@ func (l *Listener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		remote:       addrs.remote,
 		done:         make(chan struct{}),
 	}
-	l.addConn(conn)
+	l.addConn(l.ctx, conn)
 	select {
 	case <-conn.done:
 	case <-l.ctx.Done():

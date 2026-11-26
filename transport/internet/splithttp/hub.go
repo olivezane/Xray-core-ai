@@ -391,7 +391,7 @@ func (h *requestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 			conn.reader = currentSession.uploadQueue
 		}
 
-		h.ln.addConn(stat.Connection(&conn))
+		h.ln.addConn(h.ln.ctx, stat.Connection(&conn))
 
 		// "A ResponseWriter may not be used after [Handler.ServeHTTP] has returned."
 		select {
@@ -440,12 +440,14 @@ type Listener struct {
 	h3listener http3.QUICListener
 	config     *Config
 	addConn    internet.ConnHandler
+	ctx        context.Context
 	isH3       bool
 }
 
 func ListenXH(ctx context.Context, address net.Address, port net.Port, streamSettings *internet.MemoryStreamConfig, addConn internet.ConnHandler) (internet.Listener, error) {
 	l := &Listener{
 		addConn: addConn,
+		ctx:     ctx,
 	}
 	l.config = streamSettings.ProtocolSettings.(*Config)
 	if l.config != nil {

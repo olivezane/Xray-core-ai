@@ -31,7 +31,7 @@ func Test_ListenXHAndDial(t *testing.T) {
 		ProtocolSettings: &Config{
 			Path: "/sh",
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 
@@ -91,7 +91,7 @@ func TestDialWithRemoteAddr(t *testing.T) {
 		SocketSettings: &internet.SocketConfig{
 			TrustedXForwardedFor: []string{"X-Forwarded-For"},
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 
@@ -148,7 +148,7 @@ func Test_ListenXHAndDial_TLS(t *testing.T) {
 			PinnedPeerCertSha256: [][]byte{ctHash[:]},
 		},
 	}
-	listen, err := ListenXH(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(conn stat.Connection) {
+	listen, err := ListenXH(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(_ context.Context, conn stat.Connection) {
 		go func() {
 			defer conn.Close()
 
@@ -196,7 +196,7 @@ func Test_ListenXHAndDial_H2C(t *testing.T) {
 			Path: "shs",
 		},
 	}
-	listen, err := ListenXH(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(conn stat.Connection) {
+	listen, err := ListenXH(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(_ context.Context, conn stat.Connection) {
 		go func() {
 			_ = conn.Close()
 		}()
@@ -249,7 +249,7 @@ func Test_ListenXHAndDial_QUIC(t *testing.T) {
 	}
 
 	serverClosed := false
-	listen, err := ListenXH(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(conn stat.Connection) {
+	listen, err := ListenXH(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(_ context.Context, conn stat.Connection) {
 		go func() {
 			defer conn.Close()
 
@@ -317,7 +317,7 @@ func Test_ListenXHAndDial_Unix(t *testing.T) {
 		ProtocolSettings: &Config{
 			Path: "/sh",
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 
@@ -378,7 +378,7 @@ func Test_queryString(t *testing.T) {
 			// this querystring does not have any effect, but sometimes people blindly copy it from websocket config. make sure the outbound doesn't break
 			Path: "/sh?ed=2048",
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 
@@ -430,7 +430,7 @@ func Test_maxUpload(t *testing.T) {
 	}
 
 	uploadReceived := make([]byte, 10001)
-	listen, err := ListenXH(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(conn stat.Connection) {
+	listen, err := ListenXH(context.Background(), net.LocalHostIP, listenPort, streamSettings, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 			c.SetReadDeadline(time.Now().Add(2 * time.Second))
@@ -472,7 +472,7 @@ func newPacketUpEchoServer(t *testing.T, serverCfg *Config) net.Port {
 	listen, err := ListenXH(context.Background(), net.LocalHostIP, port, &internet.MemoryStreamConfig{
 		ProtocolName:     "splithttp",
 		ProtocolSettings: serverCfg,
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 			var b [5]byte
@@ -517,7 +517,7 @@ func uplinkEchoOnce(mode, method, transport string) error {
 		serverCfg.SecurityType, serverCfg.SecuritySettings = "tls", sec
 		clientCfg.SecurityType, clientCfg.SecuritySettings = "tls", sec
 	}
-	listen, err := ListenXH(context.Background(), net.LocalHostIP, port, serverCfg, func(conn stat.Connection) {
+	listen, err := ListenXH(context.Background(), net.LocalHostIP, port, serverCfg, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			defer c.Close()
 			var b [5]byte

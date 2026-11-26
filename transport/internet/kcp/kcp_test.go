@@ -28,7 +28,7 @@ func TestDialAndListen(t *testing.T) {
 			CwndMultiplier:   20,
 			MaxSendingWindow: 2 * 1024 * 1024,
 		},
-	}, func(conn stat.Connection) {
+	}, func(_ context.Context, conn stat.Connection) {
 		go func(c stat.Connection) {
 			payload := make([]byte, 4096)
 			for {

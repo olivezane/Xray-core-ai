@@ -24,6 +24,7 @@ import (
 type server struct {
 	config         *Config
 	addConn        internet.ConnHandler
+	ctx            context.Context
 	innnerListener net.Listener
 	socketSettings *internet.SocketConfig
 }
@@ -43,7 +44,7 @@ func (s *server) Handle(conn net.Conn) {
 		errors.LogInfoInner(context.Background(), err, "failed to handle request")
 		return
 	}
-	s.addConn(upgradedConn)
+	s.addConn(s.ctx, upgradedConn)
 }
 
 // upgrade execute a fake websocket upgrade process and return the available connection
@@ -159,6 +160,7 @@ func ListenHTTPUpgrade(ctx context.Context, address net.Address, port net.Port, 
 	serverInstance := &server{
 		config:         transportConfiguration,
 		addConn:        addConn,
+		ctx:            ctx,
 		innnerListener: listener,
 		socketSettings: streamSettings.SocketSettings,
 	}

@@ -303,7 +303,7 @@ func Serve(ctx context.Context, address net.Address, port net.Port, streamSettin
 		return nil, err
 	}
 
-	listenerCtx, cancel := context.WithCancel(context.Background())
+	listenerCtx, cancel := context.WithCancel(ctx)
 	listener := &Listener{
 		ctx:            listenerCtx,
 		cancel:         cancel,
@@ -425,7 +425,7 @@ func (l *Listener) acceptPending(logCtx context.Context) (bool, error) {
 		}
 		go l.drop(full)
 		accepted = true
-		l.addConn(l.newSessionConn(logCtx, session, announce))
+		l.addConn(l.ctx, l.newSessionConn(logCtx, session, announce))
 	}
 	return accepted, nil
 }

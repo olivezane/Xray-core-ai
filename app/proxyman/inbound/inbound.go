@@ -113,6 +113,32 @@ func (m *Manager) ListHandlers(ctx context.Context) []inbound.Handler {
 	return response
 }
 
+// Sessions implements inbound.SessionTracker: it returns the connections every
+// managed handler is serving.
+func (m *Manager) Sessions(ctx context.Context) []inbound.Session {
+	var sessions []inbound.Session
+	for _, handler := range m.ListHandlers(ctx) {
+		if tracker, ok := handler.(inbound.SessionTracker); ok {
+			sessions = append(sessions, tracker.Sessions(ctx)...)
+		}
+	}
+	return sessions
+}
+
+// CloseSessions implements inbound.SessionTracker: it closes the connections of
+// every managed handler matching match.
+func (m *Manager) CloseSessions(ctx context.Context, match func(inbound.Session) bool) int {
+	closed := 0
+	for _, handler := range m.ListHandlers(ctx) {
+		if tracker, ok := handler.(inbound.SessionTracker); ok {
+			closed += tracker.CloseSessions(ctx, match)
+		}
+	}
+	return closed
+}
+
+var _ inbound.SessionTracker = (*Manager)(nil)
+
 // Start implements common.Runnable.
 func (m *Manager) Start() error {
 	m.access.Lock()

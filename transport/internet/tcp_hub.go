@@ -18,7 +18,14 @@ func RegisterTransportListener(protocol string, listener ListenFunc) error {
 	return nil
 }
 
-type ConnHandler func(stat.Connection)
+// ConnHandler is called by a transport with every accepted connection.
+//
+// ctx is the transport-level context of that connection. It is derived from the
+// listener context, so it carries the transport's values (HYSTERIA validator,
+// per-session state, ...) and is cancelled once the listener stops accepting.
+// Handlers must derive their own per-connection context from it instead of
+// starting from context.Background().
+type ConnHandler func(ctx context.Context, conn stat.Connection)
 
 type ListenFunc func(ctx context.Context, address net.Address, port net.Port, settings *MemoryStreamConfig, handler ConnHandler) (Listener, error)
 

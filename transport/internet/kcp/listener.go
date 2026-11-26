@@ -30,6 +30,7 @@ type Listener struct {
 	config    *Config
 	reader    PacketReader
 	addConn   internet.ConnHandler
+	ctx       context.Context
 }
 
 func NewListener(ctx context.Context, address net.Address, port net.Port, streamSettings *internet.MemoryStreamConfig, addConn internet.ConnHandler) (*Listener, error) {
@@ -40,6 +41,7 @@ func NewListener(ctx context.Context, address net.Address, port net.Port, stream
 		sessions: make(map[ConnectionID]*Connection),
 		config:   kcpSettings,
 		addConn:  addConn,
+		ctx:      ctx,
 	}
 
 	if config := tls.ConfigFromStreamSettings(streamSettings); config != nil {
@@ -115,7 +117,7 @@ func (l *Listener) OnReceive(payload *buf.Buffer, src net.Destination) {
 			netConn = tls.Server(conn, l.tlsConfig)
 		}
 
-		l.addConn(netConn)
+		l.addConn(l.ctx, netConn)
 		l.sessions[id] = conn
 	}
 	conn.Input(segments)

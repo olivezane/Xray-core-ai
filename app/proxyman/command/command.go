@@ -61,7 +61,19 @@ func (op *RemoveUserOperation) ApplyInbound(ctx context.Context, handler inbound
 	if !ok {
 		return errors.New("proxy is not a UserManager")
 	}
-	return um.RemoveUser(ctx, op.Email)
+	if err := um.RemoveUser(ctx, op.Email); err != nil {
+		return err
+	}
+	// A removed user must not keep proxying: close the connections it opened.
+	if tracker, ok := handler.(inbound.SessionTracker); ok {
+		closed := tracker.CloseSessions(ctx, func(s inbound.Session) bool {
+			return s.Email == op.Email
+		})
+		if closed > 0 {
+			errors.LogInfo(ctx, "closed ", closed, " connection(s) of removed user ", op.Email)
+		}
+	}
+	return nil
 }
 
 type handlerServer struct {

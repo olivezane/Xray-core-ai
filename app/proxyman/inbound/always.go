@@ -10,6 +10,7 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/core"
+	finbound "github.com/xtls/xray-core/features/inbound"
 	"github.com/xtls/xray-core/features/policy"
 	"github.com/xtls/xray-core/features/routing"
 	"github.com/xtls/xray-core/features/stats"
@@ -49,6 +50,9 @@ type AlwaysOnInboundHandler struct {
 	proxy          proxy.Inbound
 	workers        []worker
 	tag            string
+	// sessions tracks every connection this handler is serving, across all of
+	// its workers, so the handler can report and close them.
+	sessions *connRegistry
 }
 
 func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *proxyman.ReceiverConfig, proxyConfig interface{}) (*AlwaysOnInboundHandler, error) {
@@ -90,6 +94,7 @@ func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *
 		proxyConfig:    proxyConfig,
 		proxy:          p,
 		tag:            tag,
+		sessions:       newConnRegistry(),
 	}
 
 	uplinkCounter, downlinkCounter := getStatCounter(core.MustFromContext(ctx), tag)
@@ -123,6 +128,7 @@ func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *
 				sniffingRequest: sniffingRequest,
 				uplinkCounter:   uplinkCounter,
 				downlinkCounter: downlinkCounter,
+				sessions:        h.sessions,
 				ctx:             ctx,
 			}
 			h.workers = append(h.workers, worker)
@@ -145,6 +151,7 @@ func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *
 						sniffingRequest: sniffingRequest,
 						uplinkCounter:   uplinkCounter,
 						downlinkCounter: downlinkCounter,
+						sessions:        h.sessions,
 						ctx:             ctx,
 					}
 					h.workers = append(h.workers, worker)
@@ -161,6 +168,7 @@ func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *
 						uplinkCounter:   uplinkCounter,
 						downlinkCounter: downlinkCounter,
 						stream:          mss,
+						sessions:        h.sessions,
 						ctx:             ctx,
 					}
 					h.workers = append(h.workers, worker)
@@ -194,6 +202,9 @@ func (h *AlwaysOnInboundHandler) Close() error {
 	for _, worker := range h.workers {
 		errs = append(errs, worker.Close())
 	}
+	// The workers cancelled their contexts and stopped accepting: close whatever
+	// connection they were still serving, then the proxy itself.
+	h.sessions.closeAll()
 	errs = append(errs, common.Close(h.proxy))
 	if err := errors.Combine(errs...); err != nil {
 		return errors.New("failed to close all resources").Base(err)
@@ -208,6 +219,28 @@ func (h *AlwaysOnInboundHandler) Tag() string {
 func (h *AlwaysOnInboundHandler) GetInbound() proxy.Inbound {
 	return h.proxy
 }
+
+// Sessions implements inbound.SessionTracker.
+func (h *AlwaysOnInboundHandler) Sessions(ctx context.Context) []finbound.Session {
+	sessions := h.sessions.sessions()
+	// An inbound that listens on no network (TUN) accepts its connections
+	// itself, outside of any worker.
+	if tracker, ok := h.proxy.(finbound.SessionTracker); ok {
+		sessions = append(sessions, tracker.Sessions(ctx)...)
+	}
+	return sessions
+}
+
+// CloseSessions implements inbound.SessionTracker.
+func (h *AlwaysOnInboundHandler) CloseSessions(ctx context.Context, match func(finbound.Session) bool) int {
+	closed := h.sessions.closeMatching(match)
+	if tracker, ok := h.proxy.(finbound.SessionTracker); ok {
+		closed += tracker.CloseSessions(ctx, match)
+	}
+	return closed
+}
+
+var _ finbound.SessionTracker = (*AlwaysOnInboundHandler)(nil)
 
 // ReceiverSettings implements inbound.Handler.
 func (h *AlwaysOnInboundHandler) ReceiverSettings() *serial.TypedMessage {

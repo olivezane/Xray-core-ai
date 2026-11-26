@@ -36,6 +36,7 @@ type httpHandler struct {
 	quicParams  *internet.QuicParams
 	addConn     internet.ConnHandler
 	conn        *quic.Conn
+	ctx         context.Context
 
 	auth bool
 	user *protocol.MemoryUser
@@ -95,6 +96,7 @@ func (h *httpHandler) AuthHTTP(w http.ResponseWriter, r *http.Request) bool {
 				udpSM := &udpSessionManager{
 					conn: h.conn,
 					m:    make(map[uint32]*InterConn),
+					ctx:  h.ctx,
 
 					addConn:        h.addConn,
 					udpIdleTimeout: time.Duration(h.config.UdpIdleTimeout) * time.Second,
@@ -132,7 +134,7 @@ func (h *httpHandler) StreamDispatcher(ft http3.FrameType, stream *quic.Stream, 
 			return false, err
 		}
 
-		h.addConn(&interConn{
+		h.addConn(h.ctx, &interConn{
 			stream: stream,
 			local:  h.conn.LocalAddr(),
 			remote: h.conn.RemoteAddr(),
@@ -153,12 +155,19 @@ type Listener struct {
 	quicParams  *internet.QuicParams
 	addConn     internet.ConnHandler
 
+	ctx      context.Context
 	pktConn  net.PacketConn
 	tr       *quic.Transport
 	listener *quic.Listener
 }
 
 func (l *Listener) handleClient(conn *quic.Conn) {
+	// Every QUIC client gets its own context: it carries the listener's values
+	// and is cancelled as soon as the client connection is gone, so connections
+	// handed to the inbound handler never outlive it.
+	clientCtx, cancel := context.WithCancel(l.ctx)
+	defer cancel()
+
 	handler := &httpHandler{
 		validator:   l.validator,
 		config:      l.config,
@@ -166,6 +175,7 @@ func (l *Listener) handleClient(conn *quic.Conn) {
 		quicParams:  l.quicParams,
 		addConn:     l.addConn,
 		conn:        conn,
+		ctx:         clientCtx,
 	}
 	h3s := http3.Server{
 		Handler:          handler,
@@ -353,6 +363,7 @@ func Listen(ctx context.Context, address net.Address, port net.Port, streamSetti
 		masqHandler: masqHandler,
 		quicParams:  quicParams,
 		addConn:     handler,
+		ctx:         ctx,
 
 		pktConn:  pktConn,
 		tr:       tr,

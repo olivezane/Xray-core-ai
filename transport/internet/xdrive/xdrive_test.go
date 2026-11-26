@@ -47,7 +47,7 @@ func pairWith(t *testing.T, streamSettings *internet.MemoryStreamConfig) (client
 
 	accepted := make(chan stat.Connection, 1)
 
-	listener, err := Serve(context.Background(), net.LocalHostIP, net.Port(0), streamSettings, func(conn stat.Connection) {
+	listener, err := Serve(context.Background(), net.LocalHostIP, net.Port(0), streamSettings, func(_ context.Context, conn stat.Connection) {
 		accepted <- conn
 	})
 	if err != nil {
@@ -401,7 +401,7 @@ func TestStaleAnnounce(t *testing.T) {
 func TestFreshAnnounce(t *testing.T) {
 	folder := t.TempDir()
 	listener := newTestListener(t, folder)
-	listener.addConn = func(conn stat.Connection) { conn.Close() }
+	listener.addConn = func(_ context.Context, conn stat.Connection) { conn.Close() }
 
 	ctx := context.Background()
 	if err := listener.storage.Put(ctx, announceName("fresh", time.Now()), nil); err != nil {
@@ -433,7 +433,7 @@ func TestAnnouncePrecision(t *testing.T) {
 func TestRecentAnnounceTTL(t *testing.T) {
 	folder := t.TempDir()
 	listener := newTestListener(t, folder)
-	listener.addConn = func(conn stat.Connection) { conn.Close() }
+	listener.addConn = func(_ context.Context, conn stat.Connection) { conn.Close() }
 
 	ctx := context.Background()
 	recent := time.Now().Add(-900 * time.Millisecond)
@@ -604,7 +604,7 @@ func runSessions(t *testing.T, streamSettings *internet.MemoryStreamConfig, n in
 	t.Helper()
 
 	accepted := make(chan stat.Connection, 1)
-	listener, err := Serve(context.Background(), net.LocalHostIP, net.Port(0), streamSettings, func(conn stat.Connection) {
+	listener, err := Serve(context.Background(), net.LocalHostIP, net.Port(0), streamSettings, func(_ context.Context, conn stat.Connection) {
 		accepted <- conn
 	})
 	if err != nil {
