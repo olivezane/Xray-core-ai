@@ -223,7 +223,10 @@ type ClientWorker struct {
 
 func NewClientWorker(ctx context.Context, stream transport.Link, strategy ClientStrategy) *ClientWorker {
 	c := &ClientWorker{carrier: newCarrier(ctx, stream, 16*time.Second, true), strategy: strategy}
-	go c.run(context.Background(), nil)
+	// run reads frames with this context: session.IsReverseMuxFromContext decides
+	// whether a frame carries the source and local endpoints, so it must be the
+	// context the carrier was created with, not a fresh Background one.
+	go c.run(c.ctx, nil)
 	return c
 }
 

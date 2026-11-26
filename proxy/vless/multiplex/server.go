@@ -63,7 +63,10 @@ func (w *ServerWorker) handleStatusNew(ctx context.Context, meta *FrameMetadata,
 	}
 	if inbound := session.InboundFromContext(ctx); inbound != nil && inbound.Source.IsValid() {
 		msg.From = inbound.Source
-		msg.Email = inbound.User.Email
+		// User is nil for anonymous and reverse flows, and before authentication.
+		if inbound.User != nil {
+			msg.Email = inbound.User.Email
+		}
 	}
 	ctx = log.ContextWithAccessMessage(ctx, msg)
 
