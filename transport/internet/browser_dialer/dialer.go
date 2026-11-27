@@ -226,9 +226,10 @@ func CheckOK(conn *websocket.Conn) error {
 	return nil
 }
 
-func init() {
-	platform.RegisterEnvReload(func() error {
-		Reload()
-		return nil
-	})
+// ReloadEnvSettings re-reads the browser dialer address from the environment and
+// restarts the dialer when it changed. It is registered by main/distro/all, so
+// the wiring is visible where the build is composed.
+func ReloadEnvSettings() error {
+	Reload()
+	return nil
 }

@@ -11,7 +11,10 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/session"
+	"github.com/xtls/xray-core/common/tracker"
 	"github.com/xtls/xray-core/common/xudp"
+	"github.com/xtls/xray-core/core"
+	finbound "github.com/xtls/xray-core/features/inbound"
 	"github.com/xtls/xray-core/transport"
 )
 
@@ -33,6 +36,10 @@ type Session struct {
 	producer  sync.Mutex
 
 	writingResponse atomic.Bool
+
+	// releaseStream drops this session's row from the connection table of the
+	// instance, when there is one. It is nil when the session is not tracked.
+	releaseStream func()
 }
 
 const (
@@ -52,7 +59,52 @@ func NewSession(ctx context.Context, link *transport.Link) *Session {
 	if session.IsReverseMuxFromContext(ctx) {
 		s.inbound = session.InboundFromContext(ctx)
 	}
+	s.releaseStream = trackStream(ctx, s, target)
 	return s
+}
+
+// TrackStream registers this mux session in the connection table of the instance,
+// so that a snapshot shows the individual streams inside one multiplexed
+// connection, not just the connection itself. It returns nil when there is no
+// instance table to write to, e.g. in a unit test.
+func trackStream(ctx context.Context, s *Session, target net.Destination) func() {
+	instance := core.FromContext(ctx)
+	if instance == nil {
+		return nil
+	}
+	manager, ok := instance.GetFeature(finbound.ManagerType()).(interface {
+		Connections() *tracker.Registry
+	})
+	if !ok {
+		return nil
+	}
+	registry := manager.Connections()
+	entry := &tracker.Entry{
+		Owner:       s,
+		Direction:   tracker.Outbound,
+		Destination: target,
+		Network:     target.Network,
+		Stream:      uint64(s.ID),
+		Start:       time.Now(),
+		Inbound:     session.InboundFromContext(ctx),
+	}
+	if !trackStreamIn(registry, entry) {
+		return nil
+	}
+	return func() { registry.Unregister(entry) }
+}
+
+// trackStreamIn registers one stream row and reports whether the table took it.
+func trackStreamIn(registry *tracker.Registry, entry *tracker.Entry) bool {
+	return registry.Register(entry)
+}
+
+// releaseFromTable drops this session's row from the connection table, once.
+func (s *Session) releaseFromTable() {
+	if s.releaseStream != nil {
+		s.releaseStream()
+		s.releaseStream = nil
+	}
 }
 
 // Initiating input is serial; native server callbacks are serialized per offer.
@@ -167,6 +219,7 @@ func (s *Session) closeLocked(x *inboundFlow, failed, local bool) {
 	} else if registered {
 		delete(c.ready, s.ID)
 		delete(c.sessions, s.ID)
+		s.releaseFromTable()
 	}
 	if first {
 		if s.done != nil {

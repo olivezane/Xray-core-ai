@@ -130,11 +130,12 @@ func (w *tcpWorker) callback(connCtx context.Context, conn stat.Connection) {
 		Conn:    conn,
 	}
 	ctx = session.ContextWithInbound(ctx, inbound)
-	if !w.sessions.register(&connection{Inbound: inbound, Network: net.Network_TCP, Start: time.Now(), Conn: conn, Cancel: cancel}) {
+	entry, ok := w.sessions.register(&connection{Inbound: inbound, Network: net.Network_TCP, Start: time.Now(), Conn: conn, Cancel: cancel})
+	if !ok {
 		common.CloseIfExists(conn)
 		return
 	}
-	defer w.sessions.unregister(conn)
+	defer w.sessions.unregister(entry)
 
 	content := new(session.Content)
 	content.SniffingRequest = w.sniffingRequest
@@ -387,11 +388,11 @@ func (w *udpWorker) callback(b *buf.Buffer, source net.Destination, originalDest
 			content := new(session.Content)
 			content.SniffingRequest = w.sniffingRequest
 			ctx = session.ContextWithContent(ctx, content)
-			if w.sessions.register(&connection{Inbound: inbound, Network: net.Network_UDP, Start: time.Now(), Conn: conn, Cancel: cancel}) {
+			if entry, ok := w.sessions.register(&connection{Inbound: inbound, Network: net.Network_UDP, Start: time.Now(), Conn: conn, Cancel: cancel}); ok {
 				if err := w.proxy.Process(ctx, net.Network_UDP, conn, w.dispatcher); err != nil {
 					errors.LogInfoInner(ctx, err, "connection ends")
 				}
-				w.sessions.unregister(conn)
+				w.sessions.unregister(entry)
 			}
 			conn.Close()
 			// conn not removed by checker TODO may be lock worker here is better
@@ -555,11 +556,12 @@ func (w *dsWorker) callback(connCtx context.Context, conn stat.Connection) {
 		Conn:    conn,
 	}
 	ctx = session.ContextWithInbound(ctx, inbound)
-	if !w.sessions.register(&connection{Inbound: inbound, Network: net.Network_UNIX, Start: time.Now(), Conn: conn, Cancel: cancel}) {
+	entry, ok := w.sessions.register(&connection{Inbound: inbound, Network: net.Network_UNIX, Start: time.Now(), Conn: conn, Cancel: cancel})
+	if !ok {
 		common.CloseIfExists(conn)
 		return
 	}
-	defer w.sessions.unregister(conn)
+	defer w.sessions.unregister(entry)
 
 	content := new(session.Content)
 	content.SniffingRequest = w.sniffingRequest

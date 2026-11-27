@@ -188,13 +188,14 @@ func TestConnRegistry(t *testing.T) {
 
 	first := &stubConn{done: make(chan struct{})}
 	second := &stubConn{done: make(chan struct{})}
-	if !r.register(&connection{Conn: first, Network: net.Network_TCP, Start: time.Now()}) {
+	if _, ok := r.register(&connection{Conn: first, Network: net.Network_TCP, Start: time.Now()}); !ok {
 		t.Fatal("registry refused a connection while open")
 	}
-	if !r.register(&connection{Conn: second, Network: net.Network_TCP, Start: time.Now()}) {
+	secondEntry, ok := r.register(&connection{Conn: second, Network: net.Network_TCP, Start: time.Now()})
+	if !ok {
 		t.Fatal("registry refused a connection while open")
 	}
-	r.unregister(second)
+	r.unregister(secondEntry)
 
 	if sessions := r.sessions(); len(sessions) != 1 {
 		t.Fatalf("expected 1 tracked session, got %d", len(sessions))
@@ -203,7 +204,7 @@ func TestConnRegistry(t *testing.T) {
 	// A connection another owner registered must survive.
 	other := sharedBy(r.Registry, "another-owner")
 	survivor := &stubConn{done: make(chan struct{})}
-	if !other.register(&connection{Conn: survivor, Network: net.Network_TCP}) {
+	if _, ok := other.register(&connection{Conn: survivor, Network: net.Network_TCP}); !ok {
 		t.Fatal("registry refused a connection of another owner")
 	}
 
@@ -226,7 +227,7 @@ func TestConnRegistry(t *testing.T) {
 	}
 
 	// The table itself stays open: the other handlers of the instance still serve.
-	if !r.register(&connection{Conn: &stubConn{done: make(chan struct{})}}) {
+	if _, ok := r.register(&connection{Conn: &stubConn{done: make(chan struct{})}}); !ok {
 		t.Error("closing the connections of one owner closed the instance table")
 	}
 }

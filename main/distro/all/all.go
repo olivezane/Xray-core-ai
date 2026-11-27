@@ -2,6 +2,11 @@ package all
 
 import (
 	"github.com/xtls/xray-core/common"
+	"github.com/xtls/xray-core/common/buf"
+	"github.com/xtls/xray-core/common/platform"
+	"github.com/xtls/xray-core/common/xudp"
+	"github.com/xtls/xray-core/features/policy"
+	"github.com/xtls/xray-core/transport/internet/browser_dialer"
 
 	// The table below lists what each of these packages creates from a
 	// configuration. A package is imported here because this file is the one place
@@ -146,11 +151,29 @@ func configObjects() []common.ConfigObject {
 	return configs
 }
 
+// envReloads is the packages whose state comes from the environment, in one
+// list. They used to register themselves from init() functions, which made the
+// reload of a setting depend on whether someone imported the package.
+func envReloads() {
+	for _, reload := range []func() error{
+		buf.ReloadEnvSettings,
+		xudp.ReloadEnvSettings,
+		policy.ReloadEnvSettings,
+		proxyfreedom.ReloadEnvSettings,
+		proxyvmessoutbound.ReloadEnvSettings,
+		browser_dialer.ReloadEnvSettings,
+	} {
+		platform.RegisterEnvReload(reload)
+	}
+}
+
 // Wire installs the parts of this build that a package cannot install for
-// itself: the configuration table above, and the tagged dialer, which needs core
-// while core cannot import it. Everything else in this file is a plain import, so
-// this function is the whole runtime wiring of a build.
+// itself: the configuration table above, the environment-backed settings and the
+// tagged dialer, which needs core while core cannot import it. Everything else in
+// this file is a plain import, so this function is the whole runtime wiring of a
+// build.
 func Wire() {
 	common.Must(common.SetConfigObjects(configObjects()))
+	envReloads()
 	taggedimpl.Install()
 }

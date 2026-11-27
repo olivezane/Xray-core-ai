@@ -3,7 +3,6 @@ package inbound
 import (
 	"github.com/xtls/xray-core/common/tracker"
 	finbound "github.com/xtls/xray-core/features/inbound"
-	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
 // connection is one connection a worker handed to its inbound proxy, together
@@ -28,13 +27,15 @@ func sharedBy(registry *tracker.Registry, owner interface{}) *connRegistry {
 	return &connRegistry{Registry: registry, owner: owner}
 }
 
-func (r *connRegistry) register(c *connection) bool {
+// register adds c to the table and returns it, so that the caller can remove
+// exactly this entry when the connection ends.
+func (r *connRegistry) register(c *connection) (*connection, bool) {
 	c.Owner = r.owner
-	return r.Register(c)
+	return c, r.Register(c)
 }
 
-func (r *connRegistry) unregister(conn stat.Connection) {
-	r.Unregister(conn)
+func (r *connRegistry) unregister(c *connection) {
+	r.Unregister(c)
 }
 
 func (r *connRegistry) sessions() []finbound.Session {

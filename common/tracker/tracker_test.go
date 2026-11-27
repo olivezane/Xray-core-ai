@@ -165,8 +165,9 @@ func TestCloseAllStopsTheTable(t *testing.T) {
 func TestUnregisterRemovesFromSnapshot(t *testing.T) {
 	registry := tracker.NewRegistry()
 	conn := &fakeConn{}
-	registry.Register(&tracker.Entry{Owner: "a", Network: net.Network_TCP, Conn: conn})
-	registry.Unregister(conn)
+	entry := &tracker.Entry{Owner: "a", Network: net.Network_TCP, Conn: conn}
+	registry.Register(entry)
+	registry.Unregister(entry)
 	if got := registry.Sessions(); len(got) != 0 {
 		t.Errorf("table holds %d connections after unregister, want 0", len(got))
 	}

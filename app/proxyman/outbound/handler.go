@@ -218,7 +218,7 @@ func (h *Handler) Dial(ctx context.Context, dest net.Destination) (stat.Connecti
 	// The statistics wrapper stays outermost, so that a caller can still see it;
 	// the tracking wrapper goes inside it and removes the entry when the
 	// connection is closed.
-	conn = h.trackConnection(conn, dest)
+	conn = h.trackConnection(ctx, conn, dest)
 	return h.getStatCouterConnection(conn), err
 }
 
@@ -254,7 +254,7 @@ func (h *Handler) SetOutboundGateway(ctx context.Context, ob *session.Outbound) 
 // trackConnection registers a dialed connection in the connection table of the
 // instance, so that it can be reported and closed with the connections of the
 // inbounds it serves. The table entry goes away when the connection is closed.
-func (h *Handler) trackConnection(conn stat.Connection, dest net.Destination) stat.Connection {
+func (h *Handler) trackConnection(ctx context.Context, conn stat.Connection, dest net.Destination) stat.Connection {
 	if h.conns == nil || conn == nil {
 		return conn
 	}
@@ -267,12 +267,16 @@ func (h *Handler) trackConnection(conn stat.Connection, dest net.Destination) st
 		Start:       time.Now(),
 		Conn:        conn,
 	}
+	// A dialed connection is attributed to the inbound that asked for it, so that
+	// a snapshot shows which user's traffic it is and closing a user's sessions
+	// reaches the connection it dialed too, not only the one it accepted.
+	entry.Inbound = session.InboundFromContext(ctx)
 	if !h.conns.Register(entry) {
 		// The instance is closing: do not hand out a connection nobody will close.
 		common.CloseIfExists(conn)
 		return conn
 	}
-	return &trackedConn{Connection: conn, registry: h.conns}
+	return &trackedConn{Connection: conn, registry: h.conns, entry: entry}
 }
 
 // trackedConn removes itself from the connection table when it is closed, so a
@@ -280,6 +284,7 @@ func (h *Handler) trackConnection(conn stat.Connection, dest net.Destination) st
 type trackedConn struct {
 	stat.Connection
 	registry *tracker.Registry
+	entry    *tracker.Entry
 }
 
 // Unwrap exposes the connection behind the tracking wrapper, so that code which
@@ -289,7 +294,7 @@ func (c *trackedConn) Unwrap() net.Conn {
 }
 
 func (c *trackedConn) Close() error {
-	c.registry.Unregister(c.Connection)
+	c.registry.Unregister(c.entry)
 	return c.Connection.Close()
 }
 

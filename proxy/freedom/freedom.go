@@ -50,7 +50,9 @@ var http403response = http.Response{
 	},
 }
 
-func reloadEnvSettings() error {
+// ReloadEnvSettings re-reads the splice setting from the environment. It is
+// registered by main/distro/all rather than from an init() function here.
+func ReloadEnvSettings() error {
 	const defaultFlagValue = "NOT_DEFINED_AT_ALL"
 	value := platform.NewEnvFlag(platform.UseFreedomSplice).GetValue(func() string { return defaultFlagValue })
 	enabled := false
@@ -63,10 +65,6 @@ func reloadEnvSettings() error {
 }
 
 func init() {
-	
-
-	platform.RegisterEnvReload(reloadEnvSettings)
-
 	for i := range allNetworks {
 		allNetworks[i] = true
 	}

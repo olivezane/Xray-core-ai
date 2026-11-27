@@ -25,12 +25,12 @@ func TestInstanceTableHoldsInboundAndOutbound(t *testing.T) {
 	handler.sessions = sharedBy(registry, handler)
 
 	served := &fakeSession{}
-	if !handler.sessions.register(&connection{
+	if _, ok := handler.sessions.register(&connection{
 		Inbound: &session.Inbound{Tag: "in", Source: net.TCPDestination(net.LocalHostIP, 1000)},
 		Network: net.Network_TCP,
 		Start:   time.Now(),
 		Conn:    served,
-	}) {
+	}); !ok {
 		t.Fatal("the instance table refused an inbound connection")
 	}
 

@@ -110,7 +110,18 @@ func (t *Handler) Init(ctx context.Context, pm policy.Manager, dispatcher routin
 	t.ctx, t.cancel = context.WithCancel(core.ToBackgroundDetachedContext(ctx))
 	t.policyManager = pm
 	t.dispatcher = dispatcher
+	// The flows of the stack go into the connection table of the instance, like
+	// the connections of every other inbound, so that one snapshot and one close
+	// reach them too. Without an instance (a bare handler in a unit test) the
+	// handler keeps a table of its own.
 	t.sessions = tracker.NewRegistry()
+	if instance := core.FromContext(ctx); instance != nil {
+		if manager, ok := instance.GetFeature(finbound.ManagerType()).(interface {
+			Connections() *tracker.Registry
+		}); ok {
+			t.sessions = manager.Connections()
+		}
+	}
 
 	if len(t.tag) > 0 && pm.ForSystem().Stats.InboundUplink {
 		statsManager := core.MustFromContext(ctx).GetFeature(stats.ManagerType()).(stats.Manager)
@@ -254,11 +265,12 @@ func (t *Handler) HandleConnection(conn net.Conn, destination net.Destination) {
 	}
 
 	ctx = session.ContextWithInbound(ctx, &inbound)
-	if !t.sessions.Register(&tracker.Entry{Inbound: &inbound, Network: destination.Network, Start: time.Now(), Conn: conn, Cancel: cancel}) {
+	entry := &tracker.Entry{Owner: t, Inbound: &inbound, Network: destination.Network, Start: time.Now(), Conn: conn, Cancel: cancel}
+	if !t.sessions.Register(entry) {
 		// The handler closed while this flow was being accepted.
 		return
 	}
-	defer t.sessions.Unregister(conn)
+	defer t.sessions.Unregister(entry)
 
 	ctx = session.ContextWithContent(ctx, &session.Content{
 		SniffingRequest: t.sniffingRequest,
@@ -302,19 +314,21 @@ func (t *Handler) Close() error {
 		t.cancel()
 	}
 	if t.sessions != nil {
-		t.sessions.CloseAll()
+		// Only the flows of this handler: the table is shared with the rest of the
+		// instance.
+		t.sessions.CloseMatchingOf(t, nil)
 	}
 	return errors.Combine(common.CloseIfExists(t.stack), common.CloseIfExists(t.tun))
 }
 
 // Sessions implements inbound.SessionTracker.
 func (t *Handler) Sessions(_ context.Context) []finbound.Session {
-	return t.sessions.Sessions()
+	return t.sessions.SessionsOf(t)
 }
 
 // CloseSessions implements inbound.SessionTracker.
 func (t *Handler) CloseSessions(_ context.Context, match func(finbound.Session) bool) int {
-	return t.sessions.CloseMatching(match)
+	return t.sessions.CloseMatchingOf(t, match)
 }
 
 var _ finbound.SessionTracker = (*Handler)(nil)

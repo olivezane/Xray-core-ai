@@ -149,7 +149,7 @@ func useReadV() bool {
 	return useReadv.Load()
 }
 
-func reloadEnvSettings() error {
+func ReloadEnvSettings() error {
 	const defaultFlagValue = "NOT_DEFINED_AT_ALL"
 	value := platform.NewEnvFlag(platform.UseReadV).GetValue(func() string { return defaultFlagValue })
 	enabled := false
@@ -161,6 +161,3 @@ func reloadEnvSettings() error {
 	return nil
 }
 
-func init() {
-	platform.RegisterEnvReload(reloadEnvSettings)
-}

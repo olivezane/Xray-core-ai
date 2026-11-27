@@ -31,7 +31,7 @@ var (
 	baseKey atomic.Value
 )
 
-func reloadEnvSettings() error {
+func ReloadEnvSettings() error {
 	Show.Store(strings.ToLower(platform.NewEnvFlag(platform.XUDPLog).GetValue(func() string { return "" })) == "true")
 	raw := platform.NewEnvFlag(platform.XUDPBaseKey).GetValue(func() string { return "" })
 	if raw == "" {
@@ -56,10 +56,6 @@ func ensureBaseKey() []byte {
 	}
 	baseKey.Store(key)
 	return key
-}
-
-func init() {
-	platform.RegisterEnvReload(reloadEnvSettings)
 }
 
 func GetGlobalID(ctx context.Context) (globalID [8]byte) {

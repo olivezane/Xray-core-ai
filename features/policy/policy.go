@@ -85,7 +85,7 @@ func ManagerType() interface{} {
 
 var defaultBufferSize atomic.Int32
 
-func reloadEnvSettings() error {
+func ReloadEnvSettings() error {
 	defaultBufferSize.Store(readDefaultBufferSize())
 	return nil
 }
@@ -109,10 +109,6 @@ func readDefaultBufferSize() int32 {
 	default:
 		return int32(size) * 1024 * 1024
 	}
-}
-
-func init() {
-	platform.RegisterEnvReload(reloadEnvSettings)
 }
 
 func defaultBufferPolicy() Buffer {

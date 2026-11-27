@@ -248,17 +248,13 @@ func shouldEnablePadding(s protocol.SecurityType) bool {
 	return enablePadding.Load() || s == protocol.SecurityType_AES128_GCM || s == protocol.SecurityType_CHACHA20_POLY1305 || s == protocol.SecurityType_AUTO
 }
 
-func reloadEnvSettings() error {
+// ReloadEnvSettings re-reads the padding setting from the environment. It is
+// registered by main/distro/all rather than from an init() function here.
+func ReloadEnvSettings() error {
 	const defaultFlagValue = "NOT_DEFINED_AT_ALL"
 	paddingValue := platform.NewEnvFlag(platform.UseVmessPadding).GetValue(func() string { return defaultFlagValue })
 	enablePadding.Store(paddingValue != defaultFlagValue)
 	return nil
-}
-
-func init() {
-	
-
-	platform.RegisterEnvReload(reloadEnvSettings)
 }
 
 // ConfigObjects is what this package creates from a configuration, for

@@ -76,6 +76,9 @@ type Session struct {
 	Destination net.Destination
 	// Network is the network the connection runs on.
 	Network net.Network
+	// Stream is the identifier of the logical stream inside a multiplexed
+	// connection, e.g. a VLESS mux session. Zero means the whole connection.
+	Stream uint64
 	// Source is the peer address of the connection.
 	Source net.Destination
 	// Local is the address the connection was accepted on.

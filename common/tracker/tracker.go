@@ -38,9 +38,12 @@ type Entry struct {
 	// OutboundTag and Destination describe a dialed connection.
 	OutboundTag string
 	Destination net.Destination
-	Network     net.Network
-	Start       time.Time
-	Conn        net.Conn
+	Network net.Network
+	Start   time.Time
+	Conn    net.Conn
+	// Stream is the identifier of the logical stream inside a multiplexed
+	// connection, e.g. a VLESS mux session. Zero means the whole connection.
+	Stream uint64
 	// Cancel stops the handling of this connection. It may be nil.
 	Cancel context.CancelFunc
 }
@@ -52,6 +55,7 @@ func (e *Entry) Session() inbound.Session {
 		OutboundTag: e.OutboundTag,
 		Destination: e.Destination,
 		Network:     e.Network,
+		Stream:      e.Stream,
 		Start:       e.Start,
 	}
 	if e.Inbound != nil {
@@ -72,13 +76,13 @@ func (e *Entry) Session() inbound.Session {
 // connections instead of leaving goroutines and buffers behind.
 type Registry struct {
 	mu      sync.Mutex
-	conns   map[net.Conn]*Entry
+	entries map[*Entry]struct{}
 	closed  bool
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
-		conns: make(map[net.Conn]*Entry, 16),
+		entries: make(map[*Entry]struct{}, 16),
 	}
 }
 
@@ -91,13 +95,19 @@ func (r *Registry) Register(e *Entry) bool {
 	if r.closed {
 		return false
 	}
-	r.conns[e.Conn] = e
+	r.entries[e] = struct{}{}
 	return true
 }
 
-func (r *Registry) Unregister(conn net.Conn) {
+// Unregister removes an entry. Entries are addressed by identity, not by
+// connection, so that several logical streams of one connection can be tracked
+// (and dropped) separately.
+func (r *Registry) Unregister(e *Entry) {
+	if e == nil {
+		return
+	}
 	r.mu.Lock()
-	delete(r.conns, conn)
+	delete(r.entries, e)
 	r.mu.Unlock()
 }
 
@@ -115,8 +125,8 @@ func (r *Registry) sessions(keep func(*Entry) bool) []inbound.Session {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	out := make([]inbound.Session, 0, len(r.conns))
-	for _, e := range r.conns {
+	out := make([]inbound.Session, 0, len(r.entries))
+	for e := range r.entries {
 		if keep == nil || keep(e) {
 			out = append(out, e.Session())
 		}
@@ -138,8 +148,8 @@ func (r *Registry) CloseMatchingOf(owner interface{}, match func(inbound.Session
 
 func (r *Registry) closeMatching(keep func(*Entry) bool, match func(inbound.Session) bool) int {
 	r.mu.Lock()
-	targets := make([]*Entry, 0, len(r.conns))
-	for _, e := range r.conns {
+	targets := make([]*Entry, 0, len(r.entries))
+	for e := range r.entries {
 		if keep != nil && !keep(e) {
 			continue
 		}

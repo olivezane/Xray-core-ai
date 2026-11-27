@@ -233,6 +233,7 @@ func (c *carrier) responseTurn(id uint16, s *Session) (buf.MultiBuffer, bool) {
 	if s.phase == outputDone {
 		delete(c.ready, s.ID)
 		delete(c.sessions, s.ID)
+		s.releaseFromTable()
 		return nil, true
 	}
 	if !ready {
