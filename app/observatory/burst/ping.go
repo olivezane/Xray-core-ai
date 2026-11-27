@@ -39,7 +39,7 @@ func newHTTPClient(ctxv context.Context, dispatcher routing.Dispatcher, handler 
 			if err != nil {
 				return nil, err
 			}
-			return tagged.Dialer(ctxv, dispatcher, dest, handler)
+			return tagged.Dial(ctxv, dispatcher, dest, handler)
 		},
 	}
 	return &http.Client{

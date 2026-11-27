@@ -73,14 +73,14 @@ func newClient(baseCtx context.Context, dispatcher routing.Dispatcher, outbound 
 	dial := func(ctx context.Context, network, address string) (net.Conn, error) {
 		var conn net.Conn
 		err := task.Run(ctx, func() error {
-			if tagged.Dialer == nil {
+			if !tagged.Ready() {
 				return errors.New("tagged dialer is not initialized")
 			}
 			dest, err := net.ParseDestination(network + ":" + address)
 			if err != nil {
 				return errors.New("cannot understand address").Base(err)
 			}
-			c, err := tagged.Dialer(baseCtx, dispatcher, dest, outbound)
+			c, err := tagged.Dial(baseCtx, dispatcher, dest, outbound)
 			if err != nil {
 				return errors.New("cannot dial remote address ", dest).Base(err)
 			}

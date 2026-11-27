@@ -20,6 +20,7 @@ import (
 	"github.com/xtls/xray-core/common/platform"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/main/commands/base"
+	"github.com/xtls/xray-core/main/distro/all"
 )
 
 var cmdRun = &base.Command{
@@ -73,6 +74,8 @@ var (
 )
 
 func executeRun(cmd *base.Command, args []string) {
+	all.Wire()
+
 	if *dump {
 		clog.ReplaceWithSeverityLogger(clog.Severity_Warning)
 		errCode := dumpConfig()

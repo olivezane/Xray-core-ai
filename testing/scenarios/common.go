@@ -25,10 +25,18 @@ import (
 	"github.com/xtls/xray-core/common/units"
 	core "github.com/xtls/xray-core/core"
 	// The scenarios build xray instances in process, so they need the stream
-	// transports wired the same way the binary has them.
+	// transports and headers wired the same way the binary has them, plus what
+	// the binary installs through main/distro/all's Wire.
+	_ "github.com/xtls/xray-core/transport/internet/headers"
 	_ "github.com/xtls/xray-core/transport/internet/transports"
+	"github.com/xtls/xray-core/transport/internet/tagged/taggedimpl"
 	"google.golang.org/protobuf/proto"
 )
+
+// init stands in for main, which calls all.Wire in the binary.
+func init() {
+	taggedimpl.Install()
+}
 
 func xor(b []byte) []byte {
 	r := make([]byte, len(b))

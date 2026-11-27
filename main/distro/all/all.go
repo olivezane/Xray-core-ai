@@ -27,8 +27,9 @@ import (
 	_ "github.com/xtls/xray-core/app/router"
 	_ "github.com/xtls/xray-core/app/stats"
 
-	// Fix dependency cycle caused by core import in internet package
-	_ "github.com/xtls/xray-core/transport/internet/tagged/taggedimpl"
+	// Fix dependency cycle caused by core import in internet package. Wire
+	// installs it, because it cannot install itself without an init().
+	"github.com/xtls/xray-core/transport/internet/tagged/taggedimpl"
 
 	// Developer preview features
 	_ "github.com/xtls/xray-core/app/observatory"
@@ -54,9 +55,8 @@ import (
 	_ "github.com/xtls/xray-core/transport/internet/reality"
 	_ "github.com/xtls/xray-core/transport/internet/tls"
 
-	// Transport headers
-	_ "github.com/xtls/xray-core/transport/internet/headers/http"
-	_ "github.com/xtls/xray-core/transport/internet/headers/noop"
+	// Transport headers. The list itself is transport/internet/headers.
+	_ "github.com/xtls/xray-core/transport/internet/headers"
 
 	// JSON & TOML & YAML
 	_ "github.com/xtls/xray-core/main/json"
@@ -69,3 +69,10 @@ import (
 	// Commands
 	_ "github.com/xtls/xray-core/main/commands/all"
 )
+
+// Wire installs the parts of this build that a package cannot install for
+// itself: they need core, and core cannot import them. Everything else in this
+// file is a plain import, so this function is the whole runtime wiring.
+func Wire() {
+	taggedimpl.Install()
+}

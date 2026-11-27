@@ -3,8 +3,6 @@ package noop
 import (
 	"context"
 	"net"
-
-	"github.com/xtls/xray-core/common"
 )
 
 type NoOpHeader struct{}
@@ -32,9 +30,4 @@ func (NoOpConnectionHeader) Server(conn net.Conn) net.Conn {
 
 func NewNoOpConnectionHeader(context.Context, interface{}) (interface{}, error) {
 	return NoOpConnectionHeader{}, nil
-}
-
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), NewNoOpHeader))
-	common.Must(common.RegisterConfig((*ConnectionConfig)(nil), NewNoOpConnectionHeader))
 }

@@ -35,6 +35,7 @@ func DialTaggedOutbound(ctx context.Context, dispatcher routing.Dispatcher, dest
 	return cnc.NewConnection(cnc.ConnectionInputMulti(r.Writer), readerOpt), nil
 }
 
-func init() {
-	tagged.Dialer = DialTaggedOutbound
+// Install makes DialTaggedOutbound the tagged dialer of this process.
+func Install() {
+	tagged.SetDialer(DialTaggedOutbound)
 }

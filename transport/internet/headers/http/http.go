@@ -312,9 +312,3 @@ func NewAuthenticator(ctx context.Context, config *Config) (Authenticator, error
 		config: config,
 	}, nil
 }
-
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		return NewAuthenticator(ctx, config.(*Config))
-	}))
-}
