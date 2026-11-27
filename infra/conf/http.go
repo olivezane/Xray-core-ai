@@ -6,27 +6,24 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/http"
 	"google.golang.org/protobuf/proto"
 )
 
-type HTTPAccount struct {
-	Username string `json:"user"`
-	Password string `json:"pass"`
-}
+// HTTPAccount is one user of an HTTP inbound, from the configuration model.
+type HTTPAccount = coreconfig.HTTPAccount
 
-func (v *HTTPAccount) Build() *http.Account {
+func buildHTTPAccount(v *coreconfig.HTTPAccount) *http.Account {
 	return &http.Account{
 		Username: v.Username,
 		Password: v.Password,
 	}
 }
 
+// HTTPServerConfig is the settings of an HTTP inbound.
 type HTTPServerConfig struct {
-	Users       []*HTTPAccount `json:"users"`
-	Accounts    []*HTTPAccount `json:"accounts"`
-	Transparent bool           `json:"allowTransparent"`
-	UserLevel   uint32         `json:"userLevel"`
+	coreconfig.HTTPServer
 }
 
 func (c *HTTPServerConfig) Build() (proto.Message, error) {
@@ -49,21 +46,12 @@ func (c *HTTPServerConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
-type HTTPRemoteConfig struct {
-	Address *Address          `json:"address"`
-	Port    uint16            `json:"port"`
-	Users   []json.RawMessage `json:"users"`
-}
+// HTTPRemoteConfig is one endpoint of an HTTP outbound.
+type HTTPRemoteConfig = coreconfig.HTTPRemote
 
+// HTTPClientConfig is the settings of an HTTP outbound.
 type HTTPClientConfig struct {
-	Address  *Address            `json:"address"`
-	Port     uint16              `json:"port"`
-	Level    uint32              `json:"level"`
-	Email    string              `json:"email"`
-	Username string              `json:"user"`
-	Password string              `json:"pass"`
-	Servers  []*HTTPRemoteConfig `json:"servers"`
-	Headers  map[string]string   `json:"headers"`
+	coreconfig.HTTPClient
 }
 
 func (v *HTTPClientConfig) Build() (proto.Message, error) {
@@ -87,7 +75,7 @@ func (v *HTTPClientConfig) Build() (proto.Message, error) {
 		return nil, errors.New(`HTTP servers: "users" should have one member at most. Multiple members in "users" should use multiple HTTP outbounds and routing balancer instead`)
 	}
 	server := &protocol.ServerEndpoint{
-		Address: serverConfig.Address.Build(),
+		Address: BuildAddress(serverConfig.Address),
 		Port:    uint32(serverConfig.Port),
 	}
 	if len(serverConfig.Users) == 1 {
@@ -110,7 +98,7 @@ func (v *HTTPClientConfig) Build() (proto.Message, error) {
 				return nil, errors.New("failed to parse HTTP account").Base(err)
 			}
 		}
-		user.Account = serial.ToTypedMessage(account.Build())
+		user.Account = serial.ToTypedMessage(buildHTTPAccount(account))
 		server.User = user
 	}
 	config.Server = server

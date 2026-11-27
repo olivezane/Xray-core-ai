@@ -5,15 +5,15 @@ import (
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/task"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/hysteria"
 	"github.com/xtls/xray-core/proxy/hysteria/account"
 	"google.golang.org/protobuf/proto"
 )
 
+// HysteriaClientConfig is the settings of a HYSTERIA outbound.
 type HysteriaClientConfig struct {
-	Version int32    `json:"version"`
-	Address *Address `json:"address"`
-	Port    uint16   `json:"port"`
+	coreconfig.HysteriaClient
 }
 
 func (c *HysteriaClientConfig) Build() (proto.Message, error) {
@@ -23,23 +23,19 @@ func (c *HysteriaClientConfig) Build() (proto.Message, error) {
 
 	config := &hysteria.ClientConfig{}
 	config.Server = &protocol.ServerEndpoint{
-		Address: c.Address.Build(),
+		Address: BuildAddress(c.Address),
 		Port:    uint32(c.Port),
 	}
 
 	return config, nil
 }
 
-type HysteriaUserConfig struct {
-	Auth  string `json:"auth"`
-	Level uint32 `json:"level"`
-	Email string `json:"email"`
-}
+// HysteriaUserConfig is one user of a HYSTERIA inbound.
+type HysteriaUserConfig = coreconfig.HysteriaUser
 
+// HysteriaServerConfig is the settings of a HYSTERIA inbound.
 type HysteriaServerConfig struct {
-	Version int32                 `json:"version"`
-	Users   []*HysteriaUserConfig `json:"users"`
-	Clients []*HysteriaUserConfig `json:"clients"`
+	coreconfig.HysteriaServer
 }
 
 func (c *HysteriaServerConfig) Build() (proto.Message, error) {

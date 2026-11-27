@@ -150,7 +150,7 @@ func writeNoiseScript(t *testing.T, script string) string {
 	return path
 }
 
-func buildNoiseMask(t *testing.T, mask *NoiseMask) *noise.Config {
+func buildNoiseForTest(t *testing.T, mask *NoiseMask) *noise.Config {
 	t.Helper()
 	msg, err := mask.Build()
 	if err != nil {
@@ -161,7 +161,7 @@ func buildNoiseMask(t *testing.T, mask *NoiseMask) *noise.Config {
 
 func TestNoiseScriptFromFile(t *testing.T) {
 	path := writeNoiseScript(t, noiseScript)
-	cfg := buildNoiseMask(t, &NoiseMask{Script: path, Reset: Int32Range{From: 30, To: 60}})
+	cfg := buildNoiseForTest(t, &NoiseMask{Script: path, Reset: Int32Range{From: 30, To: 60}})
 
 	if cfg.Script != path {
 		t.Errorf("got script %q, want the path", cfg.Script)
@@ -181,7 +181,7 @@ func TestNoiseScriptFromJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(input), &mask); err != nil {
 		t.Fatal(err)
 	}
-	if cfg := buildNoiseMask(t, &mask); cfg.Script != path {
+	if cfg := buildNoiseForTest(t, &mask); cfg.Script != path {
 		t.Errorf("got script %q, want the path", cfg.Script)
 	}
 }

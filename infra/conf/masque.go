@@ -7,14 +7,14 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/masque"
 	"google.golang.org/protobuf/proto"
 )
 
+// MasqueClientConfig is the settings of a MASQUE outbound.
 type MasqueClientConfig struct {
-	Address   *Address `json:"address"`
-	Port      uint16   `json:"port"`
-	RemoteDNS []string `json:"remoteDNS"`
+	coreconfig.MasqueClient
 }
 
 func (c *MasqueClientConfig) Build() (proto.Message, error) {
@@ -31,24 +31,19 @@ func (c *MasqueClientConfig) Build() (proto.Message, error) {
 	}
 	return &masque.ClientConfig{
 		Server: &protocol.ServerEndpoint{
-			Address: c.Address.Build(),
+			Address: BuildAddress(c.Address),
 			Port:    uint32(c.Port),
 		},
 		RemoteDns: c.RemoteDNS,
 	}, nil
 }
 
-type MasqueUserConfig struct {
-	Pass  string `json:"pass"`
-	Level uint32 `json:"level"`
-	Email string `json:"email"`
-}
+// MasqueUserConfig is one user of a MASQUE inbound.
+type MasqueUserConfig = coreconfig.MasqueUser
 
+// MasqueServerConfig is the settings of a MASQUE inbound.
 type MasqueServerConfig struct {
-	Users   []*MasqueUserConfig `json:"users"`
-	Clients []*MasqueUserConfig `json:"clients"`
-	Address []string            `json:"address"`
-	MTU     uint32              `json:"mtu"`
+	coreconfig.MasqueServer
 }
 
 func (c *MasqueServerConfig) Build() (proto.Message, error) {

@@ -185,7 +185,7 @@ func marshalKnownType(v interface{}, ignoreNullValue bool, insertTypeInfo bool) 
 		return serializePortList(npl)
 	case *conf.PortList:
 		cpl := v.(*conf.PortList)
-		return serializePortList(cpl.Build())
+		return serializePortList(conf.BuildPortList(cpl))
 	case conf.Int32Range:
 		i32rng := v.(conf.Int32Range)
 		if i32rng.Left == i32rng.Right {

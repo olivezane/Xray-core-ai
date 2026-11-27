@@ -2,19 +2,20 @@ package conf
 
 import (
 	"github.com/xtls/xray-core/common/errors"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/loopback"
 	"google.golang.org/protobuf/proto"
 )
 
+// LoopbackConfig is the settings of a loopback inbound.
 type LoopbackConfig struct {
-	InboundTag string          `json:"inboundTag"`
-	Sniffing   *SniffingConfig `json:"sniffing"`
+	coreconfig.Loopback
 }
 
 func (l LoopbackConfig) Build() (proto.Message, error) {
 	c := &loopback.Config{InboundTag: l.InboundTag}
 	if l.Sniffing != nil {
-		sc, err := l.Sniffing.Build()
+		sc, err := BuildSniffing(l.Sniffing)
 		if err != nil {
 			return nil, errors.New("failed to build sniffing config").Base(err)
 		}

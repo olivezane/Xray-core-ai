@@ -10,22 +10,14 @@ import (
 	"strings"
 
 	"github.com/xtls/xray-core/common/errors"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/tun"
 	"google.golang.org/protobuf/proto"
 )
 
+// TunConfig is the settings of a Tun inbound.
 type TunConfig struct {
-	Name                   string   `json:"name"`
-	Desc                   string   `json:"desc"`
-	GUID                   string   `json:"guid"`
-	MTU                    uint32   `json:"mtu"`
-	Gateway                []string `json:"gateway"`
-	DNS                    []string `json:"dns"`
-	UserLevel              uint32   `json:"userLevel"`
-	AutoSystemRoutingTable []string `json:"autoSystemRoutingTable"`
-	AutoOutboundsInterface *string  `json:"autoOutboundsInterface"`
-	AutoSystemDnsToGateway bool     `json:"autoSystemDnsToGateway"`
-	AutoSystemWfpBlockLeak []string `json:"autoSystemWfpBlockLeak"`
+	coreconfig.Tun
 }
 
 func (v *TunConfig) Build() (proto.Message, error) {

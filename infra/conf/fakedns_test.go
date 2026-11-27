@@ -21,7 +21,7 @@ func postProcessFakeDNS(t *testing.T, input string) (*Config, error) {
 
 func fakeDNSPools(t *testing.T, config *Config) []string {
 	t.Helper()
-	multi, err := config.DNSConfig.FakeDNS.Build()
+	multi, err := BuildFakeDNS(config.DNSConfig.FakeDNS)
 	if err != nil {
 		t.Fatal(err)
 	}

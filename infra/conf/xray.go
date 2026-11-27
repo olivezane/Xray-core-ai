@@ -15,6 +15,7 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/serial"
 	core "github.com/xtls/xray-core/core"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/freedom"
 	"github.com/xtls/xray-core/proxy/masque"
 	"github.com/xtls/xray-core/proxy/vless"
@@ -60,17 +61,12 @@ var (
 	}, "protocol", "settings")
 )
 
-type SniffingConfig struct {
-	Enabled         bool       `json:"enabled"`
-	DestOverride    StringList `json:"destOverride"`
-	DomainsExcluded StringList `json:"domainsExcluded"`
-	IPsExcluded     StringList `json:"ipsExcluded"`
-	MetadataOnly    bool       `json:"metadataOnly"`
-	RouteOnly       bool       `json:"routeOnly"`
-}
+// SniffingConfig is the "sniffing" section of the configuration model.
+type SniffingConfig = coreconfig.Sniffing
 
-// Build implements Buildable.
-func (c *SniffingConfig) Build() (*proxyman.SniffingConfig, error) {
+// BuildSniffing converts the "sniffing" section to its message: the protocol
+// names of the user become the protocol list of the message here.
+func BuildSniffing(c *coreconfig.Sniffing) (*proxyman.SniffingConfig, error) {
 	var protocols []string
 	for _, protocol := range c.DestOverride {
 		switch strings.ToLower(protocol) {
@@ -107,14 +103,10 @@ func (c *SniffingConfig) Build() (*proxyman.SniffingConfig, error) {
 	}, nil
 }
 
+// InboundDetourConfig is one entry of the "inbounds" list. The data is the model
+// type; the conversion to the handler config is the method below.
 type InboundDetourConfig struct {
-	Protocol       string           `json:"protocol"`
-	PortList       *PortList        `json:"port"`
-	ListenOn       *Address         `json:"listen"`
-	Settings       *json.RawMessage `json:"settings"`
-	Tag            string           `json:"tag"`
-	StreamSetting  *StreamConfig    `json:"streamSettings"`
-	SniffingConfig *SniffingConfig  `json:"sniffing"`
+	coreconfig.Inbound
 }
 
 // Build implements Buildable.
@@ -129,10 +121,10 @@ func (c *InboundDetourConfig) Build() (*core.InboundHandlerConfig, error) {
 		if c.PortList == nil {
 			return nil, errors.New("Listen on AnyIP but no Port(s) set in InboundDetour.")
 		}
-		receiverSettings.PortList = c.PortList.Build()
+		receiverSettings.PortList = BuildPortList(c.PortList)
 	} else {
 		// Listen on specific IP or Unix Domain Socket
-		receiverSettings.Listen = c.ListenOn.Build()
+		receiverSettings.Listen = BuildAddress(c.ListenOn)
 		listenDS := c.ListenOn.Family().IsDomain() && (filepath.IsAbs(c.ListenOn.Domain()) || c.ListenOn.Domain()[0] == '@')
 		listenIP := c.ListenOn.Family().IsIP() || (c.ListenOn.Family().IsDomain() && c.ListenOn.Domain() == "localhost")
 		if listenIP {
@@ -141,7 +133,7 @@ func (c *InboundDetourConfig) Build() (*core.InboundHandlerConfig, error) {
 				return nil, errors.New("Listen on specific ip without port in InboundDetour.")
 			}
 			// Listen on IP:Port
-			receiverSettings.PortList = c.PortList.Build()
+			receiverSettings.PortList = BuildPortList(c.PortList)
 		} else if listenDS {
 			if c.PortList != nil {
 				// Listen on Unix Domain Socket, PortList should be nil
@@ -153,7 +145,7 @@ func (c *InboundDetourConfig) Build() (*core.InboundHandlerConfig, error) {
 	}
 
 	if c.StreamSetting != nil {
-		ss, err := c.StreamSetting.Build()
+		ss, err := (&StreamConfig{*c.StreamSetting}).Build()
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +156,7 @@ func (c *InboundDetourConfig) Build() (*core.InboundHandlerConfig, error) {
 		}
 	}
 	if c.SniffingConfig != nil {
-		s, err := c.SniffingConfig.Build()
+		s, err := BuildSniffing(c.SniffingConfig)
 		if err != nil {
 			return nil, errors.New("failed to build sniffing config").Base(err)
 		}
@@ -200,15 +192,10 @@ func (c *InboundDetourConfig) Build() (*core.InboundHandlerConfig, error) {
 	}, nil
 }
 
+// OutboundDetourConfig is one entry of the "outbounds" list. The data is the
+// model type; the conversion to the handler config is the method below.
 type OutboundDetourConfig struct {
-	Protocol       string           `json:"protocol"`
-	SendThrough    *string          `json:"sendThrough"`
-	Tag            string           `json:"tag"`
-	Settings       *json.RawMessage `json:"settings"`
-	StreamSetting  *StreamConfig    `json:"streamSettings"`
-	ProxySettings  *json.RawMessage `json:"proxySettings"`
-	LegacyMux      json.RawMessage  `json:"mux,omitempty"`
-	TargetStrategy string           `json:"targetStrategy"`
+	coreconfig.Outbound
 }
 
 func requiresTransportSecurity(address *Address) bool {
@@ -346,11 +333,11 @@ func (c *OutboundDetourConfig) Build() (*core.OutboundHandlerConfig, error) {
 				}
 			}
 		}
-		senderSettings.Via = address.Build()
+		senderSettings.Via = BuildAddress(address)
 	}
 
 	if c.StreamSetting != nil {
-		ss, err := c.StreamSetting.Build()
+		ss, err := (&StreamConfig{*c.StreamSetting}).Build()
 		if err != nil {
 			return nil, errors.New("failed to build stream settings for outbound detour").Base(err)
 		}
@@ -430,14 +417,18 @@ func (c *OutboundDetourConfig) Build() (*core.OutboundHandlerConfig, error) {
 	}, nil
 }
 
-type EnvConfig map[string]string
+// EnvConfig is the "env" section of the configuration model.
+type EnvConfig = coreconfig.Env
 
-func (c EnvConfig) Override(o EnvConfig) {
+// overrideEnv copies the variables of o into c.
+func overrideEnv(c, o coreconfig.Env) {
 	for key, value := range o {
 		c[key] = value
 	}
 }
 
+// Config is a whole configuration file. Its sections are the model types; the
+// Build method below converts the whole file to the message the instance reads.
 type Config struct {
 	// Deprecated: global transport config moved to streamSettings, its presence is an error.
 	Transport json.RawMessage `json:"transport"`
@@ -505,7 +496,7 @@ func (c *Config) Override(o *Config, fn string) {
 		if c.Env == nil {
 			c.Env = EnvConfig{}
 		}
-		c.Env.Override(o.Env)
+		overrideEnv(c.Env, o.Env)
 	}
 	if o.Policy != nil {
 		c.Policy = o.Policy
@@ -593,20 +584,20 @@ func (c *Config) Build() (*core.Config, error) {
 	// The gRPC stats service and the /debug/vars endpoint both read the stats manager.
 	if c.API != nil {
 		config.App = append(config.App, serial.ToTypedMessage(&stats.Config{}))
-		apiConf, err := c.API.Build()
+		apiConf, err := BuildAPI(c.API)
 		if err != nil {
 			return nil, errors.New("failed to build API configuration").Base(err)
 		}
 		config.App = append(config.App, serial.ToTypedMessage(apiConf))
 		if c.API.Observatory != nil {
-			r, err := c.API.Observatory.Build()
+			r, err := BuildObservatory(c.API.Observatory)
 			if err != nil {
 				return nil, errors.New("failed to build observatory configuration").Base(err)
 			}
 			config.App = append(config.App, serial.ToTypedMessage(r))
 		}
 		if c.API.BurstObservatory != nil {
-			r, err := c.API.BurstObservatory.Build()
+			r, err := BuildBurstObservatory(c.API.BurstObservatory)
 			if err != nil {
 				return nil, errors.New("failed to build burst observatory configuration").Base(err)
 			}
@@ -616,7 +607,7 @@ func (c *Config) Build() (*core.Config, error) {
 
 	var logConfMsg *serial.TypedMessage
 	if c.LogConfig != nil {
-		logConfMsg = serial.ToTypedMessage(c.LogConfig.Build())
+		logConfMsg = serial.ToTypedMessage(BuildLog(c.LogConfig))
 	} else {
 		logConfMsg = serial.ToTypedMessage(DefaultLogConfig())
 	}
@@ -641,7 +632,7 @@ func (c *Config) Build() (*core.Config, error) {
 	}
 
 	if c.Policy != nil {
-		pc, err := c.Policy.Build()
+		pc, err := BuildPolicy(c.Policy)
 		if err != nil {
 			return nil, errors.New("failed to build policy configuration").Base(err)
 		}
@@ -649,7 +640,7 @@ func (c *Config) Build() (*core.Config, error) {
 	}
 
 	if c.DNSConfig != nil && c.DNSConfig.FakeDNS != nil {
-		r, err := c.DNSConfig.FakeDNS.Build()
+		r, err := BuildFakeDNS(c.DNSConfig.FakeDNS)
 		if err != nil {
 			return nil, errors.New("failed to build fake DNS configuration").Base(err)
 		}
@@ -657,7 +648,7 @@ func (c *Config) Build() (*core.Config, error) {
 	}
 
 	if c.Version != nil {
-		r, err := c.Version.Build()
+		r, err := BuildVersion(c.Version)
 		if err != nil {
 			return nil, errors.New("failed to build version configuration").Base(err)
 		}

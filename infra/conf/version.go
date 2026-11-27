@@ -5,14 +5,14 @@ import (
 
 	"github.com/xtls/xray-core/app/version"
 	"github.com/xtls/xray-core/core"
+	coreconfig "github.com/xtls/xray-core/core/config"
 )
 
-type VersionConfig struct {
-	MinVersion string `json:"min"`
-	MaxVersion string `json:"max"`
-}
+// VersionConfig is the "version" section of the configuration model.
+type VersionConfig = coreconfig.Version
 
-func (c *VersionConfig) Build() (*version.Config, error) {
+// BuildVersion converts the version section to the message the instance consumes.
+func BuildVersion(c *coreconfig.Version) (*version.Config, error) {
 	coreVersion := strconv.Itoa(int(core.Version_x)) + "." + strconv.Itoa(int(core.Version_y)) + "." + strconv.Itoa(int(core.Version_z))
 
 	return &version.Config{

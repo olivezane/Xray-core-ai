@@ -11,21 +11,18 @@ import (
 	statsservice "github.com/xtls/xray-core/app/stats/command"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/serial"
+	coreconfig "github.com/xtls/xray-core/core/config"
 )
 
 // APIConfig is the single management block. Its one port serves both the gRPC
 // control service and the HTTP /debug/vars + /debug/pprof endpoints.
 // Statistics collection is implied, so the stats app never needs a block of its own.
-type APIConfig struct {
-	Tag      string   `json:"tag"`
-	Listen   string   `json:"listen"`
-	Services []string `json:"services"`
-	// Outbound health checks, previously the top-level observatory blocks.
-	Observatory      *ObservatoryConfig      `json:"observatory"`
-	BurstObservatory *BurstObservatoryConfig `json:"burstObservatory"`
-}
+// APIConfig is the management block of the configuration model.
+type APIConfig = coreconfig.API
 
-func (c *APIConfig) Build() (*commander.Config, error) {
+// BuildAPI converts the management block to the message the instance consumes:
+// the service names of the user become the messages of the services here.
+func BuildAPI(c *coreconfig.API) (*commander.Config, error) {
 	if c.Tag == "" && c.Listen == "" {
 		return nil, errors.New("API must have a tag or listen address.")
 	}

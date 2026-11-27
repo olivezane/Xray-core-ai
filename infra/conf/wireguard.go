@@ -10,22 +10,17 @@ import (
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/task"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/wireguard"
 	"google.golang.org/protobuf/proto"
 )
 
+// WireGuardPeerConfig is one peer of a WireGuard tunnel.
 type WireGuardPeerConfig struct {
-	PublicKey    string   `json:"publicKey"`
-	PreSharedKey string   `json:"preSharedKey"`
-	Endpoint     string   `json:"endpoint"`
-	KeepAlive    uint32   `json:"keepAlive"`
-	AllowedIPs   []string `json:"allowedIPs,omitempty"`
-
-	Level uint32 `json:"level"`
-	Email string `json:"email"`
+	coreconfig.WireGuardPeer
 }
 
-func (c *WireGuardPeerConfig) Build() (*wireguard.PeerConfig, error) {
+func buildWireGuardPeer(c *coreconfig.WireGuardPeer) (*wireguard.PeerConfig, error) {
 	var err error
 	config := new(wireguard.PeerConfig)
 
@@ -56,16 +51,9 @@ func (c *WireGuardPeerConfig) Build() (*wireguard.PeerConfig, error) {
 	return config, nil
 }
 
+// WireGuardConfig is the settings of a WireGuard tunnel.
 type WireGuardConfig struct {
-	IsClient bool `json:""`
-
-	NoKernelTun bool                   `json:"noKernelTun"`
-	SecretKey   string                 `json:"secretKey"`
-	Address     []string               `json:"address"`
-	Peers       []*WireGuardPeerConfig `json:"peers"`
-	MTU         int32                  `json:"mtu"`
-	Reserved    []byte                 `json:"reserved"`
-	DNS         []string               `json:"remoteDNS"`
+	coreconfig.WireGuard
 }
 
 func (c *WireGuardConfig) Build() (proto.Message, error) {
@@ -87,7 +75,7 @@ func (c *WireGuardConfig) Build() (proto.Message, error) {
 	if c.IsClient {
 		config.Peers = make([]*wireguard.PeerConfig, len(c.Peers))
 		for i, p := range c.Peers {
-			msg, err := p.Build()
+			msg, err := buildWireGuardPeer(p)
 			if err != nil {
 				return nil, err
 			}
@@ -97,7 +85,7 @@ func (c *WireGuardConfig) Build() (proto.Message, error) {
 		config.Users = make([]*protocol.User, len(c.Peers))
 		processUser := func(idx int) error {
 			p := c.Peers[idx]
-			m, err := p.Build()
+			m, err := buildWireGuardPeer(p)
 			if err != nil {
 				return err
 			}

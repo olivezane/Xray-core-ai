@@ -6,18 +6,22 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/geodata"
 	"github.com/xtls/xray-core/common/net"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/dns"
 	"google.golang.org/protobuf/proto"
 )
 
+// DNSOutboundRuleConfig is one rule of a DNS outbound.
 type DNSOutboundRuleConfig struct {
-	Action string      `json:"action"`
-	QType  *PortList   `json:"qType"`
-	Domain *StringList `json:"domain"`
-	RCode  uint32      `json:"rCode"`
+	coreconfig.DNSOutboundRule
 }
 
+// Build converts the rule to its message.
 func (c *DNSOutboundRuleConfig) Build() (*dns.DNSRuleConfig, error) {
+	return buildDNSOutboundRule(&c.DNSOutboundRule)
+}
+
+func buildDNSOutboundRule(c *coreconfig.DNSOutboundRule) (*dns.DNSRuleConfig, error) {
 	rule := &dns.DNSRuleConfig{}
 
 	switch strings.ToLower(c.Action) {
@@ -57,17 +61,9 @@ func (c *DNSOutboundRuleConfig) Build() (*dns.DNSRuleConfig, error) {
 	return rule, nil
 }
 
+// DNSOutboundConfig is the settings of a DNS outbound.
 type DNSOutboundConfig struct {
-	RewriteNetwork Network                  `json:"rewriteNetwork"`
-	RewriteAddress *Address                 `json:"rewriteAddress"`
-	RewritePort    uint16                   `json:"rewritePort"`
-	Network        Network                  `json:"network"`
-	Address        *Address                 `json:"address"`
-	Port           uint16                   `json:"port"`
-	UserLevel      uint32                   `json:"userLevel"`
-	Rules          []*DNSOutboundRuleConfig `json:"rules"`
-	NonIPQuery     *string                  `json:"nonIPQuery"` // todo: remove legacy
-	BlockTypes     *[]int32                 `json:"blockTypes"` // todo: remove legacy
+	coreconfig.DNSOutbound
 }
 
 func (c *DNSOutboundConfig) Build() (proto.Message, error) {
@@ -82,13 +78,13 @@ func (c *DNSOutboundConfig) Build() (proto.Message, error) {
 	}
 	config := &dns.Config{
 		RewriteServer: &net.Endpoint{
-			Network: c.RewriteNetwork.Build(),
+			Network: BuildNetwork(c.RewriteNetwork),
 			Port:    uint32(c.RewritePort),
 		},
 		UserLevel: c.UserLevel,
 	}
 	if c.RewriteAddress != nil {
-		config.RewriteServer.Address = c.RewriteAddress.Build()
+		config.RewriteServer.Address = BuildAddress(c.RewriteAddress)
 	}
 
 	// todo: remove legacy
@@ -106,7 +102,7 @@ func (c *DNSOutboundConfig) Build() (proto.Message, error) {
 	}
 
 	for _, r := range c.Rules {
-		rule, err := r.Build()
+		rule, err := buildDNSOutboundRule(r)
 		if err != nil {
 			return nil, err
 		}

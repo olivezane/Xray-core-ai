@@ -8,21 +8,18 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/geodata"
 	"github.com/xtls/xray-core/common/serial"
+	coreconfig "github.com/xtls/xray-core/core/config"
 
 	"google.golang.org/protobuf/proto"
 )
 
-// StrategyConfig represents a strategy config
-type StrategyConfig struct {
-	Type     string           `json:"type"`
-	Settings *json.RawMessage `json:"settings"`
-}
+// StrategyConfig is the strategy of a balancer, from the configuration model.
+type StrategyConfig = coreconfig.StrategyConfig
 
+// BalancingRule is one balancing rule of the configuration. It carries the model
+// type and adds the conversion, so the model stays in core/config.
 type BalancingRule struct {
-	Tag         string         `json:"tag"`
-	Selectors   StringList     `json:"selector"`
-	Strategy    StrategyConfig `json:"strategy"`
-	FallbackTag string         `json:"fallbackTag"`
+	coreconfig.Balancer
 }
 
 // Build builds the balancing rule
@@ -68,11 +65,9 @@ func (r *BalancingRule) Build() (*router.BalancingRule, error) {
 	}, nil
 }
 
+// RouterConfig is the "routing" section of the configuration.
 type RouterConfig struct {
-	RuleList       []json.RawMessage `json:"rules"`
-	DomainStrategy *string           `json:"domainStrategy"`
-	Balancers      []*BalancingRule  `json:"balancers"`
-	Script         string            `json:"script"`
+	coreconfig.Router
 }
 
 func (c *RouterConfig) getDomainStrategy() router.Config_DomainStrategy {
@@ -114,7 +109,7 @@ func (c *RouterConfig) Build() (*router.Config, error) {
 	}
 
 	for _, rawBalancer := range c.Balancers {
-		balancer, err := rawBalancer.Build()
+		balancer, err := (&BalancingRule{*rawBalancer}).Build()
 		if err != nil {
 			return nil, err
 		}
@@ -204,11 +199,11 @@ func parseFieldRule(msg json.RawMessage) (*router.RoutingRule, error) {
 	}
 
 	if rawFieldRule.Port != nil {
-		rule.PortList = rawFieldRule.Port.Build()
+		rule.PortList = BuildPortList(rawFieldRule.Port)
 	}
 
 	if rawFieldRule.Network != nil {
-		rule.Networks = rawFieldRule.Network.Build()
+		rule.Networks = BuildNetworkList(rawFieldRule.Network)
 	}
 
 	if rawFieldRule.SourceIP == nil {
@@ -224,7 +219,7 @@ func parseFieldRule(msg json.RawMessage) (*router.RoutingRule, error) {
 	}
 
 	if rawFieldRule.SourcePort != nil {
-		rule.SourcePortList = rawFieldRule.SourcePort.Build()
+		rule.SourcePortList = BuildPortList(rawFieldRule.SourcePort)
 	}
 
 	if rawFieldRule.LocalIP != nil {
@@ -236,7 +231,7 @@ func parseFieldRule(msg json.RawMessage) (*router.RoutingRule, error) {
 	}
 
 	if rawFieldRule.LocalPort != nil {
-		rule.LocalPortList = rawFieldRule.LocalPort.Build()
+		rule.LocalPortList = BuildPortList(rawFieldRule.LocalPort)
 	}
 
 	if rawFieldRule.User != nil {
@@ -246,7 +241,7 @@ func parseFieldRule(msg json.RawMessage) (*router.RoutingRule, error) {
 	}
 
 	if rawFieldRule.VlessRoute != nil {
-		rule.VlessRouteList = rawFieldRule.VlessRoute.Build()
+		rule.VlessRouteList = BuildPortList(rawFieldRule.VlessRoute)
 	}
 
 	if rawFieldRule.InboundTag != nil {

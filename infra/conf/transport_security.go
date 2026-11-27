@@ -14,41 +14,17 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet/reality"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/transport/internet/tls"
 	"google.golang.org/protobuf/proto"
 )
 
-type LimitFallback struct {
-	AfterBytes       uint64
-	BytesPerSec      uint64
-	BurstBytesPerSec uint64
-}
+// LimitFallback is the limiter of a fallback, from the configuration model.
+type LimitFallback = coreconfig.LimitFallback
 
+// REALITYConfig is the REALITY security setting of the configuration.
 type REALITYConfig struct {
-	MasterKeyLog string          `json:"masterKeyLog"`
-	Show         bool            `json:"show"`
-	Target       json.RawMessage `json:"target"`
-	Dest         json.RawMessage `json:"dest"`
-	Type         string          `json:"type"`
-	Xver         uint64          `json:"xver"`
-	ServerNames  []string        `json:"serverNames"`
-	PrivateKey   string          `json:"privateKey"`
-	MinClientVer string          `json:"minClientVer"`
-	MaxClientVer string          `json:"maxClientVer"`
-	MaxTimeDiff  uint64          `json:"maxTimeDiff"`
-	ShortIds     []string        `json:"shortIds"`
-	Mldsa65Seed  string          `json:"mldsa65Seed"`
-
-	LimitFallbackUpload   LimitFallback `json:"limitFallbackUpload"`
-	LimitFallbackDownload LimitFallback `json:"limitFallbackDownload"`
-
-	Fingerprint   string `json:"fingerprint"`
-	ServerName    string `json:"serverName"`
-	Password      string `json:"password"`
-	PublicKey     string `json:"publicKey"`
-	ShortId       string `json:"shortId"`
-	Mldsa65Verify string `json:"mldsa65Verify"`
-	SpiderX       string `json:"spiderX"`
+	coreconfig.Reality
 }
 
 func (c *REALITYConfig) Build() (proto.Message, error) {
@@ -245,19 +221,11 @@ func (c *REALITYConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
-type TLSCertConfig struct {
-	CertFile       string   `json:"certificateFile"`
-	CertStr        []string `json:"certificate"`
-	KeyFile        string   `json:"keyFile"`
-	KeyStr         []string `json:"key"`
-	Usage          string   `json:"usage"`
-	OcspStapling   uint64   `json:"ocspStapling"`
-	OneTimeLoading bool     `json:"oneTimeLoading"`
-	BuildChain     bool     `json:"buildChain"`
-}
+// TLSCertConfig is one certificate of a TLS setting, from the configuration model.
+type TLSCertConfig = coreconfig.TLSCertificate
 
 // Build implements Buildable.
-func (c *TLSCertConfig) Build() (*tls.Certificate, error) {
+func BuildTLSCert(c *coreconfig.TLSCertificate) (*tls.Certificate, error) {
 	certificate := new(tls.Certificate)
 
 	cert, err := readFileOrString(c.CertFile, c.CertStr)
@@ -297,34 +265,20 @@ func (c *TLSCertConfig) Build() (*tls.Certificate, error) {
 	return certificate, nil
 }
 
+// TLSConfig is the TLS security setting of the configuration.
 type TLSConfig struct {
-	AllowInsecure           bool             `json:"allowInsecure"`
-	Certs                   []*TLSCertConfig `json:"certificates"`
-	ServerName              string           `json:"serverName"`
-	ALPN                    *StringList      `json:"alpn"`
-	EnableSessionResumption bool             `json:"enableSessionResumption"`
-	DisableSystemRoot       bool             `json:"disableSystemRoot"`
-	MinVersion              string           `json:"minVersion"`
-	MaxVersion              string           `json:"maxVersion"`
-	CipherSuites            string           `json:"cipherSuites"`
-	Fingerprint             string           `json:"fingerprint"`
-	RejectUnknownSNI        bool             `json:"rejectUnknownSni"`
-	CurvePreferences        *StringList      `json:"curvePreferences"`
-	MasterKeyLog            string           `json:"masterKeyLog"`
-	PinnedPeerCertSha256    string           `json:"pinnedPeerCertSha256"`
-	VerifyPeerCertByName    string           `json:"verifyPeerCertByName"`
-	ECHServerKeys           string           `json:"echServerKeys"`
-	ECHConfigList           string           `json:"echConfigList"`
-	ECHSocketSettings       *SocketConfig    `json:"echSockopt"`
-	UseSystemCA             bool             `json:"useSystemCA"`
+	coreconfig.TLS
 }
+
+// Model returns the model type this wrapper carries.
+func (c *TLSConfig) Model() *coreconfig.TLS { return &c.TLS }
 
 // Build implements Buildable.
 func (c *TLSConfig) Build() (proto.Message, error) {
 	config := new(tls.Config)
 	config.Certificate = make([]*tls.Certificate, len(c.Certs))
 	for idx, certConf := range c.Certs {
-		cert, err := certConf.Build()
+		cert, err := BuildTLSCert(certConf)
 		if err != nil {
 			return nil, err
 		}
@@ -398,7 +352,7 @@ func (c *TLSConfig) Build() (proto.Message, error) {
 	}
 	config.EchConfigList = c.ECHConfigList
 	if c.ECHSocketSettings != nil {
-		ss, err := c.ECHSocketSettings.Build()
+		ss, err := (&SocketConfig{*c.ECHSocketSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build ech sockopt.").Base(err)
 		}

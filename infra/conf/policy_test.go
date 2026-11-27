@@ -3,7 +3,6 @@ package conf_test
 import (
 	"testing"
 
-	"github.com/xtls/xray-core/common"
 	. "github.com/xtls/xray-core/infra/conf"
 )
 
@@ -31,8 +30,7 @@ func TestBufferSize(t *testing.T) {
 		pConf := Policy{
 			BufferSize: &bs,
 		}
-		p, err := pConf.Build()
-		common.Must(err)
+		p := BuildLevelPolicy(&pConf)
 		if p.Buffer.Connection != c.Output {
 			t.Error("expected buffer size ", c.Output, " but got ", p.Buffer.Connection)
 		}

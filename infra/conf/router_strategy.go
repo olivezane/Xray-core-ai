@@ -6,8 +6,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/xtls/xray-core/app/observatory/burst"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/app/router"
-	"github.com/xtls/xray-core/infra/conf/cfgcommon/duration"
 )
 
 const (
@@ -30,30 +30,18 @@ func (v *strategyEmptyConfig) Build() (proto.Message, error) {
 	return nil, nil
 }
 
+// strategyLeastLoadConfig is the least load strategy of the configuration. It
+// carries the model type and adds the conversion, so the model stays in
+// core/config while the boundary stays here.
 type strategyLeastLoadConfig struct {
-	// weight settings
-	Costs []*router.StrategyWeight `json:"costs,omitempty"`
-	// ping rtt baselines
-	Baselines []duration.Duration `json:"baselines,omitempty"`
-	// expected nodes count to select
-	Expected int32 `json:"expected,omitempty"`
-	// max acceptable rtt, filter away high delay nodes. default 0
-	MaxRTT duration.Duration `json:"maxRTT,omitempty"`
-	// acceptable failure rate
-	Tolerance float64 `json:"tolerance,omitempty"`
+	coreconfig.LeastLoadStrategy
 }
 
-// HealthCheckSettings holds settings for health Checker
-type HealthCheckSettings struct {
-	Destination   string            `json:"destination"`
-	Connectivity  string            `json:"connectivity"`
-	Interval      duration.Duration `json:"interval"`
-	SamplingCount int               `json:"sampling"`
-	Timeout       duration.Duration `json:"timeout"`
-	HttpMethod    string            `json:"httpMethod"`
-}
+// HealthCheckSettings is the health check section of the configuration model.
+type HealthCheckSettings = coreconfig.HealthCheck
 
-func (h HealthCheckSettings) Build() (proto.Message, error) {
+// BuildHealthCheck converts the health check section to its message.
+func BuildHealthCheck(h *coreconfig.HealthCheck) (proto.Message, error) {
 	var httpMethod string
 	if h.HttpMethod == "" {
 		httpMethod = "HEAD"

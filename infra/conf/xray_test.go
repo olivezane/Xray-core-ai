@@ -169,7 +169,7 @@ func TestSniffingConfig_Build(t *testing.T) {
 		RouteOnly:       true,
 	}
 
-	built, err := config.Build()
+	built, err := BuildSniffing(config)
 	if err != nil {
 		t.Fatalf("SniffingConfig.Build() failed: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestMultiplexConfig_Build(t *testing.T) {
 			if err := json.Unmarshal([]byte(tc.fields), &config); err != nil {
 				t.Fatal(err)
 			}
-			got, err := config.Build()
+			got, err := BuildMultiplex(&config)
 			if (err != nil) != tc.bad || !proto.Equal(got, tc.want) {
 				t.Fatalf("Build() = %v, %v, want config %v, error %t", got, err, tc.want, tc.bad)
 			}

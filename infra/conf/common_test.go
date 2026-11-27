@@ -82,7 +82,7 @@ func TestInvalidAddressJson(t *testing.T) {
 func TestStringNetwork(t *testing.T) {
 	var network Network
 	common.Must(json.Unmarshal([]byte(`"tcp"`), &network))
-	if v := network.Build(); v != net.Network_TCP {
+	if v := BuildNetwork(network); v != net.Network_TCP {
 		t.Error("network: ", v)
 	}
 }
@@ -91,7 +91,7 @@ func TestArrayNetworkList(t *testing.T) {
 	var list NetworkList
 	common.Must(json.Unmarshal([]byte("[\"Tcp\"]"), &list))
 
-	nlist := list.Build()
+	nlist := BuildNetworkList(&list)
 	if !net.HasNetwork(nlist, net.Network_TCP) {
 		t.Error("no tcp network")
 	}
@@ -104,7 +104,7 @@ func TestStringNetworkList(t *testing.T) {
 	var list NetworkList
 	common.Must(json.Unmarshal([]byte("\"TCP, ip\""), &list))
 
-	nlist := list.Build()
+	nlist := BuildNetworkList(&list)
 	if !net.HasNetwork(nlist, net.Network_TCP) {
 		t.Error("no tcp network")
 	}
@@ -211,7 +211,7 @@ func TestUserParsing(t *testing.T) {
     "level": 1
   }`), user))
 
-	nUser := user.Build()
+	nUser := BuildUser(user)
 	if r := cmp.Diff(nUser, &protocol.User{
 		Level: 1,
 		Email: "love@example.com",

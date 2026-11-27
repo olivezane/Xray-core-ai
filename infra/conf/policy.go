@@ -2,36 +2,61 @@ package conf
 
 import (
 	"github.com/xtls/xray-core/app/policy"
+	coreconfig "github.com/xtls/xray-core/core/config"
 )
 
-type Policy struct {
-	Handshake         *uint32 `json:"handshake"`
-	ConnectionIdle    *uint32 `json:"connIdle"`
-	UplinkOnly        *uint32 `json:"uplinkOnly"`
-	DownlinkOnly      *uint32 `json:"downlinkOnly"`
-	StatsUserUplink   bool    `json:"statsUserUplink"`
-	StatsUserDownlink bool    `json:"statsUserDownlink"`
-	StatsUserOnline   bool    `json:"statsUserOnline"`
-	BufferSize        *int32  `json:"bufferSize"`
+// The policy section of a configuration is the plain model in core/config. This
+// file is the boundary: it converts that model to the protobuf message the
+// instance consumes, and it is where the units of the model become the units of
+// the message (seconds as Second, kilobytes as bytes).
+type (
+	Policy       = coreconfig.Policy
+	SystemPolicy = coreconfig.SystemPolicy
+	PolicyConfig = coreconfig.PolicySet
+)
+
+// BuildPolicy converts the policy section to its protobuf message.
+func BuildPolicy(c *coreconfig.PolicySet) (*policy.Config, error) {
+	if c == nil {
+		return nil, nil
+	}
+	levels := make(map[uint32]*policy.Policy)
+	for level, p := range c.Levels {
+		if p != nil {
+			levels[level] = buildLevelPolicy(p)
+		}
+	}
+
+	config := &policy.Config{Level: levels}
+	if c.System != nil {
+		config.System = buildSystemPolicy(c.System)
+	}
+	return config, nil
 }
 
-func (t *Policy) Build() (*policy.Policy, error) {
-	config := new(policy.Policy_Timeout)
+// BuildLevelPolicy converts one level of the policy section to its protobuf
+// message.
+func BuildLevelPolicy(t *coreconfig.Policy) *policy.Policy {
+	return buildLevelPolicy(t)
+}
+
+func buildLevelPolicy(t *coreconfig.Policy) *policy.Policy {
+	timeout := new(policy.Policy_Timeout)
 	if t.Handshake != nil {
-		config.Handshake = &policy.Second{Value: *t.Handshake}
+		timeout.Handshake = &policy.Second{Value: *t.Handshake}
 	}
 	if t.ConnectionIdle != nil {
-		config.ConnectionIdle = &policy.Second{Value: *t.ConnectionIdle}
+		timeout.ConnectionIdle = &policy.Second{Value: *t.ConnectionIdle}
 	}
 	if t.UplinkOnly != nil {
-		config.UplinkOnly = &policy.Second{Value: *t.UplinkOnly}
+		timeout.UplinkOnly = &policy.Second{Value: *t.UplinkOnly}
 	}
 	if t.DownlinkOnly != nil {
-		config.DownlinkOnly = &policy.Second{Value: *t.DownlinkOnly}
+		timeout.DownlinkOnly = &policy.Second{Value: *t.DownlinkOnly}
 	}
 
 	p := &policy.Policy{
-		Timeout: config,
+		Timeout: timeout,
 		Stats: &policy.Policy_Stats{
 			UserUplink:   t.StatsUserUplink,
 			UserDownlink: t.StatsUserDownlink,
@@ -40,26 +65,17 @@ func (t *Policy) Build() (*policy.Policy, error) {
 	}
 
 	if t.BufferSize != nil {
-		bs := int32(-1)
+		connection := int32(-1)
 		if *t.BufferSize >= 0 {
-			bs = (*t.BufferSize) * 1024
+			// The model is in kilobytes, the message in bytes.
+			connection = (*t.BufferSize) * 1024
 		}
-		p.Buffer = &policy.Policy_Buffer{
-			Connection: bs,
-		}
+		p.Buffer = &policy.Policy_Buffer{Connection: connection}
 	}
-
-	return p, nil
+	return p
 }
 
-type SystemPolicy struct {
-	StatsInboundUplink    bool `json:"statsInboundUplink"`
-	StatsInboundDownlink  bool `json:"statsInboundDownlink"`
-	StatsOutboundUplink   bool `json:"statsOutboundUplink"`
-	StatsOutboundDownlink bool `json:"statsOutboundDownlink"`
-}
-
-func (p *SystemPolicy) Build() (*policy.SystemPolicy, error) {
+func buildSystemPolicy(p *coreconfig.SystemPolicy) *policy.SystemPolicy {
 	return &policy.SystemPolicy{
 		Stats: &policy.SystemPolicy_Stats{
 			InboundUplink:    p.StatsInboundUplink,
@@ -67,36 +83,5 @@ func (p *SystemPolicy) Build() (*policy.SystemPolicy, error) {
 			OutboundUplink:   p.StatsOutboundUplink,
 			OutboundDownlink: p.StatsOutboundDownlink,
 		},
-	}, nil
-}
-
-type PolicyConfig struct {
-	Levels map[uint32]*Policy `json:"levels"`
-	System *SystemPolicy      `json:"system"`
-}
-
-func (c *PolicyConfig) Build() (*policy.Config, error) {
-	levels := make(map[uint32]*policy.Policy)
-	for l, p := range c.Levels {
-		if p != nil {
-			pp, err := p.Build()
-			if err != nil {
-				return nil, err
-			}
-			levels[l] = pp
-		}
 	}
-	config := &policy.Config{
-		Level: levels,
-	}
-
-	if c.System != nil {
-		sc, err := c.System.Build()
-		if err != nil {
-			return nil, err
-		}
-		config.System = sc
-	}
-
-	return config, nil
 }

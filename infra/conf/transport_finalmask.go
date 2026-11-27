@@ -21,6 +21,7 @@ import (
 	xlua "github.com/xtls/xray-core/common/lua"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/serial"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/finalmask/filter"
 	"github.com/xtls/xray-core/transport/internet/finalmask/fragment"
@@ -102,11 +103,17 @@ var (
 	}, "type", "settings")
 )
 
+// ProxyProtocol is the PROXY protocol header setting.
 type ProxyProtocol struct {
-	Version uint32 `json:"version"`
+	coreconfig.ProxyProtocol
 }
 
+// Build converts the setting to its message.
 func (c *ProxyProtocol) Build() (proto.Message, error) {
+	return buildProxyProtocol(&c.ProxyProtocol)
+}
+
+func buildProxyProtocol(c *coreconfig.ProxyProtocol) (proto.Message, error) {
 	version := c.Version
 	if version == 0 {
 		version = 2
@@ -128,12 +135,17 @@ func addProxyProtocolMask(config *internet.StreamConfig, version uint32) {
 	config.Tcpmasks = append(config.Tcpmasks, mask)
 }
 
+// Filter blocks or allows source addresses.
 type Filter struct {
-	BlockedSourceIPs []string `json:"blockedSourceIPs"`
-	AllowedSourceIPs []string `json:"allowedSourceIPs"`
+	coreconfig.Filter
 }
 
+// Build converts the filter to its message.
 func (c *Filter) Build() (proto.Message, error) {
+	return buildFilter(&c.Filter)
+}
+
+func buildFilter(c *coreconfig.Filter) (proto.Message, error) {
 	rules, err := geodata.ParseIPRules(c.BlockedSourceIPs)
 	if err != nil {
 		return nil, errors.New(`invalid "blockedSourceIPs"`).Base(err)
@@ -145,24 +157,20 @@ func (c *Filter) Build() (proto.Message, error) {
 	return &filter.Config{BlockedSourceIps: rules, AllowedSourceIps: allowed}, nil
 }
 
-type TCPItem struct {
-	Delay     Int32Range       `json:"delay"`
-	Rand      int32            `json:"rand"`
-	RandRange *Int32Range      `json:"randRange"`
-	Capture   string           `json:"capture"`
-	Type      string           `json:"type"`
-	Reuse     string           `json:"reuse"`
-	Transform *CustomTransform `json:"transform"`
-	Packet    json.RawMessage  `json:"packet"`
-}
+// TCPItem is one item of the header-custom mask for TCP, from the model.
+type TCPItem = coreconfig.TCPItem
 
+// HeaderCustomTCP is the header-custom mask setting for TCP.
 type HeaderCustomTCP struct {
-	Clients [][]TCPItem `json:"clients"`
-	Servers [][]TCPItem `json:"servers"`
-	Errors  [][]TCPItem `json:"errors"`
+	coreconfig.HeaderCustomTCP
 }
 
+// Build converts the mask to its message.
 func (c *HeaderCustomTCP) Build() (proto.Message, error) {
+	return buildHeaderCustomTCP(&c.HeaderCustomTCP)
+}
+
+func buildHeaderCustomTCP(c *coreconfig.HeaderCustomTCP) (proto.Message, error) {
 	for _, value := range c.Clients {
 		for _, item := range value {
 			if err := validateCustomItemSpec(item.Capture, item.Packet, item.Rand, item.Reuse, item.Transform); err != nil {
@@ -290,16 +298,18 @@ func (c *HeaderCustomTCP) Build() (proto.Message, error) {
 	}, nil
 }
 
+// FragmentMask is the fragment mask setting of the configuration.
 type FragmentMask struct {
-	Packets  string       `json:"packets"`
-	Length   Int32Range   `json:"length"`
-	Delay    Int32Range   `json:"delay"`
-	Lengths  []Int32Range `json:"lengths"`
-	Delays   []Int32Range `json:"delays"`
-	MaxSplit Int32Range   `json:"maxSplit"`
+	coreconfig.FragmentMask
 }
 
+// Build converts the mask to its message.
 func (c *FragmentMask) Build() (proto.Message, error) {
+	return buildFragmentMask(&c.FragmentMask)
+}
+
+func buildFragmentMask(c *coreconfig.FragmentMask) (proto.Message, error) {
+
 	config := &fragment.Config{}
 
 	switch strings.ToLower(c.Packets) {
@@ -351,21 +361,20 @@ func (c *FragmentMask) Build() (proto.Message, error) {
 	return config, nil
 }
 
-type NoiseItem struct {
-	Rand      Int32Range      `json:"rand"`
-	RandRange *Int32Range     `json:"randRange"`
-	Type      string          `json:"type"`
-	Packet    json.RawMessage `json:"packet"`
-	Delay     Int32Range      `json:"delay"`
-}
+// NoiseItem is one noise item of the noise mask, from the configuration model.
+type NoiseItem = coreconfig.NoiseItem
 
+// NoiseMask is the noise mask setting of the configuration.
 type NoiseMask struct {
-	Reset  Int32Range  `json:"reset"`
-	Noise  []NoiseItem `json:"noise"`
-	Script string      `json:"script"`
+	coreconfig.NoiseMask
 }
 
+// Build converts the mask to its message.
 func (c *NoiseMask) Build() (proto.Message, error) {
+	return buildNoiseMask(&c.NoiseMask)
+}
+
+func buildNoiseMask(c *coreconfig.NoiseMask) (proto.Message, error) {
 	if c.Script != "" {
 		if len(c.Noise) > 0 {
 			return nil, errors.New(`"script" and "noise" can't be used together`)
@@ -511,29 +520,14 @@ func buildNoiseSegment(key, arg string) (*noise.Segment, error) {
 	}
 }
 
-type UDPItem struct {
-	Rand      int32            `json:"rand"`
-	RandRange *Int32Range      `json:"randRange"`
-	Capture   string           `json:"capture"`
-	Type      string           `json:"type"`
-	Reuse     string           `json:"reuse"`
-	Transform *CustomTransform `json:"transform"`
-	Packet    json.RawMessage  `json:"packet"`
-}
+// UDPItem is one item of the header-custom mask for UDP, from the model.
+type UDPItem = coreconfig.UDPItem
 
-type CustomTransform struct {
-	Op   string               `json:"op"`
-	Args []CustomTransformArg `json:"args"`
-}
+// CustomTransform is one transform of a header-custom item, from the model.
+type CustomTransform = coreconfig.CustomTransform
 
-type CustomTransformArg struct {
-	Type      string           `json:"type"`
-	Bytes     json.RawMessage  `json:"bytes"`
-	U64       *uint64          `json:"u64"`
-	Reuse     string           `json:"reuse"`
-	Metadata  string           `json:"metadata"`
-	Transform *CustomTransform `json:"transform"`
-}
+// CustomTransformArg is one argument of a transform, from the model.
+type CustomTransformArg = coreconfig.CustomTransformArg
 
 func validateCustomVarName(name string) error {
 	if name == "" {
@@ -670,13 +664,17 @@ func buildCustomTransformArg(arg CustomTransformArg) (*custom.ExprArg, error) {
 	}, nil
 }
 
+// HeaderCustomUDP is the header-custom mask setting for UDP.
 type HeaderCustomUDP struct {
-	Mode   string    `json:"mode"`
-	Client []UDPItem `json:"client"`
-	Server []UDPItem `json:"server"`
+	coreconfig.HeaderCustomUDP
 }
 
+// Build converts the mask to its message.
 func (c *HeaderCustomUDP) Build() (proto.Message, error) {
+	return buildHeaderCustomUDP(&c.HeaderCustomUDP)
+}
+
+func buildHeaderCustomUDP(c *coreconfig.HeaderCustomUDP) (proto.Message, error) {
 	switch c.Mode {
 	case "", "prefix", "standalone":
 	default:
@@ -761,12 +759,17 @@ func (c *HeaderCustomUDP) Build() (proto.Message, error) {
 	}
 }
 
+// MkcpLegacy is the legacy mkcp header setting.
 type MkcpLegacy struct {
-	Header string `json:"header"`
-	Value  string `json:"value"`
+	coreconfig.MkcpLegacy
 }
 
+// Build converts the setting to its message.
 func (c *MkcpLegacy) Build() (proto.Message, error) {
+	return buildMkcpLegacy(&c.MkcpLegacy)
+}
+
+func buildMkcpLegacy(c *coreconfig.MkcpLegacy) (proto.Message, error) {
 	if len(c.Header) == 0 {
 		if len(c.Value) == 0 {
 			return &original.Config{}, nil
@@ -796,12 +799,17 @@ func (c *MkcpLegacy) Build() (proto.Message, error) {
 	}
 }
 
+// Salamander is the salamander mask setting.
 type Salamander struct {
-	Password   string     `json:"password"`
-	PacketSize Int32Range `json:"packetSize"`
+	coreconfig.Salamander
 }
 
+// Build converts the setting to its message.
 func (c *Salamander) Build() (proto.Message, error) {
+	return buildSalamander(&c.Salamander)
+}
+
+func buildSalamander(c *coreconfig.Salamander) (proto.Message, error) {
 	if c.PacketSize.To > 0 {
 		if c.PacketSize.From <= 0 || c.PacketSize.To > 2048 {
 			return nil, errors.New("gecko: invalid min/max packet size")
@@ -817,22 +825,17 @@ func (c *Salamander) Build() (proto.Message, error) {
 	}, nil
 }
 
+// Sudoku is the sudoku mask setting of the configuration.
 type Sudoku struct {
-	Password string `json:"password"`
-	ASCII    string `json:"ascii"`
-
-	CustomTable       string   `json:"customTable"`
-	LegacyCustomTable string   `json:"custom_table"`
-	CustomTables      []string `json:"customTables"`
-	LegacyCustomSets  []string `json:"custom_tables"`
-
-	PaddingMin       uint32 `json:"paddingMin"`
-	LegacyPaddingMin uint32 `json:"padding_min"`
-	PaddingMax       uint32 `json:"paddingMax"`
-	LegacyPaddingMax uint32 `json:"padding_max"`
+	coreconfig.Sudoku
 }
 
+// Build converts the mask to its message.
 func (c *Sudoku) Build() (proto.Message, error) {
+	return buildSudoku(&c.Sudoku)
+}
+
+func buildSudoku(c *coreconfig.Sudoku) (proto.Message, error) {
 	customTable := c.CustomTable
 	if customTable == "" {
 		customTable = c.LegacyCustomTable
@@ -861,29 +864,23 @@ func (c *Sudoku) Build() (proto.Message, error) {
 	}, nil
 }
 
-type XDNSDomain struct {
-	Names      []string `json:"names"`
-	LenLimit   int32    `json:"lenLimit"`
-	LabelLimit int32    `json:"labelLimit"`
-	Types      []int32  `json:"types"`
-	Edns0      int32    `json:"edns0"`
-	Alphabet   string   `json:"alphabet"`
-}
+// XDNSDomain is one domain group of the xdns mask, from the configuration model.
+type XDNSDomain = coreconfig.XDNSDomain
 
-type XDNSResolver struct {
-	Addrs      []string          `json:"addrs"`
-	Worker     int32             `json:"worker"`
-	TlsConfig  *TLSConfig        `json:"tlsConfig"`
-	QuicConfig *QuicParamsConfig `json:"quicConfig"`
-}
+// XDNSResolver is one resolver of the xdns mask, from the configuration model.
+type XDNSResolver = coreconfig.XDNSResolver
 
+// XDNS is the xdns mask setting of the configuration.
 type XDNS struct {
-	Domains   []XDNSDomain   `json:"domains"`
-	Resolvers []XDNSResolver `json:"resolvers"`
-	ExtraPoll int32          `json:"extraPoll"`
+	coreconfig.XDNS
 }
 
+// Build converts the mask to its message.
 func (c *XDNS) Build() (proto.Message, error) {
+	return buildXDNS(&c.XDNS)
+}
+
+func buildXDNS(c *coreconfig.XDNS) (proto.Message, error) {
 	var domains []*xdns.DomainProto
 	var resolvers []*xdns.ResolverProto
 	for i := range c.Domains {
@@ -917,14 +914,14 @@ func (c *XDNS) Build() (proto.Message, error) {
 		var tlsConfig *tls.Config
 		var quicConfig *internet.QuicParams
 		if c.Resolvers[i].TlsConfig != nil {
-			proto, err := c.Resolvers[i].TlsConfig.Build()
+			proto, err := (&TLSConfig{*c.Resolvers[i].TlsConfig}).Build()
 			if err != nil {
 				return nil, err
 			}
 			tlsConfig = proto.(*tls.Config)
 		}
 		if c.Resolvers[i].QuicConfig != nil {
-			proto, err := c.Resolvers[i].QuicConfig.Build()
+			proto, err := (&QuicParamsConfig{*c.Resolvers[i].QuicConfig}).Build()
 			if err != nil {
 				return nil, err
 			}
@@ -964,54 +961,29 @@ func (c *XDNS) Build() (proto.Message, error) {
 	return &xdns.Config{Domains: domains, Resolvers: resolvers, ExtraPoll: c.ExtraPoll}, nil
 }
 
+// XMC is the xmc mask setting of the configuration.
 type XMC struct {
-	Hostname  string           `json:"hostname"`
-	Profiles  []XMCProfile     `json:"profiles"`
-	Password  string           `json:"password"`
-	Paddings  []XMCPaddingTurn `json:"paddings,omitempty"`
-	Yggdrasil *XMCYggdrasil    `json:"yggdrasil,omitempty"`
-	// A configured list is the complete padding schedule and replaces the
-	// built-in preset entirely, including the preset's Play-state join tail.
-	// NoPadding disables padding. An explicit empty "paddings" array means the
-	// same; an absent one keeps the built-in preset.
-	NoPadding bool `json:"noPadding,omitempty"`
+	coreconfig.XMC
 }
 
-type XMCPaddingTurn struct {
-	Length    string `json:"length"`
-	Direction string `json:"direction"`
-	// Delay is an optional millisecond value or inclusive min-max range: the
-	// pause that leads into this turn, written on the turn that follows the gap
-	// it reproduces. The sending side samples the range, the peer spends its
-	// minimum, and nothing pauses after the last turn.
-	Delay string `json:"delay,omitempty"`
-}
+// XMCPaddingTurn is one turn of the xmc padding schedule, from the model.
+type XMCPaddingTurn = coreconfig.XMCPaddingTurn
 
 // XMCYggdrasil enables third-party login through a Yggdrasil API server such
 // as Blessing Skin. The client authenticates with the API and the server
 // verifies players through its hasJoined endpoint.
-type XMCYggdrasil struct {
-	// API root of the Yggdrasil API, for example
-	// https://skin.example.com/api/yggdrasil
-	API      string `json:"api"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	// Optional player name, required when the account owns several players.
-	Player string `json:"player"`
-}
+// XMCYggdrasil is the Yggdrasil account of the xmc mask, from the model.
+type XMCYggdrasil = coreconfig.XMCYggdrasil
 
-type XMCProfile struct {
-	// Resolve the UUID by username, then request the session profile with
-	// unsigned=false. Client and server must use the same signed profile.
-	Username          string `json:"username"`
-	UUID              string `json:"uuid"`
-	TexturesValue     string `json:"texturesValue"`
-	TexturesSignature string `json:"texturesSignature"`
-}
+// XMCProfile is one Minecraft profile of the xmc mask, from the configuration
+// model. The conversion to the message stays here, together with the pattern the
+// user name has to match.
+type XMCProfile = coreconfig.XMCProfile
 
 var xmcUsernamePattern = regexp.MustCompile(`^[A-Za-z0-9_]{3,16}$`)
 
-func (c *XMCProfile) Build() (*xmc.Profile, error) {
+// buildXMCProfile converts the profile to its message.
+func buildXMCProfile(c *coreconfig.XMCProfile) (*xmc.Profile, error) {
 	if !xmcUsernamePattern.MatchString(c.Username) {
 		return nil, fmt.Errorf("invalid minecraft profile username: %q", c.Username)
 	}
@@ -1032,7 +1004,12 @@ func (c *XMCProfile) Build() (*xmc.Profile, error) {
 	}, nil
 }
 
+// Build converts the mask to its message.
 func (c *XMC) Build() (proto.Message, error) {
+	return buildXMC(&c.XMC)
+}
+
+func buildXMC(c *coreconfig.XMC) (proto.Message, error) {
 	// An explicit empty array is different from an absent field: json leaves
 	// Paddings nil when it is absent, so the user can turn padding off without
 	// a second switch.
@@ -1151,7 +1128,7 @@ func (c *XMC) Build() (proto.Message, error) {
 
 	profiles := make([]*xmc.Profile, 0, len(c.Profiles))
 	for i := range c.Profiles {
-		profile, err := c.Profiles[i].Build()
+		profile, err := buildXMCProfile(&c.Profiles[i])
 		if err != nil {
 			return nil, fmt.Errorf("build minecraft profile %d: %w", i, err)
 		}
@@ -1166,12 +1143,18 @@ func (c *XMC) Build() (proto.Message, error) {
 	return config, nil
 }
 
+// Xicmp is the xicmp mask setting of the configuration.
 type Xicmp struct {
-	DGRAM bool     `json:"dgram"`
-	IPs   []string `json:"ips"`
+	coreconfig.Xicmp
 }
 
+// Build converts the mask to its message.
 func (c *Xicmp) Build() (proto.Message, error) {
+	return buildXicmp(&c.Xicmp)
+}
+
+func buildXicmp(c *coreconfig.Xicmp) (proto.Message, error) {
+
 	for _, ip := range c.IPs {
 		if _, err := netip.ParseAddr(ip); err != nil {
 			return nil, err
@@ -1186,15 +1169,17 @@ func (c *Xicmp) Build() (proto.Message, error) {
 	return config, nil
 }
 
+// Realm is the realm mask setting of the configuration.
 type Realm struct {
-	Url         string             `json:"url"`
-	StunServers []string           `json:"stunServers"`
-	TlsConfig   *TLSConfig         `json:"tlsConfig"`
-	IPMode      string             `json:"ipMode"`
-	PortMapping *realm.PortMapping `json:"portMapping"`
+	coreconfig.Realm
 }
 
+// Build converts the mask to its message.
 func (c *Realm) Build() (proto.Message, error) {
+	return buildRealm(&c.Realm)
+}
+
+func buildRealm(c *coreconfig.Realm) (proto.Message, error) {
 	var scheme, host, port, token, id string
 	var stunServers []string
 	var tlsConfig *tls.Config
@@ -1256,7 +1241,7 @@ func (c *Realm) Build() (proto.Message, error) {
 	stunServers = c.StunServers
 
 	if c.TlsConfig != nil {
-		tc, err := c.TlsConfig.Build()
+		tc, err := (&TLSConfig{*c.TlsConfig}).Build()
 		if err != nil {
 			return nil, err
 		}
@@ -1276,14 +1261,18 @@ func (c *Realm) Build() (proto.Message, error) {
 	}, nil
 }
 
+// UDPHop is the udphop mask setting of the configuration.
 type UDPHop struct {
-	Mode        string     `json:"mode"`
-	Interval    Int32Range `json:"interval"`
-	RemoteIPs   []string   `json:"remoteIPs"`
-	RemotePorts PortList   `json:"remotePorts"`
+	coreconfig.UDPHop
 }
 
+// Build converts the mask to its message.
 func (c *UDPHop) Build() (proto.Message, error) {
+	return buildUDPHop(&c.UDPHop)
+}
+
+func buildUDPHop(c *coreconfig.UDPHop) (proto.Message, error) {
+
 	var local, remote, remoteOnce bool
 	for _, mode := range strings.Split(c.Mode, ",") {
 		switch strings.ToLower(mode) {
@@ -1325,16 +1314,15 @@ func (c *UDPHop) Build() (proto.Message, error) {
 		IntervalMin: int64(interval.From),
 		IntervalMax: int64(interval.To),
 		RemoteIPs:   remoteIPs,
-		RemotePorts: c.RemotePorts.Build().Ports(),
+		RemotePorts: BuildPortList(&c.RemotePorts).Ports(),
 	}, nil
 }
 
-type Mask struct {
-	Type     string           `json:"type"`
-	Settings *json.RawMessage `json:"settings"`
-}
+// Mask is one entry of a mask list, from the configuration model.
+type Mask = coreconfig.Mask
 
-func (c *Mask) Build(tcp bool) (proto.Message, error) {
+// buildMask converts one mask entry to its message.
+func buildMask(c *coreconfig.Mask, tcp bool) (proto.Message, error) {
 	loader := udpmaskLoader
 	if tcp {
 		loader = tcpmaskLoader
@@ -1355,7 +1343,13 @@ func (c *Mask) Build(tcp bool) (proto.Message, error) {
 	return ts, nil
 }
 
+// QuicParamsConfig is the QUIC setting of the configuration.
 type QuicParamsConfig struct {
+	coreconfig.QuicParams
+}
+
+// the fields below are read by the conversion
+type quicParamsFields struct {
 	Congestion                    string    `json:"congestion"`
 	Debug                         bool      `json:"debug"`
 	BbrProfile                    string    `json:"bbrProfile"`
@@ -1386,11 +1380,11 @@ func (config *QuicParamsConfig) Build() (proto.Message, error) {
 		return nil, errors.New("unknown bbr profile")
 	}
 
-	up, err := config.BrutalUp.Bps()
+	up, err := bandwidthBps(config.BrutalUp)
 	if err != nil {
 		return nil, err
 	}
-	down, err := config.BrutalDown.Bps()
+	down, err := bandwidthBps(config.BrutalDown)
 	if err != nil {
 		return nil, err
 	}

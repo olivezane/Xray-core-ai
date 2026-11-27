@@ -2,7 +2,6 @@ package conf
 
 import (
 	"bufio"
-	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,77 +13,13 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/geodata"
 	"github.com/xtls/xray-core/common/net"
+	coreconfig "github.com/xtls/xray-core/core/config"
 )
 
-type NameServerConfig struct {
-	ID              string     `json:"id"`
-	Address         *Address   `json:"address"`
-	ClientIP        *Address   `json:"clientIp"`
-	Port            uint16     `json:"port"`
-	SkipFallback    bool       `json:"skipFallback"`
-	Domains         StringList `json:"domains"`
-	ExpectedIPs     StringList `json:"expectedIPs"`
-	ExpectIPs       StringList `json:"expectIPs"`
-	QueryStrategy   string     `json:"queryStrategy"`
-	Tag             string     `json:"tag"`
-	TimeoutMs       uint64     `json:"timeoutMs"`
-	DisableCache    *bool      `json:"disableCache"`
-	ServeStale      *bool      `json:"serveStale"`
-	ServeExpiredTTL *uint32    `json:"serveExpiredTTL"`
-	FinalQuery      bool       `json:"finalQuery"`
-	UnexpectedIPs   StringList `json:"unexpectedIPs"`
-}
+// NameServerConfig is one name server of the configuration model.
+type NameServerConfig = coreconfig.NameServer
 
-// UnmarshalJSON implements encoding/json.Unmarshaler.UnmarshalJSON
-func (c *NameServerConfig) UnmarshalJSON(data []byte) error {
-	var address Address
-	if err := json.Unmarshal(data, &address); err == nil {
-		c.Address = &address
-		return nil
-	}
-
-	var advanced struct {
-		ID              string     `json:"id"`
-		Address         *Address   `json:"address"`
-		ClientIP        *Address   `json:"clientIp"`
-		Port            uint16     `json:"port"`
-		SkipFallback    bool       `json:"skipFallback"`
-		Domains         StringList `json:"domains"`
-		ExpectedIPs     StringList `json:"expectedIPs"`
-		ExpectIPs       StringList `json:"expectIPs"`
-		QueryStrategy   string     `json:"queryStrategy"`
-		Tag             string     `json:"tag"`
-		TimeoutMs       uint64     `json:"timeoutMs"`
-		DisableCache    *bool      `json:"disableCache"`
-		ServeStale      *bool      `json:"serveStale"`
-		ServeExpiredTTL *uint32    `json:"serveExpiredTTL"`
-		FinalQuery      bool       `json:"finalQuery"`
-		UnexpectedIPs   StringList `json:"unexpectedIPs"`
-	}
-	if err := json.Unmarshal(data, &advanced); err == nil {
-		c.ID = advanced.ID
-		c.Address = advanced.Address
-		c.ClientIP = advanced.ClientIP
-		c.Port = advanced.Port
-		c.SkipFallback = advanced.SkipFallback
-		c.Domains = advanced.Domains
-		c.ExpectedIPs = advanced.ExpectedIPs
-		c.ExpectIPs = advanced.ExpectIPs
-		c.QueryStrategy = advanced.QueryStrategy
-		c.Tag = advanced.Tag
-		c.TimeoutMs = advanced.TimeoutMs
-		c.DisableCache = advanced.DisableCache
-		c.ServeStale = advanced.ServeStale
-		c.ServeExpiredTTL = advanced.ServeExpiredTTL
-		c.FinalQuery = advanced.FinalQuery
-		c.UnexpectedIPs = advanced.UnexpectedIPs
-		return nil
-	}
-
-	return errors.New("failed to parse name server: ", string(data))
-}
-
-func (c *NameServerConfig) Build() (*dns.NameServer, error) {
+func BuildNameServer(c *coreconfig.NameServer) (*dns.NameServer, error) {
 	if c.Address == nil {
 		return nil, errors.New("nameserver address is not specified")
 	}
@@ -140,7 +75,7 @@ func (c *NameServerConfig) Build() (*dns.NameServer, error) {
 		Id: c.ID,
 		Address: &net.Endpoint{
 			Network: net.Network_UDP,
-			Address: c.Address.Build(),
+			Address: BuildAddress(c.Address),
 			Port:    uint32(c.Port),
 		},
 		ClientIp:        myClientIP,
@@ -160,104 +95,38 @@ func (c *NameServerConfig) Build() (*dns.NameServer, error) {
 	}, nil
 }
 
-// DNSConfig is a JSON serializable object for dns.Config
+// DNSConfig is the "dns" section of the configuration.
 type DNSConfig struct {
-	Servers                []*NameServerConfig `json:"servers"`
-	Script                 string              `json:"script"`
-	Hosts                  *HostsWrapper       `json:"hosts"`
-	ClientIP               *Address            `json:"clientIp"`
-	Tag                    string              `json:"tag"`
-	QueryStrategy          string              `json:"queryStrategy"`
-	DisableCache           bool                `json:"disableCache"`
-	ServeStale             bool                `json:"serveStale"`
-	ServeExpiredTTL        uint32              `json:"serveExpiredTTL"`
-	DisableFallback        bool                `json:"disableFallback"`
-	DisableFallbackIfMatch bool                `json:"disableFallbackIfMatch"`
-	EnableParallelQuery    bool                `json:"enableParallelQuery"`
-	UseSystemHosts         bool                `json:"useSystemHosts"`
-	FakeDNS                *FakeDNSConfig      `json:"fakeDns"`
+	coreconfig.DNS
 }
 
-type HostAddress struct {
-	addr  *Address
-	addrs []*Address
-}
+// HostAddress is one host of the "hosts" table of the configuration model.
+type HostAddress = coreconfig.HostAddress
 
-// MarshalJSON implements encoding/json.Marshaler.MarshalJSON
-func (h *HostAddress) MarshalJSON() ([]byte, error) {
-	if (h.addr != nil) != (h.addrs != nil) {
-		if h.addr != nil {
-			return json.Marshal(h.addr)
-		} else if h.addrs != nil {
-			return json.Marshal(h.addrs)
-		}
-	}
-	return nil, errors.New("unexpected config state")
-}
+// HostsWrapper is the "hosts" table of the configuration model.
+type HostsWrapper = coreconfig.Hosts
 
-// UnmarshalJSON implements encoding/json.Unmarshaler.UnmarshalJSON
-func (h *HostAddress) UnmarshalJSON(data []byte) error {
-	addr := new(Address)
-	var addrs []*Address
-	switch {
-	case json.Unmarshal(data, &addr) == nil:
-		h.addr = addr
-	case json.Unmarshal(data, &addrs) == nil:
-		h.addrs = addrs
-	default:
-		return errors.New("invalid address")
-	}
-	return nil
-}
-
-type HostsWrapper struct {
-	Hosts map[string]*HostAddress
-}
-
-func newHostMapping(ha *HostAddress) *dns.Config_HostMapping {
-	if ha.addr != nil {
-		if ha.addr.Family().IsDomain() {
-			return &dns.Config_HostMapping{
-				ProxiedDomain: ha.addr.Domain(),
-			}
-		}
-		return &dns.Config_HostMapping{
-			Ip: [][]byte{ha.addr.IP()},
-		}
-	}
-
-	ips := make([][]byte, 0, len(ha.addrs))
-	for _, addr := range ha.addrs {
+func newHostMapping(ha *coreconfig.HostAddress) *dns.Config_HostMapping {
+	if addr, single := ha.Single(); single {
 		if addr.Family().IsDomain() {
-			return &dns.Config_HostMapping{
-				ProxiedDomain: addr.Domain(),
-			}
+			return &dns.Config_HostMapping{ProxiedDomain: addr.Domain()}
+		}
+		return &dns.Config_HostMapping{Ip: [][]byte{addr.IP()}}
+	}
+
+	addrs := ha.Addrs()
+	ips := make([][]byte, 0, len(addrs))
+	for _, addr := range addrs {
+		if addr.Family().IsDomain() {
+			return &dns.Config_HostMapping{ProxiedDomain: addr.Domain()}
 		}
 		ips = append(ips, []byte(addr.IP()))
 	}
-	return &dns.Config_HostMapping{
-		Ip: ips,
-	}
+	return &dns.Config_HostMapping{Ip: ips}
 }
 
-// MarshalJSON implements encoding/json.Marshaler.MarshalJSON
-func (m *HostsWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(m.Hosts)
-}
-
-// UnmarshalJSON implements encoding/json.Unmarshaler.UnmarshalJSON
-func (m *HostsWrapper) UnmarshalJSON(data []byte) error {
-	hosts := make(map[string]*HostAddress)
-	err := json.Unmarshal(data, &hosts)
-	if err == nil {
-		m.Hosts = hosts
-		return nil
-	}
-	return errors.New("invalid DNS hosts").Base(err)
-}
-
-// Build implements Buildable
-func (m *HostsWrapper) Build() ([]*dns.Config_HostMapping, error) {
+// BuildHosts converts the "hosts" table to its messages.
+func BuildHosts(m *coreconfig.Hosts) ([]*dns.Config_HostMapping, error) {
 	mappings := make([]*dns.Config_HostMapping, 0, len(m.Hosts))
 	for rule, addrs := range m.Hosts {
 		mapping := newHostMapping(addrs)
@@ -370,7 +239,7 @@ func (c *DNSConfig) Build() (*dns.Config, error) {
 	}
 
 	for _, server := range c.Servers {
-		ns, err := server.Build()
+		ns, err := BuildNameServer(server)
 		if err != nil {
 			return nil, errors.New("failed to build nameserver").Base(err)
 		}
@@ -379,7 +248,7 @@ func (c *DNSConfig) Build() (*dns.Config, error) {
 	}
 
 	if c.Hosts != nil {
-		staticHosts, err := c.Hosts.Build()
+		staticHosts, err := BuildHosts(c.Hosts)
 		if err != nil {
 			return nil, errors.New("failed to build hosts").Base(err)
 		}

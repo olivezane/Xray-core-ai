@@ -7,15 +7,25 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/xtls/xray-core/app/geodata"
 	"github.com/xtls/xray-core/common/errors"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"google.golang.org/protobuf/proto"
 )
 
+// GeodataAssetConfig is one asset of the geodata section. It carries the model
+// type as an embedded field and adds the conversion to the message, so that the
+// configuration model stays in core/config while the boundary stays here. The
+// embedded fields keep their JSON names, so a configuration decodes into this
+// type unchanged.
 type GeodataAssetConfig struct {
-	URL  string `json:"url"`
-	File string `json:"file"`
+	coreconfig.Asset
 }
 
+// Build converts this asset to its message.
 func (c *GeodataAssetConfig) Build() (*geodata.Asset, error) {
+	return buildGeodataAsset(&c.Asset)
+}
+
+func buildGeodataAsset(c *coreconfig.Asset) (*geodata.Asset, error) {
 	if err := validateHTTPS(c.URL); err != nil {
 		return nil, errors.New("invalid geodata asset url: ", c.URL).Base(err)
 	}
@@ -45,12 +55,12 @@ func validateHTTPS(s string) error {
 	return nil
 }
 
+// GeodataConfig is the geodata section of the configuration.
 type GeodataConfig struct {
-	Cron     *string               `json:"cron"`
-	Outbound string                `json:"outbound"`
-	Assets   []*GeodataAssetConfig `json:"assets"`
+	coreconfig.Geodata
 }
 
+// Build converts the geodata section to its message.
 func (c *GeodataConfig) Build() (proto.Message, error) {
 	config := &geodata.Config{}
 
@@ -65,7 +75,7 @@ func (c *GeodataConfig) Build() (proto.Message, error) {
 
 	assets := make([]*geodata.Asset, 0, len(c.Assets))
 	for _, asset := range c.Assets {
-		built, err := asset.Build()
+		built, err := buildGeodataAsset(asset)
 		if err != nil {
 			return nil, err
 		}

@@ -7,6 +7,7 @@ import (
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/task"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/shadowsocks"
 	"github.com/xtls/xray-core/proxy/shadowsocks_2022"
 	"google.golang.org/protobuf/proto"
@@ -27,23 +28,12 @@ func cipherFromString(c string) shadowsocks.CipherType {
 	}
 }
 
-type ShadowsocksUserConfig struct {
-	Cipher   string   `json:"method"`
-	Password string   `json:"password"`
-	Level    byte     `json:"level"`
-	Email    string   `json:"email"`
-	Address  *Address `json:"address"`
-	Port     uint16   `json:"port"`
-}
+// ShadowsocksUserConfig is one user of a shadowsocks inbound.
+type ShadowsocksUserConfig = coreconfig.ShadowsocksUser
 
+// ShadowsocksServerConfig is the settings of a shadowsocks inbound.
 type ShadowsocksServerConfig struct {
-	Cipher      string                   `json:"method"`
-	Password    string                   `json:"password"`
-	Level       byte                     `json:"level"`
-	Email       string                   `json:"email"`
-	Users       []*ShadowsocksUserConfig `json:"users"`
-	Clients     []*ShadowsocksUserConfig `json:"clients"`
-	NetworkList *NetworkList             `json:"network"`
+	coreconfig.ShadowsocksServer
 }
 
 func (v *ShadowsocksServerConfig) Build() (proto.Message, error) {
@@ -58,7 +48,7 @@ func (v *ShadowsocksServerConfig) Build() (proto.Message, error) {
 	}
 
 	config := new(shadowsocks.ServerConfig)
-	config.Network = v.NetworkList.Build()
+	config.Network = BuildNetworkList(v.NetworkList)
 
 	if v.Users != nil {
 		if len(v.Users) > 0 {
@@ -114,7 +104,7 @@ func buildShadowsocks2022(v *ShadowsocksServerConfig) (proto.Message, error) {
 		config := new(shadowsocks_2022.ServerConfig)
 		config.Method = v.Cipher
 		config.Key = v.Password
-		config.Network = v.NetworkList.Build()
+		config.Network = BuildNetworkList(v.NetworkList)
 		config.Email = v.Email
 		config.Level = int32(v.Level)
 		return config, nil
@@ -131,7 +121,7 @@ func buildShadowsocks2022(v *ShadowsocksServerConfig) (proto.Message, error) {
 		config := new(shadowsocks_2022.MultiUserServerConfig)
 		config.Method = v.Cipher
 		config.Key = v.Password
-		config.Network = v.NetworkList.Build()
+		config.Network = BuildNetworkList(v.NetworkList)
 
 		config.Users = make([]*protocol.User, len(v.Users))
 		processUser := func(idx int) error {
@@ -158,7 +148,7 @@ func buildShadowsocks2022(v *ShadowsocksServerConfig) (proto.Message, error) {
 	config := new(shadowsocks_2022.RelayServerConfig)
 	config.Method = v.Cipher
 	config.Key = v.Password
-	config.Network = v.NetworkList.Build()
+	config.Network = BuildNetworkList(v.NetworkList)
 	for _, user := range v.Users {
 		if user.Cipher != "" {
 			return nil, errors.New("shadowsocks 2022 (relay): users must have empty method")
@@ -169,7 +159,7 @@ func buildShadowsocks2022(v *ShadowsocksServerConfig) (proto.Message, error) {
 		config.Destinations = append(config.Destinations, &shadowsocks_2022.RelayDestination{
 			Key:     user.Password,
 			Email:   user.Email,
-			Address: user.Address.Build(),
+			Address: BuildAddress(user.Address),
 			Port:    uint32(user.Port),
 			Level:   int32(user.Level),
 		})
@@ -177,23 +167,12 @@ func buildShadowsocks2022(v *ShadowsocksServerConfig) (proto.Message, error) {
 	return config, nil
 }
 
-type ShadowsocksServerTarget struct {
-	Address  *Address `json:"address"`
-	Port     uint16   `json:"port"`
-	Level    byte     `json:"level"`
-	Email    string   `json:"email"`
-	Cipher   string   `json:"method"`
-	Password string   `json:"password"`
-}
+// ShadowsocksServerTarget is one server of a shadowsocks outbound.
+type ShadowsocksServerTarget = coreconfig.ShadowsocksTarget
 
+// ShadowsocksClientConfig is the settings of a shadowsocks outbound.
 type ShadowsocksClientConfig struct {
-	Address  *Address                   `json:"address"`
-	Port     uint16                     `json:"port"`
-	Level    byte                       `json:"level"`
-	Email    string                     `json:"email"`
-	Cipher   string                     `json:"method"`
-	Password string                     `json:"password"`
-	Servers  []*ShadowsocksServerTarget `json:"servers"`
+	coreconfig.ShadowsocksClient
 }
 
 func (v *ShadowsocksClientConfig) Build() (proto.Message, error) {
@@ -228,7 +207,7 @@ func (v *ShadowsocksClientConfig) Build() (proto.Message, error) {
 
 	if _, err := shadowsocks_2022.GetCipherMethod(server.Cipher); err == nil {
 		config := new(shadowsocks_2022.ClientConfig)
-		config.Address = server.Address.Build()
+		config.Address = BuildAddress(server.Address)
 		config.Port = uint32(server.Port)
 		config.Method = server.Cipher
 		config.Key = server.Password
@@ -243,7 +222,7 @@ func (v *ShadowsocksClientConfig) Build() (proto.Message, error) {
 		return nil, errors.New("unknown cipher method: ", server.Cipher)
 	}
 	ss := &protocol.ServerEndpoint{
-		Address: server.Address.Build(),
+		Address: BuildAddress(server.Address),
 		Port:    uint32(server.Port),
 		User: &protocol.User{
 			Level:   uint32(server.Level),

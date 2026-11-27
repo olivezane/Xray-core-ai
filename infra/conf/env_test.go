@@ -44,7 +44,7 @@ func TestEnvConfigOverride(t *testing.T) {
 		"TWO":   "new",
 		"THREE": "three",
 	}
-	base.Override(override)
+	overrideEnv(base, override)
 
 	want := map[string]string{
 		"ONE":   "one",

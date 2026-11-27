@@ -20,6 +20,7 @@ import (
 	"github.com/xtls/xray-core/common/platform/filesystem"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/utils"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/grpc"
 	"github.com/xtls/xray-core/transport/internet/headers/http"
@@ -42,23 +43,28 @@ func (NoOpConnectionAuthenticator) Build() (proto.Message, error) {
 	return new(noop.ConnectionConfig), nil
 }
 
-type AuthenticatorRequest struct {
-	Version string                 `json:"version"`
-	Method  string                 `json:"method"`
-	Path    StringList             `json:"path"`
-	Headers map[string]*StringList `json:"headers"`
-}
-
+// AuthenticatorRequest is the request header of an HTTP transport.
+// sortMapKeys returns the keys of the header map in a stable order.
 func sortMapKeys(m map[string]*StringList) []string {
-	var keys []string
-	for key := range m {
-		keys = append(keys, key)
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	return keys
 }
 
+// AuthenticatorRequest is the HTTPRequest of the configuration.
+type AuthenticatorRequest struct {
+	coreconfig.HTTPRequest
+}
+
+// Build converts it to its message.
 func (v *AuthenticatorRequest) Build() (*http.RequestConfig, error) {
+	return buildAuthenticatorRequest(&v.HTTPRequest)
+}
+
+func buildAuthenticatorRequest(v *coreconfig.HTTPRequest) (*http.RequestConfig, error) {
 	config := &http.RequestConfig{
 		Uri: []string{"/"},
 		Header: []*http.Header{
@@ -143,14 +149,18 @@ func (v *AuthenticatorRequest) Build() (*http.RequestConfig, error) {
 	return config, nil
 }
 
+// AuthenticatorResponse is the response header of an HTTP transport.
+// AuthenticatorResponse is the HTTPResponse of the configuration.
 type AuthenticatorResponse struct {
-	Version string                 `json:"version"`
-	Status  string                 `json:"status"`
-	Reason  string                 `json:"reason"`
-	Headers map[string]*StringList `json:"headers"`
+	coreconfig.HTTPResponse
 }
 
+// Build converts it to its message.
 func (v *AuthenticatorResponse) Build() (*http.ResponseConfig, error) {
+	return buildAuthenticatorResponse(&v.HTTPResponse)
+}
+
+func buildAuthenticatorResponse(v *coreconfig.HTTPResponse) (*http.ResponseConfig, error) {
 	config := &http.ResponseConfig{
 		Header: []*http.Header{
 			{
@@ -211,20 +221,20 @@ func (v *AuthenticatorResponse) Build() (*http.ResponseConfig, error) {
 	return config, nil
 }
 
+// Authenticator is the header setting of the tcp transport.
 type Authenticator struct {
-	Request  AuthenticatorRequest  `json:"request"`
-	Response AuthenticatorResponse `json:"response"`
+	coreconfig.HTTPHeader
 }
 
 func (v *Authenticator) Build() (proto.Message, error) {
 	config := new(http.Config)
-	requestConfig, err := v.Request.Build()
+	requestConfig, err := buildAuthenticatorRequest(&v.Request)
 	if err != nil {
 		return nil, err
 	}
 	config.Request = requestConfig
 
-	responseConfig, err := v.Response.Build()
+	responseConfig, err := buildAuthenticatorResponse(&v.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -238,9 +248,9 @@ var tcpHeaderLoader = NewJSONConfigLoader(ConfigCreatorCache{
 	"http": func() interface{} { return new(Authenticator) },
 }, "type", "")
 
+// TCPConfig is the settings of the tcp transport.
 type TCPConfig struct {
-	HeaderConfig        json.RawMessage `json:"header"`
-	AcceptProxyProtocol bool            `json:"acceptProxyProtocol"`
+	coreconfig.TCP
 }
 
 // Build implements Buildable.
@@ -263,48 +273,13 @@ func (c *TCPConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
+// SplitHTTPConfig is the settings of the splithttp transport.
 type SplitHTTPConfig struct {
-	Host                 string            `json:"host"`
-	Path                 string            `json:"path"`
-	Mode                 string            `json:"mode"`
-	Headers              map[string]string `json:"headers"`
-	XPaddingBytes        Int32Range        `json:"xPaddingBytes"`
-	XPaddingObfsMode     bool              `json:"xPaddingObfsMode"`
-	XPaddingKey          string            `json:"xPaddingKey"`
-	XPaddingHeader       string            `json:"xPaddingHeader"`
-	XPaddingPlacement    string            `json:"xPaddingPlacement"`
-	XPaddingMethod       string            `json:"xPaddingMethod"`
-	UplinkHTTPMethod     string            `json:"uplinkHTTPMethod"`
-	SessionIDPlacement   string            `json:"sessionIDPlacement"`
-	SessionIDKey         string            `json:"sessionIDKey"`
-	SessionIDTable       string            `json:"sessionIDTable"`
-	SessionIDLength      Int32Range        `json:"sessionIDLength"`
-	SeqPlacement         string            `json:"seqPlacement"`
-	SeqKey               string            `json:"seqKey"`
-	UplinkDataPlacement  string            `json:"uplinkDataPlacement"`
-	UplinkDataKey        string            `json:"uplinkDataKey"`
-	UplinkChunkSize      Int32Range        `json:"uplinkChunkSize"`
-	NoGRPCHeader         bool              `json:"noGRPCHeader"`
-	NoSSEHeader          bool              `json:"noSSEHeader"`
-	ScMaxEachPostBytes   Int32Range        `json:"scMaxEachPostBytes"`
-	ScMinPostsIntervalMs Int32Range        `json:"scMinPostsIntervalMs"`
-	ScMaxBufferedPosts   int64             `json:"scMaxBufferedPosts"`
-	ScStreamUpServerSecs Int32Range        `json:"scStreamUpServerSecs"`
-	ServerMaxHeaderBytes int32             `json:"serverMaxHeaderBytes"`
-	Xmux                 XmuxConfig        `json:"xmux"`
-	DownloadSettings     *StreamConfig     `json:"downloadSettings"`
-	H2Params             json.RawMessage   `json:"h2Params"`
-	Extra                json.RawMessage   `json:"extra"`
+	coreconfig.SplitHTTP
 }
 
-type XmuxConfig struct {
-	MaxConcurrency   Int32Range `json:"maxConcurrency"`
-	MaxConnections   Int32Range `json:"maxConnections"`
-	CMaxReuseTimes   Int32Range `json:"cMaxReuseTimes"`
-	HMaxRequestTimes Int32Range `json:"hMaxRequestTimes"`
-	HMaxReusableSecs Int32Range `json:"hMaxReusableSecs"`
-	HKeepAlivePeriod int64      `json:"hKeepAlivePeriod"`
-}
+// XmuxConfig is the multiplex window of an HTTP based transport.
+type XmuxConfig = coreconfig.Xmux
 
 func newRangeConfig(input Int32Range) *splithttp.RangeConfig {
 	return &splithttp.RangeConfig{
@@ -314,9 +289,14 @@ func newRangeConfig(input Int32Range) *splithttp.RangeConfig {
 }
 
 // Build implements Buildable.
+// Build converts the settings to their message.
 func (c *SplitHTTPConfig) Build() (proto.Message, error) {
+	return buildSplitHTTP(&c.SplitHTTP)
+}
+
+func buildSplitHTTP(c *coreconfig.SplitHTTP) (proto.Message, error) {
 	if c.Extra != nil {
-		var extra SplitHTTPConfig
+		var extra coreconfig.SplitHTTP
 		if err := json.Unmarshal(c.Extra, &extra); err != nil {
 			return nil, errors.New(`Failed to unmarshal "extra".`).Base(err)
 		}
@@ -459,7 +439,7 @@ func (c *SplitHTTPConfig) Build() (proto.Message, error) {
 	if c.Xmux.MaxConnections.To > 0 && c.Xmux.MaxConcurrency.To > 0 {
 		return nil, errors.New("maxConnections cannot be specified together with maxConcurrency")
 	}
-	if c.Xmux == (XmuxConfig{}) {
+	if c.Xmux == (coreconfig.Xmux{}) {
 		c.Xmux.MaxConnections.From = 3
 		c.Xmux.MaxConnections.To = 3
 		c.Xmux.HMaxRequestTimes.From = 600
@@ -512,7 +492,7 @@ func (c *SplitHTTPConfig) Build() (proto.Message, error) {
 			return nil, errors.New(`Can not use "downloadSettings" in "stream-one" mode.`)
 		}
 		var err error
-		if config.DownloadSettings, err = c.DownloadSettings.Build(); err != nil {
+		if config.DownloadSettings, err = (&StreamConfig{*c.DownloadSettings}).Build(); err != nil {
 			return nil, errors.New(`Failed to build "downloadSettings".`).Base(err)
 		}
 	}
@@ -531,16 +511,9 @@ func roomSize(tableSize int, min, max int32) *big.Int {
 	return sum
 }
 
+// KCPConfig is the settings of the mkcp transport.
 type KCPConfig struct {
-	Mtu              *uint32 `json:"mtu"`
-	Tti              *uint32 `json:"tti"`
-	UpCap            *uint32 `json:"uplinkCapacity"`
-	DownCap          *uint32 `json:"downlinkCapacity"`
-	CwndMultiplier   *uint32 `json:"cwndMultiplier"`
-	MaxSendingWindow *uint32 `json:"maxSendingWindow"`
-
-	HeaderConfig json.RawMessage `json:"header"`
-	Seed         *string         `json:"seed"`
+	coreconfig.KCP
 }
 
 // Build implements Buildable.
@@ -582,15 +555,9 @@ func (c *KCPConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
+// GRPCConfig is the settings of the grpc transport.
 type GRPCConfig struct {
-	Authority           string `json:"authority"`
-	ServiceName         string `json:"serviceName"`
-	MultiMode           bool   `json:"multiMode"`
-	IdleTimeout         int32  `json:"idle_timeout"`
-	HealthCheckTimeout  int32  `json:"health_check_timeout"`
-	PermitWithoutStream bool   `json:"permit_without_stream"`
-	InitialWindowsSize  int32  `json:"initial_windows_size"`
-	UserAgent           string `json:"user_agent"`
+	coreconfig.GRPC
 }
 
 func (g *GRPCConfig) Build() (proto.Message, error) {
@@ -617,12 +584,9 @@ func (g *GRPCConfig) Build() (proto.Message, error) {
 	}, nil
 }
 
+// WebSocketConfig is the settings of the websocket transport.
 type WebSocketConfig struct {
-	Host                string            `json:"host"`
-	Path                string            `json:"path"`
-	Headers             map[string]string `json:"headers"`
-	AcceptProxyProtocol bool              `json:"acceptProxyProtocol"`
-	HeartbeatPeriod     uint32            `json:"heartbeatPeriod"`
+	coreconfig.WebSocket
 }
 
 // Build implements Buildable.
@@ -659,11 +623,9 @@ func (c *WebSocketConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
+// HttpUpgradeConfig is the settings of the httpupgrade transport.
 type HttpUpgradeConfig struct {
-	Host                string            `json:"host"`
-	Path                string            `json:"path"`
-	Headers             map[string]string `json:"headers"`
-	AcceptProxyProtocol bool              `json:"acceptProxyProtocol"`
+	coreconfig.HttpUpgrade
 }
 
 // Build implements Buildable.
@@ -703,9 +665,11 @@ const (
 	Terabyte = 1000 * Gigabyte
 )
 
-type Bandwidth string
+// Bandwidth is a bandwidth written as a string with a unit.
+type Bandwidth = coreconfig.Bandwidth
 
-func (b Bandwidth) Bps() (uint64, error) {
+// bandwidthBps parses a bandwidth with its unit into bytes per second.
+func bandwidthBps(b coreconfig.Bandwidth) (uint64, error) {
 	s := strings.TrimSpace(strings.ToLower(string(b)))
 	if s == "" {
 		return 0, nil
@@ -746,26 +710,12 @@ func (b Bandwidth) Bps() (uint64, error) {
 	return uint64(val*float64(mul)) / 8, nil
 }
 
-type Masquerade struct {
-	Type string `json:"type"`
+// Masquerade is what a HYSTERIA inbound answers with.
+type Masquerade = coreconfig.Masquerade
 
-	Dir string `json:"dir"`
-
-	Url         string `json:"url"`
-	RewriteHost bool   `json:"rewriteHost"`
-	XForwarded  bool   `json:"xForwarded"`
-	Insecure    bool   `json:"insecure"`
-
-	Content    string            `json:"content"`
-	Headers    map[string]string `json:"headers"`
-	StatusCode int32             `json:"statusCode"`
-}
-
+// HysteriaConfig is the settings of the hysteria transport.
 type HysteriaConfig struct {
-	Version        int32      `json:"version"`
-	Auth           string     `json:"auth"`
-	UdpIdleTimeout int64      `json:"udpIdleTimeout"`
-	Masquerade     Masquerade `json:"masquerade"`
+	coreconfig.Hysteria
 }
 
 func (c *HysteriaConfig) Build() (proto.Message, error) {
@@ -797,23 +747,20 @@ func (c *HysteriaConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
-type MasqueWarpConfig struct {
-	PrivateKey string   `json:"privateKey"`
-	PublicKey  string   `json:"publicKey"`
-	Address    []string `json:"address"`
-}
+// MasqueWarpConfig is the WARP account of the masque transport.
+type MasqueWarpConfig = coreconfig.MasqueWarp
 
+// MasqueConfig is the settings of the masque transport.
 type MasqueConfig struct {
-	Host    string            `json:"host"`
-	Path    string            `json:"path"`
-	User    string            `json:"user"`
-	Pass    string            `json:"pass"`
-	Headers map[string]string `json:"headers"`
-	Warp    *MasqueWarpConfig `json:"warp"`
-	Xmux    XmuxConfig        `json:"xmux"`
+	coreconfig.Masque
 }
 
+// Build converts the settings to their message.
 func (c *MasqueConfig) Build() (proto.Message, error) {
+	return buildMasque(&c.Masque)
+}
+
+func buildMasque(c *coreconfig.Masque) (proto.Message, error) {
 	var warp *masque.Warp
 	host := c.Host
 	path := c.Path
@@ -884,7 +831,7 @@ func (c *MasqueConfig) Build() (proto.Message, error) {
 	if c.Xmux.MaxConnections.To > 0 && c.Xmux.MaxConcurrency.To > 0 {
 		return nil, errors.New("maxConnections cannot be specified together with maxConcurrency")
 	}
-	if c.Xmux == (XmuxConfig{}) {
+	if c.Xmux == (coreconfig.Xmux{}) {
 		c.Xmux.MaxConnections.From = 1
 		c.Xmux.MaxConnections.To = 1
 		c.Xmux.HMaxReusableSecs.From = 1800
@@ -986,21 +933,10 @@ func readFileOrString(f string, s []string) ([]byte, error) {
 	return nil, errors.New("both file and bytes are empty.")
 }
 
+// XDriveConfig is the settings of the xdrive transport. The h3 field is not part
+// of the configuration model: StreamConfig sets it when the ALPN is h3.
 type XDriveConfig struct {
-	RemoteFolder      string          `json:"remoteFolder"`
-	Service           string          `json:"service"`
-	Secrets           []string        `json:"secrets"`
-	SegmentBytes      uint32          `json:"segmentBytes"`
-	FlushIntervalMs   uint32          `json:"flushIntervalMs"`
-	PollIntervalMs    uint32          `json:"pollIntervalMs"`
-	MaxPollIntervalMs uint32          `json:"maxPollIntervalMs"`
-	SessionTTLSeconds uint32          `json:"sessionTtlSeconds"`
-	Concurrency       uint32          `json:"concurrency"`
-	EagerWindowMs     uint32          `json:"eagerWindowMs"`
-	HoleTimeoutMs     uint32          `json:"holeTimeoutMs"`
-	Template          json.RawMessage `json:"template"`
-	S3                *XDriveS3Config `json:"s3"`
-	Xmux              XmuxConfig      `json:"xmux"`
+	coreconfig.XDrive
 
 	// set by StreamConfig when "alpn" is ["h3"]
 	h3 bool
@@ -1014,7 +950,12 @@ type XDriveS3Config struct {
 }
 
 // Build implements Buildable.
+// Build converts the settings to their message.
 func (c *XDriveConfig) Build() (proto.Message, error) {
+	return buildXDrive(&c.XDrive, c.h3)
+}
+
+func buildXDrive(c *coreconfig.XDrive, h3 bool) (proto.Message, error) {
 	switch c.Service {
 	case "local":
 	case "Google Drive":
@@ -1039,10 +980,10 @@ func (c *XDriveConfig) Build() (proto.Message, error) {
 	if c.Xmux.MaxConnections.To > 0 && c.Xmux.MaxConcurrency.To > 0 {
 		return nil, errors.New("maxConnections cannot be specified together with maxConcurrency")
 	}
-	if c.Xmux == (XmuxConfig{}) {
+	if c.Xmux == (coreconfig.Xmux{}) {
 		c.Xmux.MaxConnections.From = 1
 		c.Xmux.MaxConnections.To = 1
-		if c.Service == "google-drive" && !c.h3 {
+		if c.Service == "google-drive" && !h3 {
 			// Google gives an h2 connection 1 MiB of window, which a few sessions on
 			// a long rtt would share, an h3 connection has no such limit
 			c.Xmux.MaxConnections.From = 4

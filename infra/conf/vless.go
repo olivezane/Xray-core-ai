@@ -15,6 +15,7 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/task"
 	"github.com/xtls/xray-core/common/uuid"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/vless"
 	"github.com/xtls/xray-core/proxy/vless/inbound"
 	"github.com/xtls/xray-core/proxy/vless/multiplex"
@@ -22,22 +23,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type VLessInboundFallback struct {
-	Name string          `json:"name"`
-	Alpn string          `json:"alpn"`
-	Path string          `json:"path"`
-	Type string          `json:"type"`
-	Dest json.RawMessage `json:"dest"`
-	Xver uint64          `json:"xver"`
-}
+// VLessInboundFallback is one fallback of a VLESS inbound.
+type VLessInboundFallback = coreconfig.VLessFallback
 
+// VLessInboundConfig is the settings of a VLESS inbound.
 type VLessInboundConfig struct {
-	Users      []json.RawMessage       `json:"users"`
-	Clients    []json.RawMessage       `json:"clients"`
-	Decryption string                  `json:"decryption"`
-	Fallbacks  []*VLessInboundFallback `json:"fallbacks"`
-	Flow       string                  `json:"flow"`
-	Testseed   []uint32                `json:"testseed"`
+	coreconfig.VLessInbound
 }
 
 // Build implements Buildable
@@ -215,12 +206,17 @@ func (c *VLessInboundConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
+// VLessReverseConfig is the reverse setting of a VLESS outbound.
 type VLessReverseConfig struct {
-	Tag      string          `json:"tag"`
-	Sniffing *SniffingConfig `json:"sniffing"`
+	coreconfig.VLessReverse
 }
 
+// Build converts the reverse setting to its message.
 func (c *VLessReverseConfig) Build() (*vless.Reverse, error) {
+	return buildVLessReverse(&c.VLessReverse)
+}
+
+func buildVLessReverse(c *coreconfig.VLessReverse) (*vless.Reverse, error) {
 	if c.Tag == "" {
 		return nil, errors.New(`VLESS reverse: "tag" can't be empty`)
 	}
@@ -228,7 +224,7 @@ func (c *VLessReverseConfig) Build() (*vless.Reverse, error) {
 		Tag: c.Tag,
 	}
 	if c.Sniffing != nil {
-		sc, err := c.Sniffing.Build()
+		sc, err := BuildSniffing(c.Sniffing)
 		if err != nil {
 			return nil, errors.New(`VLESS reverse: invalid "sniffing" config`).Base(err)
 		}
@@ -237,13 +233,10 @@ func (c *VLessReverseConfig) Build() (*vless.Reverse, error) {
 	return r, nil
 }
 
-type MultiplexConfig struct {
-	Concurrency     int16  `json:"concurrency"`
-	XudpConcurrency int16  `json:"xudpConcurrency"`
-	XudpProxyUDP443 string `json:"xudpProxyUDP443"`
-}
+// MultiplexConfig is the multiplex setting of a VLESS or VMess outbound.
+type MultiplexConfig = coreconfig.Multiplex
 
-func (c *MultiplexConfig) Build() (*vless.Multiplex, error) {
+func BuildMultiplex(c *coreconfig.Multiplex) (*vless.Multiplex, error) {
 	if c == nil {
 		return nil, nil
 	}
@@ -256,31 +249,17 @@ func (c *MultiplexConfig) Build() (*vless.Multiplex, error) {
 	})
 }
 
-type VLessOutboundVnext struct {
-	Address *Address          `json:"address"`
-	Port    uint16            `json:"port"`
-	Users   []json.RawMessage `json:"users"`
-}
+// VLessOutboundVnext is one endpoint of a VLESS outbound.
+type VLessOutboundVnext = coreconfig.VLessVnext
 
+// VLessOutboundConfig is the settings of a VLESS outbound.
 type VLessOutboundConfig struct {
-	Address    *Address              `json:"address"`
-	Port       uint16                `json:"port"`
-	Level      uint32                `json:"level"`
-	Email      string                `json:"email"`
-	Id         string                `json:"id"`
-	Flow       string                `json:"flow"`
-	Seed       string                `json:"seed"`
-	Encryption string                `json:"encryption"`
-	Multiplex  *MultiplexConfig      `json:"multiplex"`
-	Reverse    *VLessReverseConfig   `json:"reverse"`
-	Testpre    uint32                `json:"testpre"`
-	Testseed   []uint32              `json:"testseed"`
-	Vnext      []*VLessOutboundVnext `json:"vnext"`
+	coreconfig.VLessOutbound
 }
 
 // Build implements Buildable
 func (c *VLessOutboundConfig) Build() (proto.Message, error) {
-	multiplex, err := c.Multiplex.Build()
+	multiplex, err := BuildMultiplex(c.Multiplex)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +285,7 @@ func (c *VLessOutboundConfig) Build() (proto.Message, error) {
 			return nil, errors.New(`VLESS vnext: "users" should have one and only one member. Multiple members in "users" should use multiple VLESS outbounds and routing balancer instead`)
 		}
 		spec := &protocol.ServerEndpoint{
-			Address: rec.Address.Build(),
+			Address: BuildAddress(rec.Address),
 			Port:    uint32(rec.Port),
 		}
 		for _, rawUser := range rec.Users {
@@ -326,7 +305,7 @@ func (c *VLessOutboundConfig) Build() (proto.Message, error) {
 				//account.Seed = c.Seed
 				account.Encryption = c.Encryption
 				if c.Reverse != nil {
-					rvs, err := c.Reverse.Build()
+					rvs, err := buildVLessReverse(c.Reverse)
 					if err != nil {
 						return nil, err
 					}

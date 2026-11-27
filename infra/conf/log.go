@@ -5,6 +5,7 @@ import (
 
 	"github.com/xtls/xray-core/app/log"
 	clog "github.com/xtls/xray-core/common/log"
+	coreconfig "github.com/xtls/xray-core/core/config"
 )
 
 func DefaultLogConfig() *log.Config {
@@ -15,15 +16,13 @@ func DefaultLogConfig() *log.Config {
 	}
 }
 
-type LogConfig struct {
-	AccessLog   string `json:"access"`
-	ErrorLog    string `json:"error"`
-	LogLevel    string `json:"logLevel"`
-	DNSLog      bool   `json:"dnsLog"`
-	MaskAddress string `json:"maskAddress"`
-}
+// LogConfig is the "log" section of the configuration model.
+type LogConfig = coreconfig.Log
 
-func (v *LogConfig) Build() *log.Config {
+// BuildLog converts the log section to the message the instance consumes: the
+// user's strings become log types and severities here, which is what the
+// boundary of the model is for.
+func BuildLog(v *coreconfig.Log) *log.Config {
 	if v == nil {
 		return nil
 	}

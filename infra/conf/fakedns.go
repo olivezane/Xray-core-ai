@@ -9,65 +9,28 @@ import (
 
 	"github.com/xtls/xray-core/app/dns/fakedns"
 	"github.com/xtls/xray-core/common/errors"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/features/dns"
 )
 
-type FakeDNSPoolElementConfig struct {
-	IPPool  string `json:"ipPool"`
-	LRUSize int64  `json:"poolSize"`
-}
+// FakeDNSPoolElementConfig is one fake DNS pool of the configuration model.
+type FakeDNSPoolElementConfig = coreconfig.FakeDNSPool
 
-type FakeDNSConfig struct {
-	pool  *FakeDNSPoolElementConfig
-	pools []*FakeDNSPoolElementConfig
-}
+// FakeDNSConfig is the fake DNS section of the configuration model.
+type FakeDNSConfig = coreconfig.FakeDNS
 
-// MarshalJSON implements encoding/json.Marshaler.MarshalJSON
-func (f *FakeDNSConfig) MarshalJSON() ([]byte, error) {
-	if (f.pool != nil) != (f.pools != nil) {
-		if f.pool != nil {
-			return json.Marshal(f.pool)
-		} else if f.pools != nil {
-			return json.Marshal(f.pools)
-		}
+
+// BuildFakeDNS converts the fake DNS section to its message.
+func BuildFakeDNS(f *coreconfig.FakeDNS) (*fakedns.FakeDnsPoolMulti, error) {
+	pools := f.Pools()
+	if len(pools) == 0 {
+		return nil, errors.New("no valid FakeDNS config")
 	}
-	return nil, errors.New("unexpected config state")
-}
-
-// UnmarshalJSON implements encoding/json.Unmarshaler.UnmarshalJSON
-func (f *FakeDNSConfig) UnmarshalJSON(data []byte) error {
-	var pool FakeDNSPoolElementConfig
-	var pools []*FakeDNSPoolElementConfig
-	switch {
-	case json.Unmarshal(data, &pool) == nil:
-		f.pool = &pool
-	case json.Unmarshal(data, &pools) == nil:
-		f.pools = pools
-	default:
-		return errors.New("invalid fakedns config")
+	built := new(fakedns.FakeDnsPoolMulti)
+	for _, v := range pools {
+		built.Pools = append(built.Pools, &fakedns.FakeDnsPool{IpPool: v.IPPool, LruSize: v.LRUSize})
 	}
-	return nil
-}
-
-func (f *FakeDNSConfig) Build() (*fakedns.FakeDnsPoolMulti, error) {
-	fakeDNSPool := fakedns.FakeDnsPoolMulti{}
-
-	if f.pool != nil {
-		fakeDNSPool.Pools = append(fakeDNSPool.Pools, &fakedns.FakeDnsPool{
-			IpPool:  f.pool.IPPool,
-			LruSize: f.pool.LRUSize,
-		})
-		return &fakeDNSPool, nil
-	}
-
-	if f.pools != nil {
-		for _, v := range f.pools {
-			fakeDNSPool.Pools = append(fakeDNSPool.Pools, &fakedns.FakeDnsPool{IpPool: v.IPPool, LruSize: v.LRUSize})
-		}
-		return &fakeDNSPool, nil
-	}
-
-	return nil, errors.New("no valid FakeDNS config")
+	return built, nil
 }
 
 type FakeDNSPostProcessingStage struct{}
@@ -108,7 +71,7 @@ func (FakeDNSPostProcessingStage) Process(config *Config) error {
 			config.DNSConfig.FakeDNS = &FakeDNSConfig{}
 			switch {
 			case isIPv4Enable && isIPv6Enable:
-				config.DNSConfig.FakeDNS.pools = []*FakeDNSPoolElementConfig{
+				config.DNSConfig.FakeDNS.SetPools([]*FakeDNSPoolElementConfig{
 					{
 						IPPool:  dns.FakeIPv4Pool,
 						LRUSize: 32768,
@@ -117,17 +80,17 @@ func (FakeDNSPostProcessingStage) Process(config *Config) error {
 						IPPool:  dns.FakeIPv6Pool,
 						LRUSize: 32768,
 					},
-				}
+				})
 			case !isIPv4Enable && isIPv6Enable:
-				config.DNSConfig.FakeDNS.pool = &FakeDNSPoolElementConfig{
+				config.DNSConfig.FakeDNS.SetPool(&FakeDNSPoolElementConfig{
 					IPPool:  dns.FakeIPv6Pool,
 					LRUSize: 65535,
-				}
+				})
 			case isIPv4Enable && !isIPv6Enable:
-				config.DNSConfig.FakeDNS.pool = &FakeDNSPoolElementConfig{
+				config.DNSConfig.FakeDNS.SetPool(&FakeDNSPoolElementConfig{
 					IPPool:  dns.FakeIPv4Pool,
 					LRUSize: 65535,
-				}
+				})
 			}
 		}
 
@@ -184,10 +147,7 @@ func tunHasIPv6(config *TunConfig) bool {
 // or its DNS address, which the pool never allocates: connections to them would
 // not reach the TUN.
 func validateFakeDNSPools(fakeDNS *FakeDNSConfig, tunConfigs []*TunConfig) error {
-	pools := fakeDNS.pools
-	if fakeDNS.pool != nil {
-		pools = []*FakeDNSPoolElementConfig{fakeDNS.pool}
-	}
+	pools := fakeDNS.Pools()
 	for _, pool := range pools {
 		_, ipRange, err := net.ParseCIDR(pool.IPPool)
 		if err != nil {

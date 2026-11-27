@@ -6,16 +6,15 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/socks"
 	"google.golang.org/protobuf/proto"
 )
 
-type SocksAccount struct {
-	Username string `json:"user"`
-	Password string `json:"pass"`
-}
+// SocksAccount is one user of a socks inbound, from the configuration model.
+type SocksAccount = coreconfig.SocksAccount
 
-func (v *SocksAccount) Build() *socks.Account {
+func buildSocksAccount(v *coreconfig.SocksAccount) *socks.Account {
 	return &socks.Account{
 		Username: v.Username,
 		Password: v.Password,
@@ -27,13 +26,9 @@ const (
 	AuthMethodUserPass = "password"
 )
 
+// SocksServerConfig is the settings of a socks inbound.
 type SocksServerConfig struct {
-	AuthMethod string          `json:"auth"`
-	Users      []*SocksAccount `json:"users"`
-	Accounts   []*SocksAccount `json:"accounts"`
-	UDP        bool            `json:"udp"`
-	Host       *Address        `json:"ip"`
-	UserLevel  uint32          `json:"userLevel"`
+	coreconfig.SocksServer
 }
 
 func (v *SocksServerConfig) Build() (proto.Message, error) {
@@ -60,27 +55,19 @@ func (v *SocksServerConfig) Build() (proto.Message, error) {
 
 	config.UdpEnabled = v.UDP
 	if v.Host != nil {
-		config.Address = v.Host.Build()
+		config.Address = BuildAddress(v.Host)
 	}
 
 	config.UserLevel = v.UserLevel
 	return config, nil
 }
 
-type SocksRemoteConfig struct {
-	Address *Address          `json:"address"`
-	Port    uint16            `json:"port"`
-	Users   []json.RawMessage `json:"users"`
-}
+// SocksRemoteConfig is one endpoint of a socks outbound.
+type SocksRemoteConfig = coreconfig.SocksRemote
 
+// SocksClientConfig is the settings of a socks outbound.
 type SocksClientConfig struct {
-	Address  *Address             `json:"address"`
-	Port     uint16               `json:"port"`
-	Level    uint32               `json:"level"`
-	Email    string               `json:"email"`
-	Username string               `json:"user"`
-	Password string               `json:"pass"`
-	Servers  []*SocksRemoteConfig `json:"servers"`
+	coreconfig.SocksClient
 }
 
 func (v *SocksClientConfig) Build() (proto.Message, error) {
@@ -104,7 +91,7 @@ func (v *SocksClientConfig) Build() (proto.Message, error) {
 		return nil, errors.New(`SOCKS servers: "users" should have one member at most. Multiple members in "users" should use multiple SOCKS outbounds and routing balancer instead`)
 	}
 	server := &protocol.ServerEndpoint{
-		Address: serverConfig.Address.Build(),
+		Address: BuildAddress(serverConfig.Address),
 		Port:    uint32(serverConfig.Port),
 	}
 	if len(serverConfig.Users) == 1 {
@@ -127,7 +114,7 @@ func (v *SocksClientConfig) Build() (proto.Message, error) {
 				return nil, errors.New("failed to parse socks account").Base(err)
 			}
 		}
-		user.Account = serial.ToTypedMessage(account.Build())
+		user.Account = serial.ToTypedMessage(buildSocksAccount(account))
 		server.User = user
 	}
 	config.Server = server

@@ -13,29 +13,18 @@ import (
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/task"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/trojan"
 	"google.golang.org/protobuf/proto"
 )
 
 // TrojanServerTarget is configuration of a single trojan server
-type TrojanServerTarget struct {
-	Address  *Address `json:"address"`
-	Port     uint16   `json:"port"`
-	Level    byte     `json:"level"`
-	Email    string   `json:"email"`
-	Password string   `json:"password"`
-	Flow     string   `json:"flow"`
-}
+// TrojanServerTarget is one server of a trojan outbound.
+type TrojanServerTarget = coreconfig.TrojanTarget
 
 // TrojanClientConfig is configuration of trojan servers
 type TrojanClientConfig struct {
-	Address  *Address              `json:"address"`
-	Port     uint16                `json:"port"`
-	Level    byte                  `json:"level"`
-	Email    string                `json:"email"`
-	Password string                `json:"password"`
-	Flow     string                `json:"flow"`
-	Servers  []*TrojanServerTarget `json:"servers"`
+	coreconfig.TrojanClient
 }
 
 // Build implements Buildable
@@ -75,7 +64,7 @@ func (c *TrojanClientConfig) Build() (proto.Message, error) {
 	}
 
 	config.Server = &protocol.ServerEndpoint{
-		Address: rec.Address.Build(),
+		Address: BuildAddress(rec.Address),
 		Port:    uint32(rec.Port),
 		User: &protocol.User{
 			Level: uint32(rec.Level),
@@ -90,28 +79,14 @@ func (c *TrojanClientConfig) Build() (proto.Message, error) {
 }
 
 // TrojanInboundFallback is fallback configuration
-type TrojanInboundFallback struct {
-	Name string          `json:"name"`
-	Alpn string          `json:"alpn"`
-	Path string          `json:"path"`
-	Type string          `json:"type"`
-	Dest json.RawMessage `json:"dest"`
-	Xver uint64          `json:"xver"`
-}
+type TrojanInboundFallback = coreconfig.TrojanFallback
 
 // TrojanUserConfig is user configuration
-type TrojanUserConfig struct {
-	Password string `json:"password"`
-	Level    byte   `json:"level"`
-	Email    string `json:"email"`
-	Flow     string `json:"flow"`
-}
+type TrojanUserConfig = coreconfig.TrojanUser
 
 // TrojanServerConfig is Inbound configuration
 type TrojanServerConfig struct {
-	Users     []*TrojanUserConfig      `json:"users"`
-	Clients   []*TrojanUserConfig      `json:"clients"`
-	Fallbacks []*TrojanInboundFallback `json:"fallbacks"`
+	coreconfig.TrojanServer
 }
 
 // Build implements Buildable

@@ -1,68 +1,25 @@
 package conf
 
 import (
-	"encoding/json"
 	"math"
 	"strings"
 
 	"github.com/xtls/xray-core/common/errors"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/transport/internet"
 )
 
-type CustomSockoptConfig struct {
-	System  string `json:"system"`
-	Network string `json:"network"`
-	Level   string `json:"level"`
-	Opt     string `json:"opt"`
-	Value   string `json:"value"`
-	Type    string `json:"type"`
-}
+// CustomSockoptConfig is one raw socket option of the configuration model.
+type CustomSockoptConfig = coreconfig.CustomSockopt
 
-type HappyEyeballsConfig struct {
-	PrioritizeIPv6   bool   `json:"prioritizeIPv6"`
-	TryDelayMs       uint64 `json:"tryDelayMs"`
-	Interleave       uint32 `json:"interleave"`
-	MaxConcurrentTry uint32 `json:"maxConcurrentTry"`
-}
+// HappyEyeballsConfig is the dual stack dial settings of the configuration model.
+type HappyEyeballsConfig = coreconfig.HappyEyeballs
 
-func (h *HappyEyeballsConfig) UnmarshalJSON(data []byte) error {
-	innerHappyEyeballsConfig := struct {
-		PrioritizeIPv6   bool   `json:"prioritizeIPv6"`
-		TryDelayMs       uint64 `json:"tryDelayMs"`
-		Interleave       uint32 `json:"interleave"`
-		MaxConcurrentTry uint32 `json:"maxConcurrentTry"`
-	}{PrioritizeIPv6: false, Interleave: 1, TryDelayMs: 0, MaxConcurrentTry: 4}
-	if err := json.Unmarshal(data, &innerHappyEyeballsConfig); err != nil {
-		return err
-	}
-	h.PrioritizeIPv6 = innerHappyEyeballsConfig.PrioritizeIPv6
-	h.TryDelayMs = innerHappyEyeballsConfig.TryDelayMs
-	h.Interleave = innerHappyEyeballsConfig.Interleave
-	h.MaxConcurrentTry = innerHappyEyeballsConfig.MaxConcurrentTry
-	return nil
-}
-
+// SocketConfig is the "sockopt" section of the configuration. It carries the
+// model type and adds the conversion to the message, where the three states of
+// TFO and the strategy names become their enum values.
 type SocketConfig struct {
-	Mark                  int32                  `json:"mark"`
-	TFO                   interface{}            `json:"tcpFastOpen"`
-	TProxy                string                 `json:"tproxy"`
-	AcceptProxyProtocol   bool                   `json:"acceptProxyProtocol"`
-	DomainStrategy        string                 `json:"domainStrategy"`
-	DialerProxy           string                 `json:"dialerProxy"`
-	TCPKeepAliveInterval  int32                  `json:"tcpKeepAliveInterval"`
-	TCPKeepAliveIdle      int32                  `json:"tcpKeepAliveIdle"`
-	TCPCongestion         string                 `json:"tcpCongestion"`
-	TCPWindowClamp        int32                  `json:"tcpWindowClamp"`
-	TCPMaxSeg             int32                  `json:"tcpMaxSeg"`
-	Penetrate             bool                   `json:"penetrate"`
-	TCPUserTimeout        int32                  `json:"tcpUserTimeout"`
-	V6only                bool                   `json:"v6only"`
-	Interface             string                 `json:"interface"`
-	TcpMptcp              bool                   `json:"tcpMptcp"`
-	CustomSockopt         []*CustomSockoptConfig `json:"customSockopt"`
-	AddressPortStrategy   string                 `json:"addressPortStrategy"`
-	HappyEyeballsSettings *HappyEyeballsConfig   `json:"happyEyeballs"`
-	TrustedXForwardedFor  []string               `json:"trustedXForwardedFor"`
+	coreconfig.Socket
 }
 
 // Build implements Buildable.

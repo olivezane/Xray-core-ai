@@ -3,20 +3,14 @@ package conf
 import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/dokodemo"
 	"google.golang.org/protobuf/proto"
 )
 
+// DokodemoConfig is the settings of a dokodemo-door inbound.
 type DokodemoConfig struct {
-	AllowedNetwork *NetworkList      `json:"allowedNetwork"`
-	RewriteAddress *Address          `json:"rewriteAddress"`
-	RewritePort    uint16            `json:"rewritePort"`
-	Network        *NetworkList      `json:"network"`
-	Address        *Address          `json:"address"`
-	Port           uint16            `json:"port"`
-	PortMap        map[string]string `json:"portMap"`
-	FollowRedirect bool              `json:"followRedirect"`
-	UserLevel      uint32            `json:"userLevel"`
+	coreconfig.Dokodemo
 }
 
 func (v *DokodemoConfig) Build() (proto.Message, error) {
@@ -30,9 +24,9 @@ func (v *DokodemoConfig) Build() (proto.Message, error) {
 		v.RewritePort = v.Port
 	}
 	config := new(dokodemo.Config)
-	config.AllowedNetworks = v.AllowedNetwork.Build()
+	config.AllowedNetworks = BuildNetworkList(v.AllowedNetwork)
 	if v.RewriteAddress != nil {
-		config.RewriteAddress = v.RewriteAddress.Build()
+		config.RewriteAddress = BuildAddress(v.RewriteAddress)
 	}
 	config.RewritePort = uint32(v.RewritePort)
 	config.PortMap = v.PortMap

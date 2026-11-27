@@ -6,19 +6,20 @@ import (
 
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/log"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/freedom"
 	"google.golang.org/protobuf/proto"
 )
 
-type ResponseConfig struct {
-	Type               string `json:"type"`
-	CustomResponseData string `json:"customResponseData"`
-}
-
+// BlackholeConfig is the settings of a blackhole outbound.
 type BlackholeConfig struct {
-	Response *ResponseConfig `json:"response"`
+	coreconfig.Blackhole
 }
 
+// ResponseConfig is what a blackhole outbound answers with.
+type ResponseConfig = coreconfig.Response
+
+// Build converts the settings of a blackhole outbound to its message.
 func (v *BlackholeConfig) Build() (proto.Message, error) {
 	errors.PrintDeprecatedFeatureWarning(`"blackhole" outbound`, `"freedom" outbound with a blocking "firewall" rule`)
 	rule := &freedom.FirewallConfig{

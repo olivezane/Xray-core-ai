@@ -12,56 +12,35 @@ import (
 	"github.com/xtls/xray-core/common/log"
 	xnet "github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/freedom"
 	"github.com/xtls/xray-core/transport/internet"
 	"google.golang.org/protobuf/proto"
 )
 
+// The types below are the freedom section of the configuration model. The ones
+// that add a conversion carry it, so the model stays in core/config.
+type (
+	Fragment = coreconfig.Fragment
+	Noise    = coreconfig.Noise
+)
+
+// FreedomConfig is the settings of a freedom outbound.
 type FreedomConfig struct {
-	TargetStrategy string                   `json:"targetStrategy"`
-	DomainStrategy string                   `json:"domainStrategy"`
-	Redirect       string                   `json:"redirect"`
-	UserLevel      uint32                   `json:"userLevel"`
-	Fragment       *Fragment                `json:"fragment"`
-	Noise          *Noise                   `json:"noise"`
-	Noises         []*Noise                 `json:"noises"`
-	ProxyProtocol  uint32                   `json:"proxyProtocol"`
-	IPsBlocked     *StringList              `json:"ipsBlocked"`
-	Firewall       []*FreedomFirewallConfig `json:"firewall"`
-	FinalRules     []*FreedomFirewallConfig `json:"finalRules"`
+	coreconfig.Freedom
 }
 
-type Fragment struct {
-	Packets  string      `json:"packets"`
-	Length   *Int32Range `json:"length"`
-	Interval *Int32Range `json:"interval"`
-	MaxSplit *Int32Range `json:"maxSplit"`
-}
-
-type Noise struct {
-	Type    string      `json:"type"`
-	Packet  string      `json:"packet"`
-	Delay   *Int32Range `json:"delay"`
-	ApplyTo string      `json:"applyTo"`
-}
-
+// FreedomFirewallConfig is one firewall rule of a freedom outbound.
 type FreedomFirewallConfig struct {
-	Action     string              `json:"action"`
-	Network    *NetworkList        `json:"network"`
-	Port       *PortList           `json:"port"`
-	IP         *StringList         `json:"ip"`
-	Delay      *Int32Range         `json:"delay"`
-	LogLevel   string              `json:"logLevel"`
-	Reply      *FreedomReplyConfig `json:"reply"`
-	BlockDelay *Int32Range         `json:"blockDelay"`
+	coreconfig.FreedomFirewall
 }
 
+// FreedomReplyConfig is the reply of a blocking rule.
 type FreedomReplyConfig struct {
-	Type               string `json:"type"`
-	CustomResponseData string `json:"customResponseData"`
+	coreconfig.FreedomReply
 }
 
-func (c *FreedomReplyConfig) Build() (*freedom.Reply, error) {
+func BuildFreedomReply(c *coreconfig.FreedomReply) (*freedom.Reply, error) {
 	replyType := strings.ToLower(c.Type)
 	switch replyType {
 	case "none", "":
@@ -220,7 +199,7 @@ func (c *FreedomConfig) Build() (proto.Message, error) {
 		}
 	}
 	for _, r := range firewall {
-		rule, err := r.Build()
+		rule, err := BuildFreedomFirewall(r)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +265,7 @@ func ParseNoise(noise *Noise) (*freedom.Noise, error) {
 	return NConfig, nil
 }
 
-func (c *FreedomFirewallConfig) Build() (*freedom.FirewallConfig, error) {
+func BuildFreedomFirewall(c *coreconfig.FreedomFirewall) (*freedom.FirewallConfig, error) {
 	rule := &freedom.FirewallConfig{}
 
 	switch strings.ToLower(c.Action) {
@@ -299,11 +278,11 @@ func (c *FreedomFirewallConfig) Build() (*freedom.FirewallConfig, error) {
 	}
 
 	if c.Network != nil {
-		rule.Networks = c.Network.Build()
+		rule.Networks = BuildNetworkList(c.Network)
 	}
 
 	if c.Port != nil {
-		rule.PortList = c.Port.Build()
+		rule.PortList = BuildPortList(c.Port)
 	}
 
 	if c.IP != nil {
@@ -334,7 +313,7 @@ func (c *FreedomFirewallConfig) Build() (*freedom.FirewallConfig, error) {
 	}
 
 	if c.Reply != nil {
-		reply, err := c.Reply.Build()
+		reply, err := BuildFreedomReply(c.Reply)
 		if err != nil {
 			return nil, err
 		}

@@ -9,20 +9,18 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/task"
 	"github.com/xtls/xray-core/common/uuid"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/vmess"
 	"github.com/xtls/xray-core/proxy/vmess/inbound"
 	"github.com/xtls/xray-core/proxy/vmess/outbound"
 	"google.golang.org/protobuf/proto"
 )
 
-type VMessAccount struct {
-	ID          string `json:"id"`
-	Security    string `json:"security"`
-	Experiments string `json:"experiments"`
-}
+// VMessAccount is one user of a VMess inbound or outbound.
+type VMessAccount = coreconfig.VMessAccount
 
 // Build implements Buildable
-func (a *VMessAccount) Build() *vmess.Account {
+func buildVMessAccount(a *coreconfig.VMessAccount) *vmess.Account {
 	var st protocol.SecurityType
 	switch strings.ToLower(a.Security) {
 	case "aes-128-gcm":
@@ -43,21 +41,19 @@ func (a *VMessAccount) Build() *vmess.Account {
 	}
 }
 
-type VMessDefaultConfig struct {
-	Level byte `json:"level"`
-}
+// VMessDefaultConfig is the default settings of a VMess inbound.
+type VMessDefaultConfig = coreconfig.VMessDefault
 
 // Build implements Buildable
-func (c *VMessDefaultConfig) Build() *inbound.DefaultConfig {
+func buildVMessDefault(c *coreconfig.VMessDefault) *inbound.DefaultConfig {
 	config := new(inbound.DefaultConfig)
 	config.Level = uint32(c.Level)
 	return config
 }
 
+// VMessInboundConfig is the settings of a VMess inbound.
 type VMessInboundConfig struct {
-	Users    []json.RawMessage   `json:"users"`
-	Clients  []json.RawMessage   `json:"clients"`
-	Defaults *VMessDefaultConfig `json:"default"`
+	coreconfig.VMessInbound
 }
 
 // Build implements Buildable
@@ -67,7 +63,7 @@ func (c *VMessInboundConfig) Build() (proto.Message, error) {
 	config := &inbound.Config{}
 
 	if c.Defaults != nil {
-		config.Default = c.Defaults.Build()
+		config.Default = buildVMessDefault(c.Defaults)
 	}
 
 	if c.Clients != nil {
@@ -91,7 +87,7 @@ func (c *VMessInboundConfig) Build() (proto.Message, error) {
 		}
 		account.ID = u.String()
 
-		user.Account = serial.ToTypedMessage(account.Build())
+		user.Account = serial.ToTypedMessage(buildVMessAccount(account))
 		config.User[idx] = user
 		return nil
 	}
@@ -102,29 +98,19 @@ func (c *VMessInboundConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
-type VMessOutboundTarget struct {
-	Address *Address          `json:"address"`
-	Port    uint16            `json:"port"`
-	Users   []json.RawMessage `json:"users"`
-}
+// VMessOutboundTarget is one endpoint of a VMess outbound.
+type VMessOutboundTarget = coreconfig.VMessOutboundTarget
 
+// VMessOutboundConfig is the settings of a VMess outbound.
 type VMessOutboundConfig struct {
-	Address     *Address               `json:"address"`
-	Port        uint16                 `json:"port"`
-	Level       uint32                 `json:"level"`
-	Email       string                 `json:"email"`
-	ID          string                 `json:"id"`
-	Security    string                 `json:"security"`
-	Experiments string                 `json:"experiments"`
-	Receivers   []*VMessOutboundTarget `json:"vnext"`
-	Multiplex   *MultiplexConfig       `json:"multiplex"`
+	coreconfig.VMessOutbound
 }
 
 // Build implements Buildable
 func (c *VMessOutboundConfig) Build() (proto.Message, error) {
 	errors.PrintNonRemovalDeprecatedFeatureWarning("VMess (with no Forward Secrecy, etc.)", "VLESS Encryption")
 
-	multiplex, err := c.Multiplex.Build()
+	multiplex, err := BuildMultiplex(c.Multiplex)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +135,7 @@ func (c *VMessOutboundConfig) Build() (proto.Message, error) {
 		return nil, errors.New(`VMess vnext: "address" is not set`)
 	}
 	spec := &protocol.ServerEndpoint{
-		Address: rec.Address.Build(),
+		Address: BuildAddress(rec.Address),
 		Port:    uint32(rec.Port),
 	}
 	rawUser := rec.Users[0]
@@ -179,7 +165,7 @@ func (c *VMessOutboundConfig) Build() (proto.Message, error) {
 	}
 	account.ID = u.String()
 
-	user.Account = serial.ToTypedMessage(account.Build())
+	user.Account = serial.ToTypedMessage(buildVMessAccount(account))
 	spec.User = user
 	config.Receiver = spec
 	return config, nil

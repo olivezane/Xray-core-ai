@@ -8,14 +8,17 @@ import (
 	utls "github.com/refraction-networking/utls"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/serial"
+	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/tls"
 )
 
-type TransportProtocol string
+// TransportProtocol is a transport name as a configuration writes it.
+type TransportProtocol = coreconfig.TransportProtocol
 
-// Build implements Buildable.
-func (p TransportProtocol) Build() (string, error) {
+// buildTransportProtocol turns a transport name of the configuration into the
+// protocol name of the transport it selects.
+func buildTransportProtocol(p coreconfig.TransportProtocol) (string, error) {
 	switch strings.ToLower(string(p)) {
 	case "raw", "tcp":
 		return "tcp", nil
@@ -47,43 +50,30 @@ func (p TransportProtocol) Build() (string, error) {
 	}
 }
 
+// StreamConfig is the "streamSettings" section of the configuration.
 type StreamConfig struct {
-	Address             *Address           `json:"address"`
-	Port                uint16             `json:"port"`
-	Method              *TransportProtocol `json:"method"`
-	Network             *TransportProtocol `json:"network"`
-	Security            string             `json:"security"`
-	FinalMask           *FinalMask         `json:"finalmask"`
-	TLSSettings         *TLSConfig         `json:"tlsSettings"`
-	REALITYSettings     *REALITYConfig     `json:"realitySettings"`
-	RAWSettings         *TCPConfig         `json:"rawSettings"`
-	TCPSettings         *TCPConfig         `json:"tcpSettings"`
-	XHTTPSettings       *SplitHTTPConfig   `json:"xhttpSettings"`
-	SplitHTTPSettings   *SplitHTTPConfig   `json:"splithttpSettings"`
-	KCPSettings         *KCPConfig         `json:"kcpSettings"`
-	GRPCSettings        *GRPCConfig        `json:"grpcSettings"`
-	WSSettings          *WebSocketConfig   `json:"wsSettings"`
-	HTTPUPGRADESettings *HttpUpgradeConfig `json:"httpupgradeSettings"`
-	HysteriaSettings    *HysteriaConfig    `json:"hysteriaSettings"`
-	MASQUESettings      *MasqueConfig      `json:"masqueSettings"`
-	XDRIVESettings      *XDriveConfig      `json:"xdriveSettings"`
-	SocketSettings      *SocketConfig      `json:"sockopt"`
+	coreconfig.Stream
 }
 
 // Build implements Buildable.
+// Build converts the section to its message.
 func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
+	return buildStream(&c.Stream)
+}
+
+func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 	config := &internet.StreamConfig{
 		Port:         uint32(c.Port),
 		ProtocolName: "tcp",
 	}
 	if c.Address != nil {
-		config.Address = c.Address.Build()
+		config.Address = BuildAddress(c.Address)
 	}
 	if c.Method != nil {
 		c.Network = c.Method
 	}
 	if c.Network != nil {
-		protocol, err := c.Network.Build()
+		protocol, err := buildTransportProtocol(*c.Network)
 		if err != nil {
 			return nil, err
 		}
@@ -96,9 +86,10 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 	case "tls":
 		tlsSettings := c.TLSSettings
 		if tlsSettings == nil {
-			tlsSettings = &TLSConfig{}
+			empty := coreconfig.TLS{}
+			tlsSettings = &empty
 		}
-		ts, err := tlsSettings.Build()
+		ts, err := (&TLSConfig{*tlsSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build TLS config.").Base(err)
 		}
@@ -121,7 +112,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		if c.REALITYSettings == nil {
 			return nil, errors.New(`REALITY: Empty "realitySettings".`)
 		}
-		ts, err := c.REALITYSettings.Build()
+		ts, err := (&REALITYConfig{*c.REALITYSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build REALITY config.").Base(err)
 		}
@@ -138,7 +129,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		c.TCPSettings = c.RAWSettings
 	}
 	if c.TCPSettings != nil {
-		ts, err := c.TCPSettings.Build()
+		ts, err := (&TCPConfig{*c.TCPSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build RAW config.").Base(err)
 		}
@@ -151,7 +142,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		c.SplitHTTPSettings = c.XHTTPSettings
 	}
 	if c.SplitHTTPSettings != nil {
-		hs, err := c.SplitHTTPSettings.Build()
+		hs, err := (&SplitHTTPConfig{*c.SplitHTTPSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build XHTTP config.").Base(err)
 		}
@@ -161,7 +152,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		})
 	}
 	if c.KCPSettings != nil {
-		ts, err := c.KCPSettings.Build()
+		ts, err := (&KCPConfig{*c.KCPSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build mKCP config.").Base(err)
 		}
@@ -171,7 +162,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		})
 	}
 	if c.GRPCSettings != nil {
-		gs, err := c.GRPCSettings.Build()
+		gs, err := (&GRPCConfig{*c.GRPCSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build gRPC config.").Base(err)
 		}
@@ -181,7 +172,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		})
 	}
 	if c.WSSettings != nil {
-		ts, err := c.WSSettings.Build()
+		ts, err := (&WebSocketConfig{*c.WSSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build WebSocket config.").Base(err)
 		}
@@ -191,7 +182,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		})
 	}
 	if c.HTTPUPGRADESettings != nil {
-		hs, err := c.HTTPUPGRADESettings.Build()
+		hs, err := (&HttpUpgradeConfig{*c.HTTPUPGRADESettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build HTTPUpgrade config.").Base(err)
 		}
@@ -201,7 +192,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		})
 	}
 	if c.HysteriaSettings != nil {
-		hs, err := c.HysteriaSettings.Build()
+		hs, err := (&HysteriaConfig{*c.HysteriaSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build Hysteria config.").Base(err)
 		}
@@ -211,7 +202,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		})
 	}
 	if c.MASQUESettings != nil {
-		ms, err := c.MASQUESettings.Build()
+		ms, err := (&MasqueConfig{*c.MASQUESettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build MASQUE config.").Base(err)
 		}
@@ -221,8 +212,9 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		})
 	}
 	if c.XDRIVESettings != nil {
-		c.XDRIVESettings.h3 = xdriveH3
-		xs, err := c.XDRIVESettings.Build()
+		xdrive := &XDriveConfig{XDrive: *c.XDRIVESettings}
+		xdrive.h3 = xdriveH3
+		xs, err := xdrive.Build()
 		if err != nil {
 			return nil, errors.New("Failed to build XDRIVE config.").Base(err)
 		}
@@ -232,7 +224,7 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 		})
 	}
 	if c.SocketSettings != nil {
-		ss, err := c.SocketSettings.Build()
+		ss, err := (&SocketConfig{*c.SocketSettings}).Build()
 		if err != nil {
 			return nil, errors.New("Failed to build sockopt.").Base(err)
 		}
@@ -241,21 +233,21 @@ func (c *StreamConfig) Build() (*internet.StreamConfig, error) {
 
 	if c.FinalMask != nil {
 		for _, mask := range c.FinalMask.Tcp {
-			proto, err := mask.Build(true)
+			proto, err := buildMask(&mask, true)
 			if err != nil {
 				return nil, errors.New("failed to build mask with type ", mask.Type).Base(err)
 			}
 			config.Tcpmasks = append(config.Tcpmasks, serial.ToTypedMessage(proto))
 		}
 		for _, mask := range c.FinalMask.Udp {
-			proto, err := mask.Build(false)
+			proto, err := buildMask(&mask, false)
 			if err != nil {
 				return nil, errors.New("failed to build mask with type ", mask.Type).Base(err)
 			}
 			config.Udpmasks = append(config.Udpmasks, serial.ToTypedMessage(proto))
 		}
 		if c.FinalMask.QuicParams != nil {
-			proto, err := c.FinalMask.QuicParams.Build()
+			proto, err := (&QuicParamsConfig{*c.FinalMask.QuicParams}).Build()
 			if err != nil {
 				return nil, err
 			}
