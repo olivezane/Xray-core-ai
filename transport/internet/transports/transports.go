@@ -1,12 +1,12 @@
 // Package transports is the one place where Xray wires its stream transports.
 //
-// Each line names a protocol and gives the function that dials with it and the
-// one that listens with it, so this file is the whole picture: there is no
-// registration from init() functions scattered over the transport packages, and
-// nothing else calls into a transport to make it usable.
+// Each line names a protocol and gives the settings it decodes to, the function
+// that dials with it and the one that listens with it, so this file is the whole
+// picture: there is no registration from init() functions scattered over the
+// transport packages, and nothing else calls into a transport to make it usable.
 //
-// Adding a transport means adding its line here and its entry in
-// transport/internet/transports/transports_test.go.
+// Adding a transport means adding its line here, a NewConfig in its package and
+// an entry in transport/internet/transports/transports_test.go.
 package transports
 
 import (
@@ -26,18 +26,18 @@ import (
 
 // All is every stream transport of this build, one line each.
 var All = []internet.Transport{
-	{Name: "tcp", Dial: tcp.Dial, Listen: tcp.ListenTCP},
-	{Name: "mkcp", Dial: kcp.DialKCP, Listen: kcp.ListenKCP},
-	{Name: "websocket", Dial: websocket.Dial, Listen: websocket.ListenWS},
-	{Name: "httpupgrade", Dial: httpupgrade.Dial, Listen: httpupgrade.ListenHTTPUpgrade},
-	{Name: "grpc", Dial: grpc.Dial, Listen: grpc.Listen},
-	{Name: "splithttp", Dial: splithttp.Dial, Listen: splithttp.ListenXH},
-	{Name: "masque", Dial: masque.Dial, Listen: masque.Listen},
-	{Name: "hysteria", Dial: hysteria.Dial, Listen: hysteria.Listen},
-	{Name: "xdrive", Dial: xdrive.Dial, Listen: xdrive.Serve},
+	{Name: "tcp", Config: internet.ConfigOf(tcp.NewConfig), Dial: tcp.Dial, Listen: tcp.ListenTCP},
+	{Name: "mkcp", Config: internet.ConfigOf(kcp.NewConfig), Dial: kcp.DialKCP, Listen: kcp.ListenKCP},
+	{Name: "websocket", Config: internet.ConfigOf(websocket.NewConfig), Dial: websocket.Dial, Listen: websocket.ListenWS},
+	{Name: "httpupgrade", Config: internet.ConfigOf(httpupgrade.NewConfig), Dial: httpupgrade.Dial, Listen: httpupgrade.ListenHTTPUpgrade},
+	{Name: "grpc", Config: internet.ConfigOf(grpc.NewConfig), Dial: grpc.Dial, Listen: grpc.Listen},
+	{Name: "splithttp", Config: internet.ConfigOf(splithttp.NewConfig), Dial: splithttp.Dial, Listen: splithttp.ListenXH},
+	{Name: "masque", Config: internet.ConfigOf(masque.NewConfig), Dial: masque.Dial, Listen: masque.Listen},
+	{Name: "hysteria", Config: internet.ConfigOf(hysteria.NewConfig), Dial: hysteria.Dial, Listen: hysteria.Listen},
+	{Name: "xdrive", Config: internet.ConfigOf(xdrive.NewConfig), Dial: xdrive.Dial, Listen: xdrive.Serve},
 	// udp carries datagrams; it is dialed by internet.Dial for UDP destinations
 	// and has nothing to listen on.
-	{Name: "udp", Dial: udp.Dial},
+	{Name: "udp", Config: internet.ConfigOf(udp.NewConfig), Dial: udp.Dial},
 }
 
 func init() {

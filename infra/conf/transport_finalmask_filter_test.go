@@ -11,6 +11,7 @@ import (
 	. "github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/finalmask/filter"
+	_ "github.com/xtls/xray-core/transport/internet/transports"
 )
 
 func TestFinalMaskFilter(t *testing.T) {

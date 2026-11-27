@@ -3,8 +3,6 @@ package masque
 import (
 	"time"
 
-	"github.com/xtls/xray-core/common"
-	"github.com/xtls/xray-core/transport/internet"
 )
 
 const protocolName = "masque"
@@ -18,10 +16,10 @@ func (c *Config) keepAlivePeriod() time.Duration {
 	return time.Duration(c.Xmux.HKeepAlivePeriod) * time.Second
 }
 
-func init() {
-	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() interface{} {
-		return &Config{
-			Path: DefaultPath,
-		}
-	}))
+// NewConfig returns the settings a stream settings entry naming this transport
+// decodes to when it carries no settings for it.
+func NewConfig() *Config {
+	return &Config{
+		Path: DefaultPath,
+	}
 }

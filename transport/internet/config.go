@@ -8,7 +8,12 @@ import (
 
 type ConfigCreator func() interface{}
 
-var globalTransportConfigCreatorCache = make(map[string]ConfigCreator)
+// ConfigOf adapts a typed constructor to a ConfigCreator, so that a transport
+// keeps its own default settings in its own package while the place that wires
+// transports stays a list of names and functions.
+func ConfigOf[T any](newConfig func() T) ConfigCreator {
+	return func() interface{} { return newConfig() }
+}
 
 var strategy = [11][3]byte{
 	//              name        strategy,   prefer, fallback
@@ -25,24 +30,17 @@ var strategy = [11][3]byte{
 	{2, 6, 4}, //   ForceIPv6v4 force,      6,      4
 }
 
-func RegisterProtocolConfigCreator(name string, creator ConfigCreator) error {
-	if _, found := globalTransportConfigCreatorCache[name]; found {
-		return errors.New("protocol ", name, " is already registered")
-	}
-	globalTransportConfigCreatorCache[name] = creator
-	return nil
-}
-
-// CreateTransportConfig returns the empty protocol settings of a transport, so
-// that its stream settings can be decoded from JSON. The transport itself is
-// wired in transport/internet/transports, where a new transport adds its line;
-// without that line #3244 comes back.
+// CreateTransportConfig returns the default protocol settings of a transport,
+// the ones a stream settings entry naming that protocol decodes to when it
+// carries no settings of its own. The transport and its settings are wired in
+// transport/internet/transports, one line each; a transport that is not listed
+// there cannot be configured, which is what #3244 was about.
 func CreateTransportConfig(name string) (interface{}, error) {
-	creator, ok := globalTransportConfigCreatorCache[name]
-	if !ok {
-		return nil, errors.New("unknown transport protocol: ", name)
+	config := transportFor(name).Config
+	if config == nil {
+		return nil, errors.New(name, " is not a stream transport of this build; transports are listed in transport/internet/transports")
 	}
-	return creator(), nil
+	return config(), nil
 }
 
 func (c *TransportConfig) GetTypedSettings() (interface{}, error) {

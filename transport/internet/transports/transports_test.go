@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet/hysteria"
+	"github.com/xtls/xray-core/transport/internet/kcp"
+	"github.com/xtls/xray-core/transport/internet/masque"
 )
 
 // TestAllIsInstalled guards that the list above is what internet looks up: a
@@ -50,5 +53,39 @@ func TestAllHasConfigCreator(t *testing.T) {
 		if _, err := internet.CreateTransportConfig(transport.Name); err != nil {
 			t.Errorf("transport %q has no config creator: %v", transport.Name, err)
 		}
+	}
+}
+
+// TestDefaultsSurviveTheMove checks the settings that used to be written in the
+// per-package init() functions: they are defaults of the transport, so they must
+// still be there when a stream settings entry carries no settings of its own.
+func TestDefaultsSurviveTheMove(t *testing.T) {
+	kcpConfig, err := internet.CreateTransportConfig("mkcp")
+	if err != nil {
+		t.Fatalf("mkcp: %v", err)
+	}
+	mkcp, ok := kcpConfig.(*kcp.Config)
+	if !ok {
+		t.Fatalf("mkcp config is %T, want *kcp.Config", kcpConfig)
+	}
+	if mkcp.Mtu != 1350 || mkcp.Tti != 50 || mkcp.UplinkCapacity != 5 || mkcp.DownlinkCapacity != 20 || mkcp.CwndMultiplier != 1 || mkcp.MaxSendingWindow != 2*1024*1024 {
+		t.Errorf("mkcp defaults changed: %v", mkcp)
+	}
+
+	masqueConfig, err := internet.CreateTransportConfig("masque")
+	if err != nil {
+		t.Fatalf("masque: %v", err)
+	}
+	masqueDef, ok := masqueConfig.(*masque.Config)
+	if !ok || masqueDef.Path != masque.DefaultPath {
+		t.Errorf("masque defaults changed: %#v", masqueConfig)
+	}
+
+	hysteriaConfig, err := internet.CreateTransportConfig("hysteria")
+	if err != nil {
+		t.Fatalf("hysteria: %v", err)
+	}
+	if hysteriaConfig.(*hysteria.Config).UdpIdleTimeout != 60 {
+		t.Errorf("hysteria defaults changed: %#v", hysteriaConfig)
 	}
 }

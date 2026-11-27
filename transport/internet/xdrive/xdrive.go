@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet"
@@ -32,10 +31,10 @@ const (
 	spareIdleStop = 10 * time.Minute
 )
 
-func init() {
-	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() interface{} {
-		return new(Config)
-	}))
+// NewConfig returns the settings a stream settings entry naming this transport
+// decodes to when it carries no settings for it.
+func NewConfig() *Config {
+	return new(Config)
 }
 
 func newSessionID() (string, error) {

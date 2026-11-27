@@ -3,10 +3,7 @@ package websocket
 import (
 	"net/http"
 
-	"github.com/xtls/xray-core/common"
-	"github.com/xtls/xray-core/common/utils"
-	"github.com/xtls/xray-core/transport/internet"
-)
+	"github.com/xtls/xray-core/common/utils")
 
 func (c *Config) GetNormalizedPath() string {
 	path := c.Path
@@ -28,8 +25,8 @@ func (c *Config) GetRequestHeader() http.Header {
 	return header
 }
 
-func init() {
-	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() interface{} {
-		return new(Config)
-	}))
+// NewConfig returns the settings a stream settings entry naming this transport
+// decodes to when it carries no settings for it.
+func NewConfig() *Config {
+	return new(Config)
 }

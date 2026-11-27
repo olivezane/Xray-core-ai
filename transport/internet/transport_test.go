@@ -47,14 +47,16 @@ func TestSetTransportsRejectsBrokenList(t *testing.T) {
 	dial := func(context.Context, xnet.Destination, *internet.MemoryStreamConfig) (stat.Connection, error) {
 		return nil, nil
 	}
+	config := func() interface{} { return nil }
 	for _, test := range []struct {
 		name   string
 		list   []internet.Transport
 		report string
 	}{
-		{name: "unnamed", list: []internet.Transport{{Dial: dial}}, report: "without a name"},
-		{name: "idle", list: []internet.Transport{{Name: "idle"}}, report: "neither dials nor listens"},
-		{name: "twice", list: []internet.Transport{{Name: "a", Dial: dial}, {Name: "a", Dial: dial}}, report: "listed twice"},
+		{name: "unnamed", list: []internet.Transport{{Config: config, Dial: dial}}, report: "without a name"},
+		{name: "no config", list: []internet.Transport{{Name: "no-config", Dial: dial}}, report: "has no config creator"},
+		{name: "idle", list: []internet.Transport{{Name: "idle", Config: config}}, report: "neither dials nor listens"},
+		{name: "twice", list: []internet.Transport{{Name: "a", Config: config, Dial: dial}, {Name: "a", Config: config, Dial: dial}}, report: "listed twice"},
 	} {
 		err := internet.SetTransports(test.list)
 		if err == nil {

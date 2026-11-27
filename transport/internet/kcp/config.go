@@ -1,8 +1,6 @@
 package kcp
 
 import (
-	"github.com/xtls/xray-core/common"
-	"github.com/xtls/xray-core/transport/internet"
 )
 
 func (c *Config) GetSendingInFlightSize() uint32 {
@@ -25,15 +23,15 @@ func (c *Config) GetReceivingInFlightSize() uint32 {
 	return size
 }
 
-func init() {
-	common.Must(internet.RegisterProtocolConfigCreator(ProtocolName, func() interface{} {
-		return &Config{
-			Mtu:              1350,
-			Tti:              50,
-			UplinkCapacity:   5,
-			DownlinkCapacity: 20,
-			CwndMultiplier:   1,
-			MaxSendingWindow: 2 * 1024 * 1024,
-		}
-	}))
+// NewConfig returns the settings a stream settings entry naming this transport
+// decodes to when it carries no settings for it.
+func NewConfig() *Config {
+	return &Config{
+		Mtu:              1350,
+		Tti:              50,
+		UplinkCapacity:   5,
+		DownlinkCapacity: 20,
+		CwndMultiplier:   1,
+		MaxSendingWindow: 2 * 1024 * 1024,
+	}
 }

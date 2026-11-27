@@ -10,8 +10,8 @@ import (
 )
 
 // Transport is one stream transport, described in one place: the protocol name
-// used in stream settings, the function that dials with it and the function
-// that listens with it.
+// used in stream settings, its settings, the function that dials with it and the
+// function that listens with it.
 //
 // A transport does not register itself. Every transport Xray ships is listed in
 // transport/internet/transports, and that list is installed here by a single
@@ -20,6 +20,9 @@ import (
 type Transport struct {
 	// Name is the protocol name, e.g. "tcp".
 	Name string
+	// Config returns the default settings of this transport, the ones a stream
+	// settings entry naming it decodes to when it carries none.
+	Config ConfigCreator
 	// Dial dials through this transport. It is nil when the transport cannot
 	// be used to reach a destination.
 	Dial DialFunc
@@ -61,6 +64,8 @@ func SetTransports(list []Transport) error {
 		switch {
 		case t.Name == "":
 			return errors.New("stream transport without a name")
+		case t.Config == nil:
+			return errors.New("stream transport ", t.Name, " has no config creator")
 		case t.Dial == nil && t.Listen == nil:
 			return errors.New("stream transport ", t.Name, " neither dials nor listens")
 		}

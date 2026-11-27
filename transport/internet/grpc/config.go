@@ -4,14 +4,12 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/xtls/xray-core/common"
-	"github.com/xtls/xray-core/transport/internet"
 )
 
-func init() {
-	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() interface{} {
-		return new(Config)
-	}))
+// NewConfig returns the settings a stream settings entry naming this transport
+// decodes to when it carries no settings for it.
+func NewConfig() *Config {
+	return new(Config)
 }
 
 func (c *Config) getServiceName() string {
