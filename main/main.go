@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 
 	"github.com/xtls/xray-core/main/commands/base"
@@ -13,6 +14,8 @@ func main() {
 	// connection handling and the environment-backed settings are in place whatever
 	// command is used.
 	all.Wire()
+	InstallRun()
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
 	os.Args = getArgsV4Compatible()
 

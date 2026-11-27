@@ -44,13 +44,15 @@ The -dump flag tells Xray to print the merged config.
 	`,
 }
 
+// InstallRun wires the run command. The flags it uses refer back to the command,
+// so its Run is assigned here instead of in the command literal, and main calls
+// this instead of an init() function doing it.
+func InstallRun() {
+	cmdRun.Run = executeRun
+}
+
 // The --lua-privileged-pubkey=key flag sets the trusted Ed25519 public key
 // for privileged local Lua scripts, encoded as unpadded Base64URL.
-
-func init() {
-	cmdRun.Run = executeRun // break init loop
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-}
 
 var (
 	configFiles cmdarg.Arg // "Config file for Xray.", the option is customed type, parse in main

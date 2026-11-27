@@ -12,6 +12,7 @@ import (
 	"github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/infra/conf/serial"
 	allcommands "github.com/xtls/xray-core/main/commands/all"
+	"github.com/xtls/xray-core/main/confloader/external"
 	jsonconf "github.com/xtls/xray-core/main/json"
 	tomlconf "github.com/xtls/xray-core/main/toml"
 	yamlconf "github.com/xtls/xray-core/main/yaml"
@@ -206,6 +207,7 @@ func Wire() {
 		conf.SetConfigureFilePostProcessingStages([]conf.ConfigureFilePostProcessingStage{&conf.FakeDNSPostProcessingStage{}})
 		envReloads()
 		allcommands.Install()
+		external.Install()
 		taggedimpl.Install()
 	})
 }

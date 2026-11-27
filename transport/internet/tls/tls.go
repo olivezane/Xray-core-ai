@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"math/big"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -212,7 +213,11 @@ func copyConfig(c *tls.Config) *utls.Config {
 	return config
 }
 
-func init() {
+// installRandomizedFingerprints adds the fingerprints that need a random seed to
+// the preset table. It runs on first use instead of from an init() function, so
+// that importing this package no longer draws random numbers as a side effect:
+// the table is filled when a fingerprint is actually asked for.
+var installRandomizedFingerprints = sync.OnceFunc(func() {
 	bigInt, _ := rand.Int(rand.Reader, big.NewInt(int64(len(ModernFingerprints))))
 	stopAt := int(bigInt.Int64())
 	i := 0
@@ -234,12 +239,13 @@ func init() {
 	randomizednoalpn.Weights = &weights
 	PresetFingerprints["randomized"] = &randomized
 	PresetFingerprints["randomizednoalpn"] = &randomizednoalpn
-}
+})
 
 func GetFingerprint(name string) (fingerprint *utls.ClientHelloID) {
 	if name == "" {
 		return &utls.HelloChrome_Auto
 	}
+	installRandomizedFingerprints()
 	if fingerprint = PresetFingerprints[name]; fingerprint != nil {
 		return
 	}

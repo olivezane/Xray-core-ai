@@ -161,6 +161,8 @@ func httpUnixToCanonical(target string) string {
 	return raw
 }
 
-func init() {
-	confloader.EffectiveConfigFileLoader = ConfigLoader
+// Install hands the file loader to main/confloader, which cannot import this
+// package.
+func Install() {
+	confloader.SetConfigFileLoader(ConfigLoader)
 }
