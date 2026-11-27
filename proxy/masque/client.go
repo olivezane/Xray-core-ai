@@ -390,8 +390,14 @@ func (t *tunnel) close() {
 	})
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjectsMasqueClient = []common.ConfigObject{
+	{
+		Config: (*ClientConfig)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return NewClient(ctx, config.(*ClientConfig))
-	}))
+	},
+	},
 }

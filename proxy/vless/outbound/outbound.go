@@ -37,12 +37,6 @@ import (
 	"github.com/xtls/xray-core/transport/internet/tls"
 )
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		return New(ctx, config.(*Config))
-	}))
-}
-
 // Handler is an outbound connection handler for VLess protocol.
 type Handler struct {
 	server        *protocol.ServerSpec
@@ -471,4 +465,16 @@ func (h *Handler) process(ctx context.Context, link *transport.Link, dialer inte
 	}
 
 	return nil, nil, nil
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		return New(ctx, config.(*Config))
+	},
+	},
 }

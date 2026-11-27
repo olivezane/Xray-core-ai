@@ -21,12 +21,6 @@ import (
 	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
-func init() {
-	common.Must(common.RegisterConfig((*RelayServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		return NewRelayServer(ctx, config.(*RelayServerConfig))
-	}))
-}
-
 type relayDest struct {
 	destination net.Destination
 	email       string
@@ -266,4 +260,16 @@ func (i *RelayInbound) processUDP(ctx context.Context, conn stat.Connection, dis
 			_ = link.Writer.WriteMultiBuffer(buf.MultiBuffer{b})
 		}
 	}
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjectsShadowsocks2022InboundRelay = []common.ConfigObject{
+	{
+		Config: (*RelayServerConfig)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		return NewRelayServer(ctx, config.(*RelayServerConfig))
+	},
+	},
 }

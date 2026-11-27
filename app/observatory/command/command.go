@@ -32,8 +32,13 @@ func (s *service) Register(server *grpc.Server) {
 	RegisterObservatoryServiceServer(server, s)
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, cfg interface{}) (interface{}, error) {
 		s := core.MustFromContext(ctx)
 		sv := &service{v: s}
 		err := s.RequireFeatures(func(Observatory extension.Observatory) {
@@ -43,5 +48,6 @@ func init() {
 			return nil, err
 		}
 		return sv, nil
-	}))
+	},
+	},
 }

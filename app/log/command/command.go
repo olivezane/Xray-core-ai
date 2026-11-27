@@ -47,9 +47,15 @@ func (s *service) Register(server *grpc.Server) {
 	server.RegisterService(&vCoreDesc, ls)
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, cfg interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, cfg interface{}) (interface{}, error) {
 		s := core.MustFromContext(ctx)
 		return &service{v: s}, nil
-	}))
+	},
+	},
 }

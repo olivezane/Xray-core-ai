@@ -3,6 +3,7 @@ package outbound_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	core "github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/outbound"
 	"github.com/xtls/xray-core/proxy/freedom"
+	"github.com/xtls/xray-core/testing/configs"
 	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
@@ -172,4 +174,8 @@ func TestTagsCache(t *testing.T) {
 	wg_add_rm.Wait()
 	stop_get = true
 	wg_get.Wait()
+}
+func TestMain(m *testing.M) {
+	configs.MustInstall(freedom.ConfigObjects)
+	os.Exit(m.Run())
 }

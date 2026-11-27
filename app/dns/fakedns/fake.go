@@ -274,22 +274,30 @@ func NewFakeDNSHolderMulti(conf *FakeDnsPoolMulti) (*HolderMulti, error) {
 	return holderMulti, nil
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*FakeDnsPool)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*FakeDnsPool)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		var f *Holder
 		var err error
 		if f, err = NewFakeDNSHolderConfigOnly(config.(*FakeDnsPool)); err != nil {
 			return nil, err
 		}
 		return f, nil
-	}))
-
-	common.Must(common.RegisterConfig((*FakeDnsPoolMulti)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+	},
+	},
+	{
+		Config: (*FakeDnsPoolMulti)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		var f *HolderMulti
 		var err error
 		if f, err = NewFakeDNSHolderMulti(config.(*FakeDnsPoolMulti)); err != nil {
 			return nil, err
 		}
 		return f, nil
-	}))
+	},
+	},
 }

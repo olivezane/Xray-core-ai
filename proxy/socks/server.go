@@ -285,8 +285,14 @@ func (s *Server) handleUDPPayload(ctx context.Context, conn stat.Connection, dis
 	}
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjectsSocksServer = []common.ConfigObject{
+	{
+		Config: (*ServerConfig)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return NewServer(ctx, config.(*ServerConfig))
-	}))
+	},
+	},
 }

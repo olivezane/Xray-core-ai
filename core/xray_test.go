@@ -1,6 +1,7 @@
 package core_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/xtls/xray-core/app/dispatcher"
@@ -13,7 +14,7 @@ import (
 	. "github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/dns"
 	"github.com/xtls/xray-core/features/dns/localdns"
-	_ "github.com/xtls/xray-core/main/distro/all"
+	all "github.com/xtls/xray-core/main/distro/all"
 	"github.com/xtls/xray-core/proxy/dokodemo"
 	"github.com/xtls/xray-core/proxy/vmess"
 	"github.com/xtls/xray-core/proxy/vmess/outbound"
@@ -83,4 +84,9 @@ func TestXrayClose(t *testing.T) {
 	server, err := StartInstance("protobuf", cfgBytes)
 	common.Must(err)
 	server.Close()
+}
+
+func TestMain(m *testing.M) {
+	all.Wire()
+	os.Exit(m.Run())
 }

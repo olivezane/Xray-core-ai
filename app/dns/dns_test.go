@@ -1,6 +1,7 @@
 package dns_test
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	feature_dns "github.com/xtls/xray-core/features/dns"
 	"github.com/xtls/xray-core/proxy/freedom"
 	_ "github.com/xtls/xray-core/transport/internet/transports"
+	"github.com/xtls/xray-core/testing/configs"
 	"github.com/xtls/xray-core/testing/servers/udp"
 )
 
@@ -1033,4 +1035,8 @@ func TestMultiMatchPrioritizedDomain(t *testing.T) {
 	if startTime.After(endTime.Add(time.Second * 2)) {
 		t.Error("DNS query doesn't finish in 2 seconds.")
 	}
+}
+func TestMain(m *testing.M) {
+	configs.MustInstall(ConfigObjects, freedom.ConfigObjects)
+	os.Exit(m.Run())
 }

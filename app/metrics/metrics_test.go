@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"encoding/json"
+	"os"
 	stdnet "net"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/core"
 	feature_outbound "github.com/xtls/xray-core/features/outbound"
+	"github.com/xtls/xray-core/testing/configs"
 )
 
 func TestMetricsCanRestartInSameProcess(t *testing.T) {
@@ -158,4 +160,8 @@ func metricsHandler(t *testing.T, server *core.Instance) *MetricsHandler {
 		t.Fatal("metrics handler not registered")
 	}
 	return handler
+}
+func TestMain(m *testing.M) {
+	configs.MustInstall(ConfigObjects, appstats.ConfigObjects)
+	os.Exit(m.Run())
 }

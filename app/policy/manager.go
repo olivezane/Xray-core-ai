@@ -61,8 +61,14 @@ func (m *Instance) Close() error {
 	return nil
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return New(ctx, config.(*Config))
-	}))
+	},
+	},
 }

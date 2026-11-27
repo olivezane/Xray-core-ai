@@ -2,6 +2,7 @@ package command_test
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/xtls/xray-core/app/dispatcher"
@@ -13,6 +14,7 @@ import (
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/testing/configs"
 )
 
 func TestLoggerRestart(t *testing.T) {
@@ -31,4 +33,9 @@ func TestLoggerRestart(t *testing.T) {
 		V: v,
 	}
 	common.Must2(server.RestartLogger(context.Background(), &RestartLoggerRequest{}))
+}
+
+func TestMain(m *testing.M) {
+	configs.MustInstall(log.ConfigObjects)
+	os.Exit(m.Run())
 }

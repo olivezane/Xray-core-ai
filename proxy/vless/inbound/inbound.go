@@ -42,33 +42,6 @@ import (
 	"github.com/xtls/xray-core/transport/internet/tls"
 )
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		var dc dns.Client
-		if err := core.RequireFeatures(ctx, func(d dns.Client) error {
-			dc = d
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-
-		c := config.(*Config)
-
-		validator := new(vless.MemoryValidator)
-		for _, user := range c.Users {
-			u, err := user.ToMemoryUser()
-			if err != nil {
-				return nil, errors.New("failed to get VLESS user").Base(err)
-			}
-			if err := validator.Add(u); err != nil {
-				return nil, errors.New("failed to initiate user").Base(err)
-			}
-		}
-
-		return New(ctx, c, dc, validator)
-	}))
-}
-
 // Handler is an inbound connection handler that handles messages in VLess protocol.
 type Handler struct {
 	policyManager          policy.Manager
@@ -638,4 +611,37 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 		return errors.New("failed to dispatch request").Base(err)
 	}
 	return nil
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		var dc dns.Client
+		if err := core.RequireFeatures(ctx, func(d dns.Client) error {
+			dc = d
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+
+		c := config.(*Config)
+
+		validator := new(vless.MemoryValidator)
+		for _, user := range c.Users {
+			u, err := user.ToMemoryUser()
+			if err != nil {
+				return nil, errors.New("failed to get VLESS user").Base(err)
+			}
+			if err := validator.Add(u); err != nil {
+				return nil, errors.New("failed to initiate user").Base(err)
+			}
+		}
+
+		return New(ctx, c, dc, validator)
+	},
+	},
 }

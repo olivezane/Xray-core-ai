@@ -20,8 +20,14 @@ func (r reflectionService) Register(s *grpc.Server) {
 	reflection.Register(s)
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*ReflectionConfig)(nil), func(ctx context.Context, cfg interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjectsCommanderService = []common.ConfigObject{
+	{
+		Config: (*ReflectionConfig)(nil),
+		New: func(ctx context.Context, cfg interface{}) (interface{}, error) {
 		return reflectionService{}, nil
-	}))
+	},
+	},
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	stdnet "net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 	statsservice "github.com/xtls/xray-core/app/stats/command"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/testing/configs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -92,4 +94,9 @@ func pickListenAddress(t *testing.T) string {
 	}
 	defer listener.Close()
 	return listener.Addr().String()
+}
+
+func TestMain(m *testing.M) {
+	configs.MustInstall(commander.ConfigObjectsCommander, commander.ConfigObjectsCommanderService, statsservice.ConfigObjects)
+	os.Exit(m.Run())
 }

@@ -289,8 +289,13 @@ func (r *Route) GetRuleIndex() int {
 	return r.ruleIndex
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		r := new(Router)
 		if err := core.RequireFeatures(ctx, func(d dns.Client, ohm outbound.Manager, dispatcher routing.Dispatcher) error {
 			return r.Init(ctx, config.(*Config), d, ohm, dispatcher)
@@ -298,5 +303,6 @@ func init() {
 			return nil, err
 		}
 		return r, nil
-	}))
+	},
+	},
 }

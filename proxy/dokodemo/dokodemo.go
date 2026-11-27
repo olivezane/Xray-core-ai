@@ -21,16 +21,6 @@ import (
 	"github.com/xtls/xray-core/transport/internet/tls"
 )
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		d := new(DokodemoDoor)
-		err := core.RequireFeatures(ctx, func(pm policy.Manager) error {
-			return d.Init(config.(*Config), pm, session.SockoptFromContext(ctx))
-		})
-		return d, err
-	}))
-}
-
 type DokodemoDoor struct {
 	policyManager  policy.Manager
 	config         *Config
@@ -270,4 +260,20 @@ func (w *PacketWriter) Close() error {
 		}
 	}
 	return nil
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		d := new(DokodemoDoor)
+		err := core.RequireFeatures(ctx, func(pm policy.Manager) error {
+			return d.Init(config.(*Config), pm, session.SockoptFromContext(ctx))
+		})
+		return d, err
+	},
+	},
 }

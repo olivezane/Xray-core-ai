@@ -26,21 +26,6 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		h := new(Handler)
-		if err := core.RequireFeatures(ctx, func(dnsClient dns.Client, policyManager policy.Manager) error {
-			core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
-				h.fdns = fdns
-			})
-			return h.Init(config.(*Config), dnsClient, policyManager)
-		}); err != nil {
-			return nil, err
-		}
-		return h, nil
-	}))
-}
-
 type DNSRule struct {
 	action  RuleAction
 	qTypes  []uint16
@@ -507,4 +492,25 @@ func (c *outboundConn) Close() error {
 	}
 	c.access.Unlock()
 	return nil
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		h := new(Handler)
+		if err := core.RequireFeatures(ctx, func(dnsClient dns.Client, policyManager policy.Manager) error {
+			core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
+				h.fdns = fdns
+			})
+			return h.Init(config.(*Config), dnsClient, policyManager)
+		}); err != nil {
+			return nil, err
+		}
+		return h, nil
+	},
+	},
 }

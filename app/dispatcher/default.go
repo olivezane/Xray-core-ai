@@ -105,21 +105,6 @@ type DefaultDispatcher struct {
 	fdns   dns.FakeDNSEngine
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		d := new(DefaultDispatcher)
-		if err := core.RequireFeatures(ctx, func(om outbound.Manager, router routing.Router, pm policy.Manager, sm stats.Manager, dc dns.Client) error {
-			core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
-				d.fdns = fdns
-			})
-			return d.Init(config.(*Config), om, router, pm, sm)
-		}); err != nil {
-			return nil, err
-		}
-		return d, nil
-	}))
-}
-
 // Init initializes DefaultDispatcher.
 func (d *DefaultDispatcher) Init(config *Config, om outbound.Manager, router routing.Router, pm policy.Manager, sm stats.Manager) error {
 	d.ohm = om
@@ -513,4 +498,25 @@ func (d *DefaultDispatcher) routedDispatch(ctx context.Context, link *transport.
 	}
 
 	handler.Dispatch(ctx, link)
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		d := new(DefaultDispatcher)
+		if err := core.RequireFeatures(ctx, func(om outbound.Manager, router routing.Router, pm policy.Manager, sm stats.Manager, dc dns.Client) error {
+			core.OptionalFeatures(ctx, func(fdns dns.FakeDNSEngine) {
+				d.fdns = fdns
+			})
+			return d.Init(config.(*Config), om, router, pm, sm)
+		}); err != nil {
+			return nil, err
+		}
+		return d, nil
+	},
+	},
 }

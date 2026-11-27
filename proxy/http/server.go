@@ -352,8 +352,14 @@ func readResponseAndHandle100Continue(r *bufio.Reader, req *http.Request, writer
 	return http.ReadResponse(r, req)
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjectsHttpServer = []common.ConfigObject{
+	{
+		Config: (*ServerConfig)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return NewServer(ctx, config.(*ServerConfig))
-	}))
+	},
+	},
 }

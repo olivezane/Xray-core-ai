@@ -27,12 +27,6 @@ import (
 	"github.com/xtls/xray-core/transport/internet/udp"
 )
 
-func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		return NewServer(ctx, config.(*ServerConfig))
-	}))
-}
-
 // Server is an inbound connection handler that handles messages in trojan protocol.
 type Server struct {
 	policyManager policy.Manager
@@ -544,4 +538,16 @@ func (s *Server) fallback(ctx context.Context, err error, sessionPolicy policy.S
 	}
 
 	return nil
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjectsTrojanServer = []common.ConfigObject{
+	{
+		Config: (*ServerConfig)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		return NewServer(ctx, config.(*ServerConfig))
+	},
+	},
 }

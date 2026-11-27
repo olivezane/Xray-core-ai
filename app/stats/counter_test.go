@@ -2,11 +2,13 @@ package stats_test
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	. "github.com/xtls/xray-core/app/stats"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/features/stats"
+	"github.com/xtls/xray-core/testing/configs"
 )
 
 func TestStatsCounter(t *testing.T) {
@@ -28,4 +30,9 @@ func TestStatsCounter(t *testing.T) {
 	if v := c.Value(); v != 0 {
 		t.Fatal("unexpected Value() return: ", v, ", wanted ", 0)
 	}
+}
+
+func TestMain(m *testing.M) {
+	configs.MustInstall(ConfigObjects)
+	os.Exit(m.Run())
 }

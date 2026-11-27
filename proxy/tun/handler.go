@@ -332,12 +332,18 @@ func (t *Handler) Process(ctx context.Context, network net.Network, conn stat.Co
 	return nil
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		t := &Handler{config: config.(*Config)}
 		err := core.RequireFeatures(ctx, func(pm policy.Manager, dispatcher routing.Dispatcher) error {
 			return t.Init(ctx, pm, dispatcher)
 		})
 		return t, err
-	}))
+	},
+	},
 }

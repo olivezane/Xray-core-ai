@@ -1,6 +1,7 @@
 package dns_test
 
 import (
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ import (
 	dns_proxy "github.com/xtls/xray-core/proxy/dns"
 	"github.com/xtls/xray-core/proxy/dokodemo"
 	_ "github.com/xtls/xray-core/transport/internet/transports"
+	"github.com/xtls/xray-core/testing/configs"
 	"github.com/xtls/xray-core/testing/servers/tcp"
 	"github.com/xtls/xray-core/testing/servers/udp"
 )
@@ -496,4 +498,8 @@ func TestDNSRules(t *testing.T) {
 			t.Fatal("expected Success, but got ", in.Rcode)
 		}
 	}
+}
+func TestMain(m *testing.M) {
+	configs.MustInstall(dnsapp.ConfigObjects, dns_proxy.ConfigObjects, dokodemo.ConfigObjects)
+	os.Exit(m.Run())
 }

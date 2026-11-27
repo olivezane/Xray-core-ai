@@ -18,12 +18,6 @@ import (
 	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
-func init() {
-	common.Must(common.RegisterConfig((*ServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		return NewServer(ctx, config.(*ServerConfig))
-	}))
-}
-
 type Inbound struct {
 	networks      []net.Network
 	method        *CipherMethod
@@ -182,4 +176,16 @@ func (i *Inbound) processUDP(ctx context.Context, conn stat.Connection, dispatch
 			_ = link.Writer.WriteMultiBuffer(buf.MultiBuffer{payloadBuf})
 		}
 	}
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjectsShadowsocks2022Inbound = []common.ConfigObject{
+	{
+		Config: (*ServerConfig)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		return NewServer(ctx, config.(*ServerConfig))
+	},
+	},
 }

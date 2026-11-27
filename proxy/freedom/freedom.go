@@ -63,19 +63,7 @@ func reloadEnvSettings() error {
 }
 
 func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		h := new(Handler)
-		if streamSettings, ok := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig); ok && streamSettings.SocketSettings != nil {
-			h.resolveStrategy = streamSettings.SocketSettings.DomainStrategy
-			h.usesDialerProxy = len(streamSettings.SocketSettings.DialerProxy) > 0
-		}
-		if err := core.RequireFeatures(ctx, func(pm policy.Manager) error {
-			return h.Init(config.(*Config), pm)
-		}); err != nil {
-			return nil, err
-		}
-		return h, nil
-	}))
+	
 
 	platform.RegisterEnvReload(reloadEnvSettings)
 
@@ -914,4 +902,26 @@ func GenerateRandomBytes(n int64) ([]byte, error) {
 	}
 
 	return b, nil
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjects = []common.ConfigObject{
+	{
+		Config: (*Config)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		h := new(Handler)
+		if streamSettings, ok := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig); ok && streamSettings.SocketSettings != nil {
+			h.resolveStrategy = streamSettings.SocketSettings.DomainStrategy
+			h.usesDialerProxy = len(streamSettings.SocketSettings.DialerProxy) > 0
+		}
+		if err := core.RequireFeatures(ctx, func(pm policy.Manager) error {
+			return h.Init(config.(*Config), pm)
+		}); err != nil {
+			return nil, err
+		}
+		return h, nil
+	},
+	},
 }

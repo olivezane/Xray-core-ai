@@ -14,6 +14,7 @@ import (
 	xlua "github.com/xtls/xray-core/common/lua"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/testing/configs"
 	"github.com/yuin/gopher-lua/parse"
 	"google.golang.org/protobuf/proto"
 )
@@ -123,4 +124,8 @@ func TestProtobufConfigValidation(t *testing.T) {
 			}
 		})
 	}
+}
+func TestMain(m *testing.M) {
+	configs.MustInstall(ConfigObjects)
+	os.Exit(m.Run())
 }

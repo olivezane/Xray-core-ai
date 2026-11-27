@@ -24,12 +24,6 @@ import (
 	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
-func init() {
-	common.Must(common.RegisterConfig((*MultiUserServerConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		return NewMultiServer(ctx, config.(*MultiUserServerConfig))
-	}))
-}
-
 type MultiUserInbound struct {
 	sync.Mutex
 	networks      []net.Network
@@ -309,4 +303,16 @@ func (i *MultiUserInbound) processUDP(ctx context.Context, conn stat.Connection,
 			_ = link.Writer.WriteMultiBuffer(buf.MultiBuffer{pBuf})
 		}
 	}
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjectsShadowsocks2022InboundMulti = []common.ConfigObject{
+	{
+		Config: (*MultiUserServerConfig)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		return NewMultiServer(ctx, config.(*MultiUserServerConfig))
+	},
+	},
 }

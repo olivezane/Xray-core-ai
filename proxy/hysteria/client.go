@@ -169,12 +169,6 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 	return nil
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*ClientConfig)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
-		return NewClient(ctx, config.(*ClientConfig))
-	}))
-}
-
 // UDPWriter is not safe for concurrent writes.
 type UDPWriter struct {
 	writer io.Writer
@@ -307,4 +301,16 @@ func (r *UDPReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	b.Resize(0, int32(n))
 	b.UDP = addr
 	return buf.MultiBuffer{b}, nil
+}
+
+// ConfigObjects is what this package creates from a configuration, for
+// main/distro/all to install: nothing registers itself here, so this is the whole
+// surface this package adds to the configuration table.
+var ConfigObjectsHysteriaClient = []common.ConfigObject{
+	{
+		Config: (*ClientConfig)(nil),
+		New: func(ctx context.Context, config interface{}) (interface{}, error) {
+		return NewClient(ctx, config.(*ClientConfig))
+	},
+	},
 }

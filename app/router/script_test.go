@@ -25,6 +25,7 @@ import (
 	"github.com/xtls/xray-core/features/routing"
 	routing_session "github.com/xtls/xray-core/features/routing/session"
 	"github.com/xtls/xray-core/proxy/freedom"
+	"github.com/xtls/xray-core/testing/configs"
 	_ "github.com/xtls/xray-core/transport/internet/transports"
 )
 
@@ -418,4 +419,8 @@ end`)
 	if queries.Load() == 0 {
 		t.Fatal("DNS query did not pass through the dispatcher")
 	}
+}
+func TestMain(m *testing.M) {
+	configs.MustInstall(ConfigObjects, freedom.ConfigObjects, appdns.ConfigObjects)
+	os.Exit(m.Run())
 }
