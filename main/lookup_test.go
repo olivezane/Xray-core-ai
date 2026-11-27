@@ -13,6 +13,16 @@ import (
 	"time"
 )
 
+// mustMarshalString renders s as a JSON string literal, so that paths with
+// backslashes survive being written into a JSON fixture.
+func mustMarshalString(s string) string {
+	b, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
 func TestLookupCommand(t *testing.T) {
 	if os.Getenv("XRAY_TEST_LOOKUP_COMMAND") == "1" && len(flag.Args()) > 0 {
 		os.Args = append([]string{os.Args[0]}, flag.Args()...)
@@ -74,8 +84,10 @@ func TestLookupCommand(t *testing.T) {
   return "block", "lua-rule"
 end`
 	scriptConfig := filepath.Join(dir, "script.json")
+	// The path goes into a JSON string, so it is escaped as JSON: a Windows path
+	// contains backslashes that are not valid JSON escapes when pasted as is.
 	scriptConfigBody := `{
-  "routing": {"script": "` + script + `"},
+  "routing": {"script": ` + mustMarshalString(script) + `},
   "outbounds": [{"protocol": "freedom", "tag": "direct"}, {"protocol": "blackhole", "tag": "block"}]
 }`
 	untagged := filepath.Join(dir, "untagged.json")
