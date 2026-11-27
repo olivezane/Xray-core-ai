@@ -375,9 +375,6 @@ func Listen(ctx context.Context, address net.Address, port net.Port, streamSetti
 	return l, nil
 }
 
-func init() {
-	common.Must(internet.RegisterTransportListener(protocolName, Listen))
-}
 
 const (
 	masqueradeProxyBufferSize          = 32 * 1024

@@ -19,6 +19,7 @@ import (
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/stat"
 	"github.com/xtls/xray-core/transport/internet/tcp"
+	_ "github.com/xtls/xray-core/transport/internet/transports"
 )
 
 // ctxRecorder records what the worker hands to the proxy and blocks like a proxy

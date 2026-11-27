@@ -5,7 +5,6 @@ import (
 	"time"
 
 	goreality "github.com/xtls/reality"
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet"
@@ -134,6 +133,3 @@ func Listen(ctx context.Context, address net.Address, port net.Port, settings *i
 	return listener, nil
 }
 
-func init() {
-	common.Must(internet.RegisterTransportListener(protocolName, Listen))
-}

@@ -5,7 +5,6 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/dice"
 	"github.com/xtls/xray-core/common/errors"
@@ -82,6 +81,3 @@ func DialKCP(ctx context.Context, dest net.Destination, streamSettings *internet
 	return iConn, nil
 }
 
-func init() {
-	common.Must(internet.RegisterTransportDialer(ProtocolName, DialKCP))
-}

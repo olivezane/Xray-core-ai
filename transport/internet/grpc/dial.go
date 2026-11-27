@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xtls/xray-core/common"
 	c "github.com/xtls/xray-core/common/ctx"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
@@ -34,9 +33,6 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 	return stat.Connection(conn), nil
 }
 
-func init() {
-	common.Must(internet.RegisterTransportDialer(protocolName, Dial))
-}
 
 type dialerConf struct {
 	net.Destination

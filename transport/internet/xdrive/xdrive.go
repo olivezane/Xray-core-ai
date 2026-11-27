@@ -36,8 +36,6 @@ func init() {
 	common.Must(internet.RegisterProtocolConfigCreator(protocolName, func() interface{} {
 		return new(Config)
 	}))
-	common.Must(internet.RegisterTransportDialer(protocolName, Dial))
-	common.Must(internet.RegisterTransportListener(protocolName, Serve))
 }
 
 func newSessionID() (string, error) {

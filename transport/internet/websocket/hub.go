@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	http_proto "github.com/xtls/xray-core/common/protocol/http"
@@ -157,6 +156,3 @@ func (ln *Listener) Close() error {
 	return ln.listener.Close()
 }
 
-func init() {
-	common.Must(internet.RegisterTransportListener(protocolName, ListenWS))
-}

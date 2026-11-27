@@ -5,7 +5,6 @@ import (
 	gotls "crypto/tls"
 	"sync"
 
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
@@ -175,6 +174,3 @@ func ListenKCP(ctx context.Context, address net.Address, port net.Port, streamSe
 	return NewListener(ctx, address, port, streamSettings, addConn)
 }
 
-func init() {
-	common.Must(internet.RegisterTransportListener(ProtocolName, ListenKCP))
-}

@@ -33,8 +33,10 @@ func RegisterProtocolConfigCreator(name string, creator ConfigCreator) error {
 	return nil
 }
 
-// Note: Each new transport needs to add init() func in transport/internet/xxx/config.go
-// Otherwise, it will cause #3244
+// CreateTransportConfig returns the empty protocol settings of a transport, so
+// that its stream settings can be decoded from JSON. The transport itself is
+// wired in transport/internet/transports, where a new transport adds its line;
+// without that line #3244 comes back.
 func CreateTransportConfig(name string) (interface{}, error) {
 	creator, ok := globalTransportConfigCreatorCache[name]
 	if !ok {

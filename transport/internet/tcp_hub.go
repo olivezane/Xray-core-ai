@@ -5,34 +5,7 @@ import (
 
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
-	"github.com/xtls/xray-core/transport/internet/stat"
 )
-
-var transportListenerCache = make(map[string]ListenFunc)
-
-func RegisterTransportListener(protocol string, listener ListenFunc) error {
-	if _, found := transportListenerCache[protocol]; found {
-		return errors.New(protocol, " listener already registered.")
-	}
-	transportListenerCache[protocol] = listener
-	return nil
-}
-
-// ConnHandler is called by a transport with every accepted connection.
-//
-// ctx is the transport-level context of that connection. It is derived from the
-// listener context, so it carries the transport's values (HYSTERIA validator,
-// per-session state, ...) and is cancelled once the listener stops accepting.
-// Handlers must derive their own per-connection context from it instead of
-// starting from context.Background().
-type ConnHandler func(ctx context.Context, conn stat.Connection)
-
-type ListenFunc func(ctx context.Context, address net.Address, port net.Port, settings *MemoryStreamConfig, handler ConnHandler) (Listener, error)
-
-type Listener interface {
-	Close() error
-	Addr() net.Addr
-}
 
 // ListenUnix is the UDS version of ListenTCP
 func ListenUnix(ctx context.Context, address net.Address, settings *MemoryStreamConfig, handler ConnHandler) (Listener, error) {
@@ -44,12 +17,7 @@ func ListenUnix(ctx context.Context, address net.Address, settings *MemoryStream
 		settings = s
 	}
 
-	protocol := settings.ProtocolName
-	listenFunc := transportListenerCache[protocol]
-	if listenFunc == nil {
-		return nil, errors.New(protocol, " unix listener not registered.")
-	}
-	listener, err := listenFunc(ctx, address, net.Port(0), settings, handler)
+	listener, err := listenStream(ctx, settings.ProtocolName, address, net.Port(0), settings, handler)
 	if err != nil {
 		return nil, errors.New("failed to listen on unix address: ", address).Base(err)
 	}
@@ -76,16 +44,22 @@ func ListenTCP(ctx context.Context, address net.Address, port net.Port, settings
 		return nil, errors.New("port 0 is not allowed for listening on TCP")
 	}
 
-	protocol := settings.ProtocolName
-	listenFunc := transportListenerCache[protocol]
-	if listenFunc == nil {
-		return nil, errors.New(protocol, " listener not registered.")
-	}
-	listener, err := listenFunc(ctx, address, port, settings, handler)
+	listener, err := listenStream(ctx, settings.ProtocolName, address, port, settings, handler)
 	if err != nil {
 		return nil, errors.New("failed to listen on address: ", address, ":", port).Base(err)
 	}
 	return listener, nil
+}
+
+// listenStream hands the accept loop of a listener over to the transport named
+// by the stream settings. It is the only way an inbound gets a listener, so
+// transportFor is where the protocol is looked up and where a protocol that
+// cannot listen is reported.
+func listenStream(ctx context.Context, protocol string, address net.Address, port net.Port, settings *MemoryStreamConfig, handler ConnHandler) (Listener, error) {
+	if listen := transportFor(protocol).Listen; listen != nil {
+		return listen(ctx, address, port, settings, handler)
+	}
+	return nil, errors.New(protocol, " is not a stream transport that listens; the transports of this build are listed in transport/internet/transports")
 }
 
 // ListenSystem listens on a local address for incoming TCP connections.

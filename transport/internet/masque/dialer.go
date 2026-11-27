@@ -13,7 +13,6 @@ import (
 
 	"github.com/apernet/quic-go"
 	"github.com/apernet/quic-go/http3"
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/net/cnc"
@@ -342,6 +341,3 @@ func setUserAgent(header http.Header) {
 	}
 }
 
-func init() {
-	common.Must(internet.RegisterTransportDialer(protocolName, Dial))
-}

@@ -30,20 +30,6 @@ type Dialer interface {
 	SetOutboundGateway(ctx context.Context, ob *session.Outbound)
 }
 
-// dialFunc is an interface to dial network connection to a specific destination.
-type dialFunc func(ctx context.Context, dest net.Destination, streamSettings *MemoryStreamConfig) (stat.Connection, error)
-
-var transportDialerCache = make(map[string]dialFunc)
-
-// RegisterTransportDialer registers a Dialer with given name.
-func RegisterTransportDialer(protocol string, dialer dialFunc) error {
-	if _, found := transportDialerCache[protocol]; found {
-		return errors.New(protocol, " dialer already registered")
-	}
-	transportDialerCache[protocol] = dialer
-	return nil
-}
-
 // Dial dials a internet connection towards the given destination.
 func Dial(ctx context.Context, dest net.Destination, streamSettings *MemoryStreamConfig) (stat.Connection, error) {
 	if dest.Network == net.Network_TCP {
@@ -55,20 +41,17 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *MemoryStrea
 			streamSettings = s
 		}
 
-		protocol := streamSettings.ProtocolName
-		dialer := transportDialerCache[protocol]
-		if dialer == nil {
-			return nil, errors.New(protocol, " dialer not registered")
+		if dialer := transportFor(streamSettings.ProtocolName).Dial; dialer != nil {
+			return dialer(ctx, dest, streamSettings)
 		}
-		return dialer(ctx, dest, streamSettings)
+		return nil, errors.New(streamSettings.ProtocolName, " is not a stream transport that dials; the transports of this build are listed in transport/internet/transports")
 	}
 
 	if dest.Network == net.Network_UDP {
-		udpDialer := transportDialerCache["udp"]
-		if udpDialer == nil {
-			return nil, errors.New("UDP dialer not registered")
+		if udpDialer := transportFor("udp").Dial; udpDialer != nil {
+			return udpDialer(ctx, dest, streamSettings)
 		}
-		return udpDialer(ctx, dest, streamSettings)
+		return nil, errors.New("no stream transport dials UDP; the transports of this build are listed in transport/internet/transports")
 	}
 
 	return nil, errors.New("unknown network ", dest.Network)

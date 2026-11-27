@@ -20,6 +20,7 @@ import (
 	"github.com/xtls/xray-core/core"
 	dns_proxy "github.com/xtls/xray-core/proxy/dns"
 	"github.com/xtls/xray-core/proxy/dokodemo"
+	_ "github.com/xtls/xray-core/transport/internet/transports"
 	"github.com/xtls/xray-core/testing/servers/tcp"
 	"github.com/xtls/xray-core/testing/servers/udp"
 )

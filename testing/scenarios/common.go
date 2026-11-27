@@ -24,6 +24,9 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/units"
 	core "github.com/xtls/xray-core/core"
+	// The scenarios build xray instances in process, so they need the stream
+	// transports wired the same way the binary has them.
+	_ "github.com/xtls/xray-core/transport/internet/transports"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -417,6 +417,3 @@ func (c *ServerConn) SetWriteDeadline(time.Time) error {
 	return nil
 }
 
-func init() {
-	common.Must(internet.RegisterTransportListener(protocolName, Listen))
-}

@@ -616,9 +616,6 @@ func getTLSConfig(streamSettings *internet.MemoryStreamConfig) *gotls.Config {
 	return config.GetTLSConfig()
 }
 
-func init() {
-	common.Must(internet.RegisterTransportListener(protocolName, ListenXH))
-}
 
 type QListener struct {
 	http3.QUICListener

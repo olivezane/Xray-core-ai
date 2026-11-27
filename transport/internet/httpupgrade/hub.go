@@ -168,6 +168,3 @@ func ListenHTTPUpgrade(ctx context.Context, address net.Address, port net.Port, 
 	return serverInstance, nil
 }
 
-func init() {
-	common.Must(internet.RegisterTransportListener(protocolName, ListenHTTPUpgrade))
-}

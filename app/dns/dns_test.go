@@ -19,6 +19,7 @@ import (
 	"github.com/xtls/xray-core/core"
 	feature_dns "github.com/xtls/xray-core/features/dns"
 	"github.com/xtls/xray-core/proxy/freedom"
+	_ "github.com/xtls/xray-core/transport/internet/transports"
 	"github.com/xtls/xray-core/testing/servers/udp"
 )
 

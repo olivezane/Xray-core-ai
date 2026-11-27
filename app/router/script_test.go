@@ -25,6 +25,7 @@ import (
 	"github.com/xtls/xray-core/features/routing"
 	routing_session "github.com/xtls/xray-core/features/routing/session"
 	"github.com/xtls/xray-core/proxy/freedom"
+	_ "github.com/xtls/xray-core/transport/internet/transports"
 )
 
 type luaRouteDNSClient struct {
