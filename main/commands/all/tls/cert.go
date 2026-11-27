@@ -46,9 +46,6 @@ Arguments:
 `,
 }
 
-func init() {
-	cmdCert.Run = executeCert // break init loop
-}
 
 var (
 	certDomainNames stringList

@@ -21,9 +21,6 @@ From seed: {{.Exec}} mldsa65 -i "seed (base64.RawURLEncoding)"
 `,
 }
 
-func init() {
-	cmdMLDSA65.Run = executeMLDSA65 // break init loop
-}
 
 var input_mldsa65 = cmdMLDSA65.Flag.String("i", "", "")
 

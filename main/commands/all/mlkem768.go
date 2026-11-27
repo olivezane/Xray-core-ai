@@ -22,9 +22,6 @@ From seed: {{.Exec}} mlkem768 -i "seed (base64.RawURLEncoding)"
 `,
 }
 
-func init() {
-	cmdMLKEM768.Run = executeMLKEM768 // break init loop
-}
 
 var input_mlkem768 = cmdMLKEM768.Flag.String("i", "", "")
 

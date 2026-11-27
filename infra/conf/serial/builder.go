@@ -41,7 +41,10 @@ func mergeConfigs(files []*core.ConfigSource) (*conf.Config, error) {
 		if err != nil {
 			return nil, errors.New("failed to read config: ", file).Base(err)
 		}
-		decoder := ReaderDecoderByFormat[file.Format]
+		decoder, found := ReaderDecoderFor(file.Format)
+	if !found {
+		return nil, errors.New("no decoder for format ", file.Format)
+	}
 		if file.Format == "json" && UseStrictJSON {
 			decoder = DecodeJSONConfigStrict
 		}
@@ -68,13 +71,24 @@ func BuildConfig(files []*core.ConfigSource) (*core.Config, error) {
 
 type readerDecoder func(io.Reader) (*conf.Config, error)
 
-var ReaderDecoderByFormat = make(map[string]readerDecoder)
+// readerDecoders is the whole list of formats this package can read, one line
+// each. It is a var rather than a map filled by an init() function, so reading it
+// tells you which files a build reads.
+var readerDecoders = map[string]readerDecoder{
+	"json": DecodeJSONConfig,
+	"yaml": DecodeYAMLConfig,
+	"toml": DecodeTOMLConfig,
+}
 
-func init() {
-	ReaderDecoderByFormat["json"] = DecodeJSONConfig
-	ReaderDecoderByFormat["yaml"] = DecodeYAMLConfig
-	ReaderDecoderByFormat["toml"] = DecodeTOMLConfig
+// ReaderDecoderFor returns the decoder of a config format.
+func ReaderDecoderFor(format string) (readerDecoder, bool) {
+	decoder, found := readerDecoders[format]
+	return decoder, found
+}
 
+// Install hands the config builder to core, which cannot import this package
+// because this package imports core. The place that composes a build calls it.
+func Install() {
 	core.ConfigBuilderForFiles = BuildConfig
 	core.ConfigMergedFormFiles = MergeConfigFromFiles
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/cmdarg"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/core"
@@ -13,8 +12,10 @@ import (
 	"github.com/xtls/xray-core/main/confloader"
 )
 
-func init() {
-	common.Must(core.RegisterConfigLoader(&core.ConfigFormat{
+// ConfigFormats returns the formats this package reads, for the place that composes
+// a build to install with core.SetConfigFormats.
+func ConfigFormats() []*core.ConfigFormat {
+	return []*core.ConfigFormat{{
 		Name:      "JSON",
 		Extension: []string{"json"},
 		Loader: func(input interface{}) (*core.Config, error) {
@@ -53,5 +54,5 @@ func init() {
 				return nil, errors.New("unknown type")
 			}
 		},
-	}))
+	}}
 }

@@ -27,9 +27,6 @@ Examples:
 
 var decodeGzipEnabled = cmdDecode.Flag.Bool("gzip", false, "Decompress the decoded bytes with gzip.")
 
-func init() {
-	cmdDecode.Run = executeDecode
-}
 
 func executeDecode(cmd *base.Command, args []string) {
 	if len(args) == 0 || len(args) > 2 {

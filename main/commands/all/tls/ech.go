@@ -27,9 +27,6 @@ Restore ECHConfigs from ECHServerKeys: {{.Exec}} tls ech -i "ECHServerKeys (base
 `, // Enable PQ signature schemes: {{.Exec}} tls ech --pq-signature-schemes-enabled
 }
 
-func init() {
-	cmdECH.Run = executeECH
-}
 
 var input_echServerKeys = cmdECH.Flag.String("i", "", "ECHServerKeys (base64.StdEncoding)")
 

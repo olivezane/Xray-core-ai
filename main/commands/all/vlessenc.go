@@ -16,9 +16,6 @@ Generate decryption/encryption json pair (VLESS Encryption).
 `,
 }
 
-func init() {
-	cmdVLESSEnc.Run = executeVLESSEnc // break init loop
-}
 
 func executeVLESSEnc(cmd *base.Command, args []string) {
 	privateKey, password, _, _ := genCurve25519(nil)

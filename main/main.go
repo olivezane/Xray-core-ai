@@ -5,10 +5,15 @@ import (
 	"os"
 
 	"github.com/xtls/xray-core/main/commands/base"
-	_ "github.com/xtls/xray-core/main/distro/all"
+	"github.com/xtls/xray-core/main/distro/all"
 )
 
 func main() {
+	// Wire the build before anything runs, so that the configuration formats, the
+	// connection handling and the environment-backed settings are in place whatever
+	// command is used.
+	all.Wire()
+
 	os.Args = getArgsV4Compatible()
 
 	base.RootCommand.Long = "Xray is a platform for building proxies."

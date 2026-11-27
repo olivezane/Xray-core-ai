@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/cmdarg"
 	"github.com/xtls/xray-core/common/errors"
@@ -41,22 +40,43 @@ var (
 	ConfigMergedFormFiles ConfigsMerger
 )
 
-// RegisterConfigLoader add a new ConfigLoader.
-func RegisterConfigLoader(format *ConfigFormat) error {
-	name := strings.ToLower(format.Name)
-	if _, found := configLoaderByName[name]; found {
-		return errors.New(format.Name, " already registered.")
-	}
-	configLoaderByName[name] = format
+// DefaultConfigFormats returns the configuration formats of core itself: the
+// protobuf format of a compiled config.
+func DefaultConfigFormats() []*ConfigFormat {
+	return []*ConfigFormat{{
+		Name:      "Protobuf",
+		Extension: []string{"pb"},
+		Loader:    loadProtobufInput,
+	}}
+}
 
-	for _, ext := range format.Extension {
-		lext := strings.ToLower(ext)
-		if f, found := configLoaderByExt[lext]; found {
-			return errors.New(ext, " already registered to ", f.Name)
+// SetConfigFormats installs the configuration formats of a build, one line per
+// format at the place that composes the build. A format is not registered from an
+// init() function, so reading the place that calls this tells you which config
+// files a build can read.
+func SetConfigFormats(formats []*ConfigFormat) error {
+	byName := make(map[string]*ConfigFormat, len(formats))
+	byExt := make(map[string]*ConfigFormat, len(formats))
+	for _, format := range formats {
+		if format == nil || format.Name == "" || format.Loader == nil {
+			return errors.New("config format without a name or a loader")
 		}
-		configLoaderByExt[lext] = format
-	}
+		name := strings.ToLower(format.Name)
+		if _, found := byName[name]; found {
+			return errors.New(format.Name, " is listed twice")
+		}
+		byName[name] = format
 
+		for _, ext := range format.Extension {
+			lext := strings.ToLower(ext)
+			if f, found := byExt[lext]; found {
+				return errors.New(ext, " is claimed by both ", format.Name, " and ", f.Name)
+			}
+			byExt[lext] = format
+		}
+	}
+	configLoaderByName = byName
+	configLoaderByExt = byExt
 	return nil
 }
 
@@ -159,6 +179,30 @@ func LoadConfig(formatName string, input interface{}) (*Config, error) {
 	return nil, errors.New("Unable to load config")
 }
 
+// loadProtobufInput reads a protobuf config from the input a command gave.
+func loadProtobufInput(input interface{}) (*Config, error) {
+	switch v := input.(type) {
+	case cmdarg.Arg:
+		r, err := confloader.LoadConfig(v[0])
+		if err != nil {
+			return nil, err
+		}
+		data, err := buf.ReadAllToBytes(r)
+		if err != nil {
+			return nil, err
+		}
+		return loadProtobufConfig(data)
+	case io.Reader:
+		data, err := buf.ReadAllToBytes(v)
+		if err != nil {
+			return nil, err
+		}
+		return loadProtobufConfig(data)
+	default:
+		return nil, errors.New("unknown type")
+	}
+}
+
 func loadProtobufConfig(data []byte) (*Config, error) {
 	config := new(Config)
 	if err := proto.Unmarshal(data, config); err != nil {
@@ -167,29 +211,4 @@ func loadProtobufConfig(data []byte) (*Config, error) {
 	return config, nil
 }
 
-func init() {
-	common.Must(RegisterConfigLoader(&ConfigFormat{
-		Name:      "Protobuf",
-		Extension: []string{"pb"},
-		Loader: func(input interface{}) (*Config, error) {
-			switch v := input.(type) {
-			case cmdarg.Arg:
-				r, err := confloader.LoadConfig(v[0])
-				if err != nil {
-					return nil, err
-				}
-				data, err := buf.ReadAllToBytes(r)
-				if err != nil {
-					return nil, err
-				}
-				return loadProtobufConfig(data)
-			case io.Reader:
-				data, err := buf.ReadAllToBytes(v)
-				common.Must(err)
-				return loadProtobufConfig(data)
-			default:
-				return nil, errors.New("unknown type")
-			}
-		},
-	}))
-}
+

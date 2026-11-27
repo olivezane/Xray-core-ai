@@ -19,9 +19,6 @@ UUIDv5 (from input): {{.Exec}} uuid -i "example"
 `,
 }
 
-func init() {
-	cmdUUID.Run = executeUUID // break init loop
-}
 
 var input = cmdUUID.Flag.String("i", "", "")
 

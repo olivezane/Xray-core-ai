@@ -26,9 +26,6 @@ Examples:
 
 var gzipEnabled = cmdEncode.Flag.Bool("gzip", false, "Compress the input with gzip.")
 
-func init() {
-	cmdEncode.Run = executeEncode
-}
 
 func executeEncode(cmd *base.Command, args []string) {
 	if len(args) != 1 {

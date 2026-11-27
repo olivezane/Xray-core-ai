@@ -181,7 +181,3 @@ func CreateFileLogWriter(path string) (WriterCreator, error) {
 		}
 	}, nil
 }
-
-func init() {
-	RegisterHandler(NewLogger(CreateStdoutLogWriter()))
-}

@@ -20,9 +20,6 @@ with -i. PrivateKey (seed) and PublicKey use unpadded Base64URL.
 
 var inputEd25519 = cmdEd25519.Flag.String("i", "", "Ed25519 private key seed in unpadded Base64URL.")
 
-func init() {
-	cmdEd25519.Run = executeEd25519
-}
 
 func executeEd25519(cmd *base.Command, args []string) {
 	if len(args) != 0 {

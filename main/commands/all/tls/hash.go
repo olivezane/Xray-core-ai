@@ -22,9 +22,6 @@ var cmdHash = &base.Command{
 	`,
 }
 
-func init() {
-	cmdHash.Run = executeHash // break init loop
-}
 
 var input = cmdHash.Flag.String("cert", "fullchain.pem", "The file path of the certificate")
 

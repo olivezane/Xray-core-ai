@@ -31,9 +31,6 @@ Arguments:
 `,
 }
 
-func init() {
-	cmdPing.Run = executePing // break init loop
-}
 
 var pingIPStr = cmdPing.Flag.String("ip", "", "")
 

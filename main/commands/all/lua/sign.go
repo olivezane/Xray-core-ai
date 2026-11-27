@@ -24,9 +24,6 @@ var (
 	signOutput = cmdSign.Flag.String("o", "", "Output file, or - for stdout. Default: input file.")
 )
 
-func init() {
-	cmdSign.Run = executeSign
-}
 
 func executeSign(cmd *base.Command, args []string) {
 	if len(args) != 1 {

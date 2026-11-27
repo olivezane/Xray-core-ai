@@ -16,9 +16,6 @@ From private key: {{.Exec}} wg -i "private key (base64.StdEncoding)"
 `,
 }
 
-func init() {
-	cmdWG.Run = executeWG // break init loop
-}
 
 var input_wireguard = cmdWG.Flag.String("i", "", "")
 

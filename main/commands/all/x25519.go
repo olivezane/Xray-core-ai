@@ -17,9 +17,6 @@ For Std Encoding: {{.Exec}} x25519 --std-encoding
 `,
 }
 
-func init() {
-	cmdX25519.Run = executeX25519 // break init loop
-}
 
 var (
 	input_stdEncoding = cmdX25519.Flag.Bool("std-encoding", false, "")

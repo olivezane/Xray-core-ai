@@ -1,11 +1,20 @@
 package all
 
 import (
+	"sync"
+
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/platform"
 	"github.com/xtls/xray-core/common/xudp"
+	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/policy"
+	"github.com/xtls/xray-core/infra/conf"
+	"github.com/xtls/xray-core/infra/conf/serial"
+	allcommands "github.com/xtls/xray-core/main/commands/all"
+	jsonconf "github.com/xtls/xray-core/main/json"
+	tomlconf "github.com/xtls/xray-core/main/toml"
+	yamlconf "github.com/xtls/xray-core/main/yaml"
 	"github.com/xtls/xray-core/transport/internet/browser_dialer"
 
 	// The table below lists what each of these packages creates from a
@@ -167,13 +176,36 @@ func envReloads() {
 	}
 }
 
+var wireOnce sync.Once
+
+// configFormats is every way this build can read a configuration, one line each:
+// the format the core package carries and the ones the loader packages add.
+func configFormats() []*core.ConfigFormat {
+	formats := core.DefaultConfigFormats()
+	for _, more := range [][]*core.ConfigFormat{
+		jsonconf.ConfigFormats(),
+		tomlconf.ConfigFormats(),
+		yamlconf.ConfigFormats(),
+	} {
+		formats = append(formats, more...)
+	}
+	return formats
+}
+
 // Wire installs the parts of this build that a package cannot install for
-// itself: the configuration table above, the environment-backed settings and the
-// tagged dialer, which needs core while core cannot import it. Everything else in
-// this file is a plain import, so this function is the whole runtime wiring of a
-// build.
+// itself: the configuration table above, the configuration formats, the config
+// builder of core, the environment-backed settings and the tagged dialer, which
+// needs core while core cannot import it. Everything else in this file is a plain
+// import, so this function is the whole runtime wiring of a build, and calling it
+// twice is the same as calling it once.
 func Wire() {
-	common.Must(common.SetConfigObjects(configObjects()))
-	envReloads()
-	taggedimpl.Install()
+	wireOnce.Do(func() {
+		common.Must(common.SetConfigObjects(configObjects()))
+		common.Must(core.SetConfigFormats(configFormats()))
+		serial.Install()
+		conf.SetConfigureFilePostProcessingStages([]conf.ConfigureFilePostProcessingStage{&conf.FakeDNSPostProcessingStage{}})
+		envReloads()
+		allcommands.Install()
+		taggedimpl.Install()
+	})
 }

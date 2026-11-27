@@ -3,7 +3,6 @@ package log
 import (
 	"sync"
 
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/log"
 )
@@ -14,7 +13,24 @@ type HandlerCreatorOptions struct {
 
 type HandlerCreator func(LogType, HandlerCreatorOptions) (log.Handler, error)
 
-var handlerCreatorMap = make(map[LogType]HandlerCreator)
+// handlerCreatorMap is the whole table: the log types this build can create a
+// handler for, one line each. RegisterHandlerCreator is only for replacing an
+// entry, e.g. in a test, so nothing registers itself from an init() function.
+var handlerCreatorMap = map[LogType]HandlerCreator{
+	LogType_Console: func(lt LogType, options HandlerCreatorOptions) (log.Handler, error) {
+		return log.NewLogger(log.CreateStdoutLogWriter()), nil
+	},
+	LogType_File: func(lt LogType, options HandlerCreatorOptions) (log.Handler, error) {
+		creator, err := log.CreateFileLogWriter(options.Path)
+		if err != nil {
+			return nil, err
+		}
+		return log.NewLogger(creator), nil
+	},
+	LogType_None: func(lt LogType, options HandlerCreatorOptions) (log.Handler, error) {
+		return nil, nil
+	},
+}
 
 var handlerCreatorMapLock = &sync.RWMutex{}
 
@@ -39,22 +55,4 @@ func createHandler(logType LogType, options HandlerCreatorOptions) (log.Handler,
 		return nil, errors.New("unable to create log handler for ", logType)
 	}
 	return creator(logType, options)
-}
-
-func init() {
-	common.Must(RegisterHandlerCreator(LogType_Console, func(lt LogType, options HandlerCreatorOptions) (log.Handler, error) {
-		return log.NewLogger(log.CreateStdoutLogWriter()), nil
-	}))
-
-	common.Must(RegisterHandlerCreator(LogType_File, func(lt LogType, options HandlerCreatorOptions) (log.Handler, error) {
-		creator, err := log.CreateFileLogWriter(options.Path)
-		if err != nil {
-			return nil, err
-		}
-		return log.NewLogger(creator), nil
-	}))
-
-	common.Must(RegisterHandlerCreator(LogType_None, func(lt LogType, options HandlerCreatorOptions) (log.Handler, error) {
-		return nil, nil
-	}))
 }
