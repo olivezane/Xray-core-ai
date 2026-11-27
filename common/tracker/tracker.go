@@ -1,5 +1,5 @@
-// Package tracker keeps the connections an inbound is serving, so that they can
-// be inspected and closed as a whole, per inbound, or per user.
+// Package tracker keeps the connections an instance is carrying, so that they can
+// be inspected and closed as a whole, per inbound, per outbound, or per user.
 package tracker
 
 import (
@@ -13,17 +13,34 @@ import (
 	"github.com/xtls/xray-core/features/inbound"
 )
 
-// Entry is one connection being served, together with the metadata its proxy
-// fills in while it processes it.
+// Direction says which side of the instance a connection belongs to.
+type Direction int
+
+const (
+	Inbound Direction = iota
+	Outbound
+)
+
+// Entry is one connection being carried, together with the metadata its owner
+// fills in while it works with it.
 type Entry struct {
-	// Inbound is the session metadata of the connection. The proxy owns it and
-	// fills it in during processing, so the tracker only reads it, and only when
-	// a snapshot is taken: that is how a connection is reported with the user it
-	// authenticated as, without every proxy having to report it.
+	// Owner is who registered the connection: an inbound handler or an outbound
+	// handler. It is what per-owner views filter on, which keeps two untagged
+	// handlers apart.
+	Owner interface{}
+	// Direction tells an accepted connection from a dialed one.
+	Direction Direction
+	// Inbound is the session metadata of an accepted connection. The proxy owns
+	// it and fills it in during processing, so the tracker only reads it, and
+	// only when a snapshot is taken: that is how a connection is reported with
+	// the user it authenticated as, without every proxy having to report it.
 	Inbound *session.Inbound
-	Network net.Network
-	Start   time.Time
-	Conn    net.Conn
+	// OutboundTag and Destination describe a dialed connection.
+	OutboundTag string
+	Destination net.Destination
+	Network     net.Network
+	Start       time.Time
+	Conn        net.Conn
 	// Cancel stops the handling of this connection. It may be nil.
 	Cancel context.CancelFunc
 }
@@ -31,8 +48,11 @@ type Entry struct {
 // Session renders the entry as a snapshot for inbound.SessionTracker.
 func (e *Entry) Session() inbound.Session {
 	s := inbound.Session{
-		Network: e.Network,
-		Start:   e.Start,
+		Direction:   inbound.Direction(e.Direction),
+		OutboundTag: e.OutboundTag,
+		Destination: e.Destination,
+		Network:     e.Network,
+		Start:       e.Start,
 	}
 	if e.Inbound != nil {
 		s.InboundTag = e.Inbound.Tag
@@ -45,13 +65,15 @@ func (e *Entry) Session() inbound.Session {
 	return s
 }
 
-// Registry tracks the connections one inbound is serving. Closing them is what
-// makes a closed handler or a removed user actually release its connections
-// instead of leaving their goroutines and buffers behind.
+// Registry is one table of connections. An instance has a single one, shared by
+// its inbound and outbound handlers: that is what makes the table global, while
+// each handler still sees and closes only its own connections. Closing them is
+// what makes a closed instance, handler or removed user actually release its
+// connections instead of leaving goroutines and buffers behind.
 type Registry struct {
-	mu     sync.Mutex
-	conns  map[net.Conn]*Entry
-	closed bool
+	mu      sync.Mutex
+	conns   map[net.Conn]*Entry
+	closed  bool
 }
 
 func NewRegistry() *Registry {
@@ -79,14 +101,25 @@ func (r *Registry) Unregister(conn net.Conn) {
 	r.mu.Unlock()
 }
 
-// Sessions returns a snapshot of the tracked connections.
+// Sessions returns a snapshot of every tracked connection of the instance.
 func (r *Registry) Sessions() []inbound.Session {
+	return r.sessions(nil)
+}
+
+// SessionsOf returns a snapshot of the connections owner registered.
+func (r *Registry) SessionsOf(owner interface{}) []inbound.Session {
+	return r.sessions(func(e *Entry) bool { return e.Owner == owner })
+}
+
+func (r *Registry) sessions(keep func(*Entry) bool) []inbound.Session {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	out := make([]inbound.Session, 0, len(r.conns))
 	for _, e := range r.conns {
-		out = append(out, e.Session())
+		if keep == nil || keep(e) {
+			out = append(out, e.Session())
+		}
 	}
 	return out
 }
@@ -95,9 +128,21 @@ func (r *Registry) Sessions() []inbound.Session {
 // connections stay registered until their owner unregisters them, so that a
 // single owner stays responsible for each one.
 func (r *Registry) CloseMatching(match func(inbound.Session) bool) int {
+	return r.closeMatching(nil, match)
+}
+
+// CloseMatchingOf closes the connections owner registered that match match.
+func (r *Registry) CloseMatchingOf(owner interface{}, match func(inbound.Session) bool) int {
+	return r.closeMatching(func(e *Entry) bool { return e.Owner == owner }, match)
+}
+
+func (r *Registry) closeMatching(keep func(*Entry) bool, match func(inbound.Session) bool) int {
 	r.mu.Lock()
 	targets := make([]*Entry, 0, len(r.conns))
 	for _, e := range r.conns {
+		if keep != nil && !keep(e) {
+			continue
+		}
 		if match == nil || match(e.Session()) {
 			targets = append(targets, e)
 		}
@@ -106,7 +151,7 @@ func (r *Registry) CloseMatching(match func(inbound.Session) bool) int {
 
 	for _, e := range targets {
 		if e.Cancel != nil {
-			e.Cancel() // let the proxy unwind its handling
+			e.Cancel() // let the owner unwind its handling
 		}
 		common.CloseIfExists(e.Conn) // and unblock its reads and writes
 	}

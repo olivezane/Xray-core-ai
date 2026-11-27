@@ -47,12 +47,33 @@ func ManagerType() interface{} {
 	return (*Manager)(nil)
 }
 
-// Session is a snapshot of one connection an inbound handler is serving.
+// Direction says which side of the instance a tracked connection belongs to.
+//
+// xray:api:beta
+type Direction int
+
+const (
+	// DirectionInbound is a connection an inbound handler accepted.
+	DirectionInbound Direction = iota
+	// DirectionOutbound is a connection an outbound handler dialed.
+	DirectionOutbound
+)
+
+// Session is a snapshot of one connection the instance is carrying, accepted by
+// an inbound handler or dialed by an outbound one.
 //
 // xray:api:beta
 type Session struct {
-	// InboundTag is the tag of the inbound handling the connection.
+	// Direction tells an accepted connection from a dialed one.
+	Direction Direction
+	// InboundTag is the tag of the inbound handling the connection. Empty for a
+	// dialed connection.
 	InboundTag string
+	// OutboundTag is the tag of the outbound that dialed the connection. Empty
+	// for an accepted connection.
+	OutboundTag string
+	// Destination is what a dialed connection reaches.
+	Destination net.Destination
 	// Network is the network the connection runs on.
 	Network net.Network
 	// Source is the peer address of the connection.
@@ -66,9 +87,10 @@ type Session struct {
 	Start time.Time
 }
 
-// SessionTracker is implemented by inbound handlers and by the inbound Manager.
-// It exposes the connections currently being served, so that they can be
-// inspected and closed as a whole, per inbound, or per user.
+// SessionTracker is implemented by inbound handlers, by the inbound Manager and
+// by the outbound Manager. It exposes the connections an instance is carrying, so
+// that they can be inspected and closed as a whole, per inbound, per outbound, or
+// per user.
 //
 // xray:api:beta
 type SessionTracker interface {

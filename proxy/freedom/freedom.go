@@ -563,6 +563,7 @@ func NewPacketReader(conn net.Conn, h *Handler, defaultRule *Firewall, UDPOverri
 	if statConn != nil {
 		counter = statConn.ReadCounter
 	}
+	iConn = stat.TryUnwrapStatsConn(iConn)
 	if c, ok := iConn.(*net.PacketConnWrapper); ok {
 		isOverridden := false
 		if UDPOverride.Address != nil || UDPOverride.Port != 0 {
@@ -638,6 +639,7 @@ func NewPacketWriter(conn net.Conn, h *Handler, defaultRule *Firewall, UDPOverri
 	if statConn != nil {
 		counter = statConn.WriteCounter
 	}
+	iConn = stat.TryUnwrapStatsConn(iConn)
 	if c, ok := iConn.(*net.PacketConnWrapper); ok {
 		// If DialDest is a domain, it will be resolved in dialer
 		// check this behavior and add it to map

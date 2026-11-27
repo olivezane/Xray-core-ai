@@ -180,8 +180,9 @@ func TestWorkerReportsSessions(t *testing.T) {
 	}
 }
 
-// TestConnRegistry verifies the ownership rules: closeAll closes the tracked
-// connections, and a closed registry refuses new ones.
+// TestConnRegistry verifies the ownership rules of a handler: closing it closes
+// the connections that handler serves, leaves those of other owners alone, and
+// does not take the instance table down with it.
 func TestConnRegistry(t *testing.T) {
 	r := newConnRegistry()
 
@@ -199,6 +200,13 @@ func TestConnRegistry(t *testing.T) {
 		t.Fatalf("expected 1 tracked session, got %d", len(sessions))
 	}
 
+	// A connection another owner registered must survive.
+	other := sharedBy(r.Registry, "another-owner")
+	survivor := &stubConn{done: make(chan struct{})}
+	if !other.register(&connection{Conn: survivor, Network: net.Network_TCP}) {
+		t.Fatal("registry refused a connection of another owner")
+	}
+
 	r.closeAll()
 
 	select {
@@ -211,9 +219,15 @@ func TestConnRegistry(t *testing.T) {
 		t.Error("closeAll closed a connection that was unregistered")
 	default:
 	}
+	select {
+	case <-survivor.done:
+		t.Error("closeAll closed a connection of another owner")
+	default:
+	}
 
-	if r.register(&connection{Conn: &stubConn{done: make(chan struct{})}}) {
-		t.Error("a closed registry accepted a connection")
+	// The table itself stays open: the other handlers of the instance still serve.
+	if !r.register(&connection{Conn: &stubConn{done: make(chan struct{})}}) {
+		t.Error("closing the connections of one owner closed the instance table")
 	}
 }
 

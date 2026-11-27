@@ -6,6 +6,7 @@ import (
 	goerrors "errors"
 	"io"
 	"math/big"
+	"time"
 
 	"github.com/xtls/xray-core/common/dice"
 
@@ -16,7 +17,9 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/session"
+	"github.com/xtls/xray-core/common/tracker"
 	"github.com/xtls/xray-core/core"
+	finbound "github.com/xtls/xray-core/features/inbound"
 	"github.com/xtls/xray-core/features/outbound"
 	"github.com/xtls/xray-core/features/policy"
 	"github.com/xtls/xray-core/features/stats"
@@ -54,6 +57,10 @@ func getStatCounter(v *core.Instance, tag string) (stats.Counter, stats.Counter)
 
 // Handler implements outbound.Handler.
 type Handler struct {
+	// conns is the connection table of the instance, where every connection this
+	// handler dials is registered until it is closed. It is nil in a bare handler
+	// without an instance.
+	conns           *tracker.Registry
 	tag             string
 	senderSettings  *proxyman.SenderConfig
 	streamSettings  *internet.MemoryStreamConfig
@@ -71,6 +78,14 @@ func NewHandler(ctx context.Context, config *core.OutboundHandlerConfig) (outbou
 		tag:             config.Tag,
 		uplinkCounter:   uplinkCounter,
 		downlinkCounter: downlinkCounter,
+	}
+
+	// The instance's connection table, where this handler registers every
+	// connection it dials.
+	if manager, ok := v.GetFeature(finbound.ManagerType()).(interface {
+		Connections() *tracker.Registry
+	}); ok {
+		h.conns = manager.Connections()
 	}
 
 	if config.SenderSettings != nil {
@@ -200,8 +215,11 @@ func (h *Handler) Dial(ctx context.Context, dest net.Destination) (stat.Connecti
 	}
 
 	conn, err := internet.Dial(ctx, dest, h.streamSettings)
-	conn = h.getStatCouterConnection(conn)
-	return conn, err
+	// The statistics wrapper stays outermost, so that a caller can still see it;
+	// the tracking wrapper goes inside it and removes the entry when the
+	// connection is closed.
+	conn = h.trackConnection(conn, dest)
+	return h.getStatCouterConnection(conn), err
 }
 
 func (h *Handler) SetOutboundGateway(ctx context.Context, ob *session.Outbound) {
@@ -231,6 +249,48 @@ func (h *Handler) SetOutboundGateway(ctx context.Context, ob *session.Outbound) 
 			ob.Gateway = addr
 		}
 	}
+}
+
+// trackConnection registers a dialed connection in the connection table of the
+// instance, so that it can be reported and closed with the connections of the
+// inbounds it serves. The table entry goes away when the connection is closed.
+func (h *Handler) trackConnection(conn stat.Connection, dest net.Destination) stat.Connection {
+	if h.conns == nil || conn == nil {
+		return conn
+	}
+	entry := &tracker.Entry{
+		Owner:       h,
+		Direction:   tracker.Outbound,
+		OutboundTag: h.tag,
+		Destination: dest,
+		Network:     dest.Network,
+		Start:       time.Now(),
+		Conn:        conn,
+	}
+	if !h.conns.Register(entry) {
+		// The instance is closing: do not hand out a connection nobody will close.
+		common.CloseIfExists(conn)
+		return conn
+	}
+	return &trackedConn{Connection: conn, registry: h.conns}
+}
+
+// trackedConn removes itself from the connection table when it is closed, so a
+// finished connection does not stay in a snapshot.
+type trackedConn struct {
+	stat.Connection
+	registry *tracker.Registry
+}
+
+// Unwrap exposes the connection behind the tracking wrapper, so that code which
+// inspects the raw connection still sees it.
+func (c *trackedConn) Unwrap() net.Conn {
+	return c.Connection
+}
+
+func (c *trackedConn) Close() error {
+	c.registry.Unregister(c.Connection)
+	return c.Connection.Close()
 }
 
 func (h *Handler) getStatCouterConnection(conn stat.Connection) stat.Connection {

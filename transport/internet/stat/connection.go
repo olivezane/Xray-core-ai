@@ -33,12 +33,25 @@ func (c *CounterConnection) Write(b []byte) (int, error) {
 	return nBytes, err
 }
 
+// Unwrapper is implemented by a wrapper that hides the connection it wraps, e.g.
+// the connection tracker. Unwrapping keeps type checks (a *net.PacketConnWrapper,
+// for instance) working through a wrapped connection.
+type Unwrapper interface {
+	Unwrap() net.Conn
+}
+
+// TryUnwrapStatsConn returns the connection behind the wrappers Xray puts around
+// a dialed or accepted connection, so that callers can see what it really is.
 func TryUnwrapStatsConn(conn net.Conn) net.Conn {
-	if conn == nil {
-		return conn
-	}
-	if conn, ok := conn.(*CounterConnection); ok {
-		return conn.Connection
+	for conn != nil {
+		switch wrapper := conn.(type) {
+		case *CounterConnection:
+			conn = wrapper.Connection
+		case Unwrapper:
+			conn = wrapper.Unwrap()
+		default:
+			return conn
+		}
 	}
 	return conn
 }

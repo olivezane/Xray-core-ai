@@ -9,6 +9,7 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/session"
+	"github.com/xtls/xray-core/common/tracker"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/inbound"
 )
@@ -19,12 +20,17 @@ type Manager struct {
 	untaggedHandlers []inbound.Handler
 	taggedHandlers   map[string]inbound.Handler
 	running          bool
+	// conns is the connection table of the whole instance. Inbound and outbound
+	// handlers register the connections they carry here, so the instance can
+	// report and close them as a whole.
+	conns *tracker.Registry
 }
 
 // New returns a new Manager for inbound handlers.
 func New(ctx context.Context, config *proxyman.InboundConfig) (*Manager, error) {
 	m := &Manager{
 		taggedHandlers: make(map[string]inbound.Handler),
+		conns:          tracker.NewRegistry(),
 	}
 	return m, nil
 }
@@ -113,28 +119,22 @@ func (m *Manager) ListHandlers(ctx context.Context) []inbound.Handler {
 	return response
 }
 
-// Sessions implements inbound.SessionTracker: it returns the connections every
-// managed handler is serving.
+// Connections returns the connection table of this instance: every connection
+// its inbound and outbound handlers are carrying.
+func (m *Manager) Connections() *tracker.Registry {
+	return m.conns
+}
+
+// Sessions implements inbound.SessionTracker: it returns every connection the
+// instance is carrying, accepted by an inbound or dialed by an outbound.
 func (m *Manager) Sessions(ctx context.Context) []inbound.Session {
-	var sessions []inbound.Session
-	for _, handler := range m.ListHandlers(ctx) {
-		if tracker, ok := handler.(inbound.SessionTracker); ok {
-			sessions = append(sessions, tracker.Sessions(ctx)...)
-		}
-	}
-	return sessions
+	return m.conns.Sessions()
 }
 
 // CloseSessions implements inbound.SessionTracker: it closes the connections of
-// every managed handler matching match.
+// the instance matching match, wherever they are.
 func (m *Manager) CloseSessions(ctx context.Context, match func(inbound.Session) bool) int {
-	closed := 0
-	for _, handler := range m.ListHandlers(ctx) {
-		if tracker, ok := handler.(inbound.SessionTracker); ok {
-			closed += tracker.CloseSessions(ctx, match)
-		}
-	}
-	return closed
+	return m.conns.CloseMatching(match)
 }
 
 var _ inbound.SessionTracker = (*Manager)(nil)
@@ -178,6 +178,10 @@ func (m *Manager) Close() error {
 			errs = append(errs, err)
 		}
 	}
+
+	// The table also holds the connections of outbound handlers, which no inbound
+	// handler closes.
+	m.conns.CloseAll()
 
 	if len(errs) > 0 {
 		return errors.New("failed to close all handlers").Base(errors.New(serial.Concat(errs...)))

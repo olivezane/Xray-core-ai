@@ -10,18 +10,26 @@ import (
 // with the metadata the proxy fills in while it processes it.
 type connection = tracker.Entry
 
-// connRegistry tracks the connections the workers of one inbound handler are
-// serving. It belongs to the handler, not to a worker, so that closing the
-// handler closes every connection of every port at once.
+// connRegistry is the part of the instance-wide connection table that the workers
+// of one inbound handler write to. The table itself is shared by every inbound
+// and outbound handler of the instance, so a connection can be found and closed
+// from anywhere, while a handler only ever sees the entries it registered.
 type connRegistry struct {
 	*tracker.Registry
+	owner interface{}
 }
 
 func newConnRegistry() *connRegistry {
 	return &connRegistry{Registry: tracker.NewRegistry()}
 }
 
+// sharedBy returns the view of registry that owner writes to.
+func sharedBy(registry *tracker.Registry, owner interface{}) *connRegistry {
+	return &connRegistry{Registry: registry, owner: owner}
+}
+
 func (r *connRegistry) register(c *connection) bool {
+	c.Owner = r.owner
 	return r.Register(c)
 }
 
@@ -30,13 +38,16 @@ func (r *connRegistry) unregister(conn stat.Connection) {
 }
 
 func (r *connRegistry) sessions() []finbound.Session {
-	return r.Sessions()
+	return r.SessionsOf(r.owner)
 }
 
 func (r *connRegistry) closeMatching(match func(finbound.Session) bool) int {
-	return r.CloseMatching(match)
+	return r.CloseMatchingOf(r.owner, match)
 }
 
+// closeAll closes the connections this owner is serving, and nothing else: the
+// table is shared by the whole instance, so closing it here would reach the
+// connections of other handlers, including the ones serving the management API.
 func (r *connRegistry) closeAll() {
-	r.CloseAll()
+	r.CloseMatchingOf(r.owner, nil)
 }

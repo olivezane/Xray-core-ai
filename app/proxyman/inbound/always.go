@@ -9,6 +9,7 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/session"
+	"github.com/xtls/xray-core/common/tracker"
 	"github.com/xtls/xray-core/core"
 	finbound "github.com/xtls/xray-core/features/inbound"
 	"github.com/xtls/xray-core/features/policy"
@@ -94,8 +95,19 @@ func NewAlwaysOnInboundHandler(ctx context.Context, tag string, receiverConfig *
 		proxyConfig:    proxyConfig,
 		proxy:          p,
 		tag:            tag,
-		sessions:       newConnRegistry(),
 	}
+	// The handler writes into the connection table of the instance, so that the
+	// instance can report and close every connection it carries. Without an
+	// instance (a bare handler in a unit test) it keeps a table of its own.
+	registry := tracker.NewRegistry()
+	if instance := core.FromContext(ctx); instance != nil {
+		if manager, ok := instance.GetFeature(finbound.ManagerType()).(interface {
+			Connections() *tracker.Registry
+		}); ok {
+			registry = manager.Connections()
+		}
+	}
+	h.sessions = sharedBy(registry, h)
 
 	uplinkCounter, downlinkCounter := getStatCounter(core.MustFromContext(ctx), tag)
 
