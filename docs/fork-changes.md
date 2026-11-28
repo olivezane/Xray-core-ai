@@ -1,8 +1,8 @@
 # 与上游 XTLS/Xray-core 的差异
 
 本仓库是 XTLS/Xray-core 的下游分支。协议、线路格式、分享链接与上游完全一致，
-可以和上游节点互通；差别只有三处：**部分配置块被合并/搬家**、**新增 `xray lookup` 命令**、
-**若干行为修复**。升级前只需改配置。
+可以和上游节点互通；差别只有四处：**部分配置块被合并/搬家**、**protobuf 不再是配置格式**、
+**新增 `xray lookup` 命令**、**若干行为修复**。升级前只需改配置。
 
 ## 1. 破坏性配置变更（必须迁移）
 
@@ -49,7 +49,27 @@
 `/debug/vars` 与 pprof 与 gRPC 共用同一个端口：HTTP/1.1 走调试端点，
 `Content-Type: application/grpc` 的 HTTP/2 请求走 gRPC，控制端不用改。
 
-## 2. 新增命令：`xray lookup`
+## 2. protobuf 不再是配置格式（必须迁移）
+
+配置模型现在是普通的 Go 结构体，protobuf 只保留在 API 边界——它是值跨 gRPC 时的形状，
+不是配置文件的形状。因此：
+
+| 旧用法 | 现状 |
+|---|---|
+| `xray run -c config.pb` | 报错 `protobuf is not a configuration format` |
+| `-format=protobuf` | 同上 |
+| `xray convert pb` | 保留命令，只回同一句话 |
+
+JSON / YAML / TOML 配置写法一个字段都没变，只改扩展名即可。手上有 `.pb` 配置的话，
+**用升级前的二进制**把它导成 JSON：
+
+```bash
+xray run -dump -c config.pb > config.json
+```
+
+得到的 `config.json` 新版可以直接读。
+
+## 3. 新增命令：`xray lookup`
 
 不启动任何入站，只回答"这个域名/IP 会走哪条规则、哪个出站、哪个 DNS"。
 
@@ -72,7 +92,7 @@ sourcePort / localPort / vlessRoute；routing.script 或 dns.script 存在时结
 规则求值、balancer 选择、freedom 隐式 firewall。`-json` 模式把日志赶到 stderr，
 stdout 只有 JSON。
 
-## 3. TUN（仅 Android 行为变化）
+## 4. TUN（仅 Android 行为变化）
 
 - 没设 `xray.tun.fd` 时**自己创建设备**（`/dev/tun`，退回 `/dev/net/tun`），
   并设置 MTU、地址、link up、路由、ip rule；关闭时反向清理。
@@ -83,7 +103,7 @@ stdout 只有 JSON。
   解析不到时每秒重查一次；TUN 关闭后不再拦截进程内其它出站拨号。
 - Windows / Darwin / FreeBSD / Linux 的 TUN 实现无变化。
 
-## 4. DNS
+## 5. DNS
 
 **新增 DNS over TLS**：
 
@@ -111,7 +131,7 @@ opcode，否则丢弃；DoH 不跟随重定向（RFC 8484）；DoH 按 `Age` 头
 DoQ 按声明的长度读取应答，解析失败不再把半截数据当结果。日志里 DNS 决策的
 域名/IP 规则改成可直接粘回配置的格式（`domain:xxx`、`geoip:cn`、`!ip:...`）。
 
-## 5. 嗅探
+## 6. 嗅探
 
 - 新增 **DNS**、**STUN** 识别。它们只用于路由匹配，不能写进 `destOverride`
   （`destOverride` 仍只接受 `http` / `tls` / `quic` / `fakedns`）。
@@ -124,7 +144,7 @@ DoQ 按声明的长度读取应答，解析失败不再把半截数据当结果�
   `/r?u=http://other.com/` 不再能劫持目标；`\r\n\r\n` 结束头部时不再把手
   读进请求体。
 
-## 6. 传输与性能
+## 7. 传输与性能
 
 - VLESS / VMess 入站**先把响应头 flush 出去**，再等下行数据。客户端"等头再发 body"时
   不会互等。
@@ -141,15 +161,16 @@ DoQ 按声明的长度读取应答，解析失败不再把半截数据当结果�
 - REALITY 入站启动后会把目标探测结果打进日志：探测中/失败/收集不到 post-handshake
   记录都会明确 warning，不再像上游那样静默退回普通 Go TLS 行为。
 
-## 7. 构建与发布
+## 8. 构建与发布
 
 - CI 上传的构建产物名带 7 位短 commit（`Xray-linux-64-1f4c389`），目录里能直接区分
   是哪次提交构建的。
 - `go.mod` 依赖与上游一致，没有额外依赖。
 
-## 8. 升级步骤
+## 9. 升级步骤
 
-1. 按第 1 节把 `stats` / `metrics` / `observatory` / `fakeDns` 迁进 `api` 与 `dns`。
+1. 按第 1 节把 `stats` / `metrics` / `observatory` / `fakeDns` 迁进 `api` 与 `dns`；
+   有 `.pb` 配置的按第 2 节先导成 JSON。
 2. `xray run -test -c config.json` 看有没有那几行 removal warning。
 3. `xray lookup -c config.json <常用域名>` 对比迁移前后的出站是否符合预期。
 4. 换二进制。

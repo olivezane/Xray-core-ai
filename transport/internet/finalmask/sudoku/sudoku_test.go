@@ -1,7 +1,6 @@
 package sudoku
 
 import (
-	"bytes"
 	"crypto/ecdh"
 	"crypto/rand"
 	cryptotls "crypto/tls"
@@ -10,18 +9,16 @@ import (
 	"fmt"
 	"io"
 	stdnet "net"
-	"os"
-	"os/exec"
-	"os/signal"
-	"path/filepath"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/xtls/xray-core/app/dispatcher"
 	"github.com/xtls/xray-core/app/log"
 	"github.com/xtls/xray-core/app/proxyman"
+	appinbound "github.com/xtls/xray-core/app/proxyman/inbound"
+	appoutbound "github.com/xtls/xray-core/app/proxyman/outbound"
+	"github.com/xtls/xray-core/common"
 	clog "github.com/xtls/xray-core/common/log"
 	xnet "github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
@@ -32,6 +29,7 @@ import (
 	"github.com/xtls/xray-core/proxy/dokodemo"
 	"github.com/xtls/xray-core/proxy/freedom"
 	hyproxy "github.com/xtls/xray-core/proxy/hysteria"
+	_ "github.com/xtls/xray-core/transport/internet/transports"
 	hyaccount "github.com/xtls/xray-core/proxy/hysteria/account"
 	"github.com/xtls/xray-core/proxy/vless"
 	vin "github.com/xtls/xray-core/proxy/vless/inbound"
@@ -43,7 +41,6 @@ import (
 	splithttp "github.com/xtls/xray-core/transport/internet/splithttp"
 	transtcp "github.com/xtls/xray-core/transport/internet/tcp"
 	xtls "github.com/xtls/xray-core/transport/internet/tls"
-	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -125,7 +122,6 @@ func TestSudokuE2ETemp(t *testing.T) {
 		t.Skip("skipping sudoku e2e harness in short mode")
 	}
 
-	bin := buildE2EBinary(t)
 	payloadSize := 192 * 1024
 	modes := []trafficMode{
 		{
@@ -167,6 +163,9 @@ func TestSudokuE2ETemp(t *testing.T) {
 		}},
 	}
 
+	// Instances run in this process now, so there is no binary to point them at.
+	bin := ""
+	_ = bin
 	results := make([]caseResult, 0, len(cases)*len(modes))
 	for _, tc := range cases {
 		tc := tc
@@ -252,8 +251,8 @@ func runVLESSRealityCase(t *testing.T, bin string, mode trafficMode, payloadSize
 								Settings:     serial.ToTypedMessage(&transtcp.Config{}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&reality.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&reality.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&reality.Config{
 								Show:        true,
 								Dest:        fmt.Sprintf("localhost:%d", decoy.Port()),
@@ -263,7 +262,7 @@ func runVLESSRealityCase(t *testing.T, bin string, mode trafficMode, payloadSize
 								Type:        "tcp",
 							}),
 						},
-						Tcpmasks: []*serial.TypedMessage{serial.ToTypedMessage(cloneConfig(mode.config))},
+						Tcpmasks: []any{cloneConfig(mode.config)},
 					},
 				}),
 				ProxySettings: serial.ToTypedMessage(&vin.Config{
@@ -320,8 +319,8 @@ func runVLESSRealityCase(t *testing.T, bin string, mode trafficMode, payloadSize
 								Settings:     serial.ToTypedMessage(&transtcp.Config{}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&reality.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&reality.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&reality.Config{
 								Show:        true,
 								Fingerprint: "chrome",
@@ -331,14 +330,14 @@ func runVLESSRealityCase(t *testing.T, bin string, mode trafficMode, payloadSize
 								SpiderX:     "/",
 							}),
 						},
-						Tcpmasks: []*serial.TypedMessage{serial.ToTypedMessage(cloneConfig(mode.config))},
+						Tcpmasks: []any{cloneConfig(mode.config)},
 					},
 				}),
 			},
 		},
 	})
 
-	serverCmd, clientCmd := runXrayPair(t, bin, serverConfig, clientConfig)
+	serverCmd, clientCmd := runXrayPair(t, serverConfig, clientConfig)
 	defer stopCmd(clientCmd)
 	defer stopCmd(serverCmd)
 	exerciseTCPClient(t, int(clientPort), payloadSize)
@@ -377,14 +376,14 @@ func runHysteria2Case(t *testing.T, bin string, mode trafficMode, payloadSize in
 								}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&xtls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&xtls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&xtls.Config{
 								Certificate:  []*xtls.Certificate{xtls.ParseCertificate(ct)},
 								NextProtocol: []string{"h3"},
 							}),
 						},
-						Udpmasks: []*serial.TypedMessage{serial.ToTypedMessage(cloneConfig(mode.config))},
+						Udpmasks: []any{cloneConfig(mode.config)},
 					},
 				}),
 				ProxySettings: serial.ToTypedMessage(&hyproxy.ServerConfig{
@@ -440,22 +439,22 @@ func runHysteria2Case(t *testing.T, bin string, mode trafficMode, payloadSize in
 								}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&xtls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&xtls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&xtls.Config{
 								ServerName:           "localhost",
 								PinnedPeerCertSha256: [][]byte{ctHash[:]},
 								NextProtocol:         []string{"h3"},
 							}),
 						},
-						Udpmasks: []*serial.TypedMessage{serial.ToTypedMessage(cloneConfig(mode.config))},
+						Udpmasks: []any{cloneConfig(mode.config)},
 					},
 				}),
 			},
 		},
 	})
 
-	serverCmd, clientCmd := runXrayPair(t, bin, serverConfig, clientConfig)
+	serverCmd, clientCmd := runXrayPair(t, serverConfig, clientConfig)
 	defer stopCmd(clientCmd)
 	defer stopCmd(serverCmd)
 	if err := exerciseTCPClientErr(t, int(clientPort), payloadSize); err != nil {
@@ -494,7 +493,7 @@ func runVLesseEncCase(t *testing.T, bin string, mode trafficMode, payloadSize in
 						TransportSettings: []*internet.TransportConfig{
 							{ProtocolName: "tcp", Settings: serial.ToTypedMessage(&transtcp.Config{})},
 						},
-						Tcpmasks: []*serial.TypedMessage{serial.ToTypedMessage(cloneConfig(mode.config))},
+						Tcpmasks: []any{cloneConfig(mode.config)},
 					},
 				}),
 				ProxySettings: serial.ToTypedMessage(&vin.Config{
@@ -554,14 +553,14 @@ func runVLesseEncCase(t *testing.T, bin string, mode trafficMode, payloadSize in
 						TransportSettings: []*internet.TransportConfig{
 							{ProtocolName: "tcp", Settings: serial.ToTypedMessage(&transtcp.Config{})},
 						},
-						Tcpmasks: []*serial.TypedMessage{serial.ToTypedMessage(cloneConfig(mode.config))},
+						Tcpmasks: []any{cloneConfig(mode.config)},
 					},
 				}),
 			},
 		},
 	})
 
-	serverCmd, clientCmd := runXrayPair(t, bin, serverConfig, clientConfig)
+	serverCmd, clientCmd := runXrayPair(t, serverConfig, clientConfig)
 	defer stopCmd(clientCmd)
 	defer stopCmd(serverCmd)
 	exerciseTCPClient(t, int(clientPort), payloadSize)
@@ -598,7 +597,7 @@ func runVLESSXHTTPCase(t *testing.T, bin string, mode trafficMode, payloadSize i
 						TransportSettings: []*internet.TransportConfig{
 							{ProtocolName: "splithttp", Settings: serial.ToTypedMessage(xhttpConfig)},
 						},
-						Tcpmasks: []*serial.TypedMessage{serial.ToTypedMessage(cloneConfig(mode.config))},
+						Tcpmasks: []any{cloneConfig(mode.config)},
 					},
 				}),
 				ProxySettings: serial.ToTypedMessage(&vin.Config{
@@ -652,14 +651,14 @@ func runVLESSXHTTPCase(t *testing.T, bin string, mode trafficMode, payloadSize i
 						TransportSettings: []*internet.TransportConfig{
 							{ProtocolName: "splithttp", Settings: serial.ToTypedMessage(xhttpConfig)},
 						},
-						Tcpmasks: []*serial.TypedMessage{serial.ToTypedMessage(cloneConfig(mode.config))},
+						Tcpmasks: []any{cloneConfig(mode.config)},
 					},
 				}),
 			},
 		},
 	})
 
-	serverCmd, clientCmd := runXrayPair(t, bin, serverConfig, clientConfig)
+	serverCmd, clientCmd := runXrayPair(t, serverConfig, clientConfig)
 	defer stopCmd(clientCmd)
 	defer stopCmd(serverCmd)
 	exerciseTCPClient(t, int(clientPort), payloadSize)
@@ -926,8 +925,11 @@ func cloneConfig(cfg *Config) *Config {
 	if cfg == nil {
 		return nil
 	}
-	out := proto.Clone(cfg).(*Config)
-	return out
+	// The settings are a plain Go value now, so a copy is written rather than
+	// cloned through protobuf.
+	copied := *cfg
+	copied.CustomTables = append([]string(nil), cfg.CustomTables...)
+	return &copied
 }
 
 func defaultApps(cfg *core.Config) *core.Config {
@@ -944,89 +946,71 @@ func defaultApps(cfg *core.Config) *core.Config {
 	return cfg
 }
 
-func buildE2EBinary(t *testing.T) string {
-	t.Helper()
-	e2eBinaryOnce.Do(func() {
-		tempDir, err := os.MkdirTemp("", "xray-sudoku-e2e-*")
-		if err != nil {
-			e2eBinaryErr = err
-			return
-		}
-		e2eBinaryPath = filepath.Join(tempDir, "xray.test")
-		cmd := exec.Command("go", "build", "-o", e2eBinaryPath, "./main")
-		cmd.Dir = repoRoot(t)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		e2eBinaryErr = cmd.Run()
-	})
-	if e2eBinaryErr != nil {
-		t.Fatal(e2eBinaryErr)
-	}
-	return e2eBinaryPath
-}
 
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("failed to locate repo root")
-		}
-		dir = parent
-	}
-}
 
-func runXrayPair(t *testing.T, bin string, serverCfg, clientCfg *core.Config) (*exec.Cmd, *exec.Cmd) {
+func runXrayPair(t *testing.T, serverCfg, clientCfg *core.Config) (*core.Instance, *core.Instance) {
 	t.Helper()
-	serverCmd := runXray(t, bin, serverCfg)
+	serverCmd := runXray(t, serverCfg)
 
 	time.Sleep(500 * time.Millisecond)
 
-	clientCmd := runXray(t, bin, clientCfg)
+	clientCmd := runXray(t, clientCfg)
 
 	time.Sleep(1500 * time.Millisecond)
 	return serverCmd, clientCmd
 }
 
-func runXray(t *testing.T, bin string, cfg *core.Config) *exec.Cmd {
+// runXray starts a configuration in this process. A configuration is plain Go
+// values now and its settings are protobuf messages, which no configuration file
+// carries, so there is nothing to hand a subprocess.
+var configObjectsOnce sync.Once
+
+func installConfigObjects() {
+	configObjectsOnce.Do(func() {
+		var objects []common.ConfigObject
+		for _, list := range [][]common.ConfigObject{
+			log.ConfigObjects,
+			dispatcher.ConfigObjects,
+			appinbound.ConfigObjects,
+			appoutbound.ConfigObjects,
+			dokodemo.ConfigObjects,
+			freedom.ConfigObjects,
+			vin.ConfigObjects,
+			vout.ConfigObjects,
+			hyproxy.ConfigObjectsHysteriaServer,
+			hyproxy.ConfigObjectsHysteriaClient,
+		} {
+			objects = append(objects, list...)
+		}
+		common.Must(common.SetConfigObjects(objects))
+		// The mask this test uses carries settings that are a plain Go value, so
+		// its name has to be readable here as well.
+		common.Must(common.SetSettingsTypes([]common.SettingsType{{Config: (*Config)(nil)}}))
+	})
+}
+
+func runXray(t *testing.T, cfg *core.Config) *core.Instance {
 	t.Helper()
-	cfgBytes, err := proto.Marshal(cfg)
+	// The instance is built in this process, so it needs the configuration table
+	// main installs. This package cannot import main/distro/all (it would import
+	// this package), so the entries the scenarios use are listed here.
+	installConfigObjects()
+	instance, err := core.New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(bin, "-config=stdin:", "-format=pb")
-	cmd.Stdin = bytes.NewReader(cfgBytes)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
+	if err := instance.Start(); err != nil {
+		instance.Close()
 		t.Fatal(err)
 	}
-	return cmd
+	return instance
 }
 
-func stopCmd(cmd *exec.Cmd) {
-	if cmd == nil || cmd.Process == nil {
+func stopCmd(instance *core.Instance) {
+	if instance == nil {
 		return
 	}
-	_ = cmd.Process.Signal(syscall.SIGTERM)
-	done := make(chan struct{})
-	go func() {
-		_, _ = cmd.Process.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(3 * time.Second):
-		_ = cmd.Process.Kill()
-		<-done
-	}
+	_ = instance.Close()
 }
 
 func startTCPRelay(t *testing.T, listenPort int, target string) *tcpRelay {
@@ -1386,11 +1370,3 @@ func mustDecodeHex(t *testing.T, s string) []byte {
 	return out
 }
 
-func init() {
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-ch
-		os.Exit(130)
-	}()
-}

@@ -83,11 +83,9 @@ func (r *Router) PickRoute(ctx routing.Context) (routing.Route, error) {
 
 // AddRule implements routing.Router.
 func (r *Router) AddRule(config *serial.TypedMessage, shouldAppend bool) error {
-	inst, err := config.GetInstance()
-	if err != nil {
-		return err
-	}
-	if c, ok := inst.(*Config); ok {
+	// The settings are a plain Go value now, so they are read back by the name
+	// they say for themselves.
+	if c, ok := common.UnwrapSettings(config).(*Config); ok {
 		return r.ReloadRules(c, shouldAppend)
 	}
 	return errors.New("AddRule: config type error")

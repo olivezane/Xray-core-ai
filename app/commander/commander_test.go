@@ -15,6 +15,7 @@ import (
 	"github.com/xtls/xray-core/app/proxyman"
 	_ "github.com/xtls/xray-core/app/proxyman/inbound"
 	_ "github.com/xtls/xray-core/app/proxyman/outbound"
+	logcommand "github.com/xtls/xray-core/app/log/command"
 	appstats "github.com/xtls/xray-core/app/stats"
 	statsservice "github.com/xtls/xray-core/app/stats/command"
 	"github.com/xtls/xray-core/common/serial"
@@ -28,7 +29,7 @@ func TestCommanderServesGRPCAndMetricsOnOnePort(t *testing.T) {
 	listen := pickListenAddress(t)
 
 	server, err := core.New(&core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dispatcher.Config{}),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
@@ -85,6 +86,28 @@ func TestCommanderServesGRPCAndMetricsOnOnePort(t *testing.T) {
 	}
 }
 
+// TestCommanderAcceptsAServiceThatIsAPlainGoConfig checks that a service whose
+// settings are a plain Go value is created. A service that is no longer a protobuf
+// message crosses the configuration the same way, and used to be refused here.
+func TestCommanderAcceptsAServiceThatIsAPlainGoConfig(t *testing.T) {
+	server, err := core.New(&core.Config{
+		App: []any{
+			serial.ToTypedMessage(&dispatcher.Config{}),
+			serial.ToTypedMessage(&proxyman.InboundConfig{}),
+			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
+			serial.ToTypedMessage(&commander.Config{
+				Service: []*serial.TypedMessage{serial.ToTypedMessage(&logcommand.Config{})},
+			}),
+		},
+	})
+	if err != nil {
+		t.Fatalf("a service that is a plain Go configuration was refused: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = server.Close()
+	})
+}
+
 func pickListenAddress(t *testing.T) string {
 	t.Helper()
 
@@ -97,6 +120,6 @@ func pickListenAddress(t *testing.T) string {
 }
 
 func TestMain(m *testing.M) {
-	configs.MustInstall(commander.ConfigObjectsCommander, commander.ConfigObjectsCommanderService, statsservice.ConfigObjects)
+	configs.MustInstall(commander.ConfigObjectsCommander, commander.ConfigObjectsCommanderService, statsservice.ConfigObjects, logcommand.ConfigObjects)
 	os.Exit(m.Run())
 }

@@ -5,7 +5,6 @@ import (
 	"net/netip"
 
 	"github.com/xtls/xray-core/common/protocol"
-	"google.golang.org/protobuf/proto"
 )
 
 func (p *PeerConfig) AsAccount() (protocol.Account, error) {
@@ -45,7 +44,7 @@ func (a *MemoryAccount) Equals(other protocol.Account) bool {
 	return false
 }
 
-func (a *MemoryAccount) ToProto() proto.Message {
+func (a *MemoryAccount) ToProto() any {
 	allowedIPs := make([]string, 0, len(a.AllowedIPs))
 	for i := range a.AllowedIPs {
 		allowedIPs = append(allowedIPs, a.AllowedIPs[i].String())

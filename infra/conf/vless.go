@@ -20,7 +20,6 @@ import (
 	"github.com/xtls/xray-core/proxy/vless/inbound"
 	"github.com/xtls/xray-core/proxy/vless/multiplex"
 	"github.com/xtls/xray-core/proxy/vless/outbound"
-	"google.golang.org/protobuf/proto"
 )
 
 // VLessInboundFallback is one fallback of a VLESS inbound.
@@ -32,7 +31,7 @@ type VLessInboundConfig struct {
 }
 
 // Build implements Buildable
-func (c *VLessInboundConfig) Build() (proto.Message, error) {
+func (c *VLessInboundConfig) Build() (any, error) {
 	config := new(inbound.Config)
 
 	if c.Clients != nil {
@@ -258,7 +257,7 @@ type VLessOutboundConfig struct {
 }
 
 // Build implements Buildable
-func (c *VLessOutboundConfig) Build() (proto.Message, error) {
+func (c *VLessOutboundConfig) Build() (any, error) {
 	multiplex, err := BuildMultiplex(c.Multiplex)
 	if err != nil {
 		return nil, err

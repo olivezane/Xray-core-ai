@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 
-	"google.golang.org/protobuf/proto"
 
 	"github.com/xtls/xray-core/common/protocol"
 )
@@ -16,7 +15,7 @@ type MemoryAccount struct {
 
 // AsAccount implements protocol.AsAccount.
 func (u *Account) AsAccount() (protocol.Account, error) {
-	keyStr := u.GetKey()
+	keyStr := u.Key
 	raw, err := base64.StdEncoding.DecodeString(keyStr)
 	if err != nil {
 		raw = []byte(keyStr)
@@ -34,7 +33,7 @@ func (a *MemoryAccount) Equals(another protocol.Account) bool {
 	return false
 }
 
-func (a *MemoryAccount) ToProto() proto.Message {
+func (a *MemoryAccount) ToProto() any {
 	return &Account{
 		Key: base64.StdEncoding.EncodeToString(a.Key),
 	}

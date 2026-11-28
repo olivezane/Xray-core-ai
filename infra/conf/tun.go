@@ -12,7 +12,6 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/tun"
-	"google.golang.org/protobuf/proto"
 )
 
 // TunConfig is the settings of a Tun inbound.
@@ -20,7 +19,7 @@ type TunConfig struct {
 	coreconfig.Tun
 }
 
-func (v *TunConfig) Build() (proto.Message, error) {
+func (v *TunConfig) Build() (any, error) {
 	config := &tun.Config{
 		Name:                   v.Name,
 		Desc:                   v.Desc,

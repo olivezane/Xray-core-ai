@@ -5,11 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/cmdarg"
 	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/main/confloader"
-	"google.golang.org/protobuf/proto"
 )
 
 // ConfigFormat is a configurable format of Xray config file.
@@ -40,14 +37,12 @@ var (
 	ConfigMergedFormFiles ConfigsMerger
 )
 
-// DefaultConfigFormats returns the configuration formats of core itself: the
-// protobuf format of a compiled config.
+// DefaultConfigFormats returns the configuration formats of core itself. Core
+// carries none: a configuration is JSON, TOML or YAML, and the formats are added
+// by the packages that read them. Protobuf is not a configuration format: it is
+// the shape a value takes when it crosses the API.
 func DefaultConfigFormats() []*ConfigFormat {
-	return []*ConfigFormat{{
-		Name:      "Protobuf",
-		Extension: []string{"pb"},
-		Loader:    loadProtobufInput,
-	}}
+	return nil
 }
 
 // SetConfigFormats installs the configuration formats of a build, one line per
@@ -157,13 +152,11 @@ func LoadConfig(formatName string, input interface{}) (*Config, error) {
 			}
 		}
 
-		// only one protobuf config file is allowed
+		// Protobuf is not a configuration format: it is the shape a value takes
+		// when it crosses the API, and nothing reads a configuration written that
+		// way.
 		if hasProtobuf {
-			if len(v) == 1 {
-				return configLoaderByName["protobuf"].Loader(v)
-			} else {
-				return nil, errors.New("Only one protobuf config file is allowed")
-			}
+			return nil, errors.New("protobuf is not a configuration format; write JSON, TOML or YAML")
 		}
 
 		// to avoid import cycle
@@ -177,38 +170,6 @@ func LoadConfig(formatName string, input interface{}) (*Config, error) {
 	}
 
 	return nil, errors.New("Unable to load config")
-}
-
-// loadProtobufInput reads a protobuf config from the input a command gave.
-func loadProtobufInput(input interface{}) (*Config, error) {
-	switch v := input.(type) {
-	case cmdarg.Arg:
-		r, err := confloader.LoadConfig(v[0])
-		if err != nil {
-			return nil, err
-		}
-		data, err := buf.ReadAllToBytes(r)
-		if err != nil {
-			return nil, err
-		}
-		return loadProtobufConfig(data)
-	case io.Reader:
-		data, err := buf.ReadAllToBytes(v)
-		if err != nil {
-			return nil, err
-		}
-		return loadProtobufConfig(data)
-	default:
-		return nil, errors.New("unknown type")
-	}
-}
-
-func loadProtobufConfig(data []byte) (*Config, error) {
-	config := new(Config)
-	if err := proto.Unmarshal(data, config); err != nil {
-		return nil, err
-	}
-	return config, nil
 }
 
 

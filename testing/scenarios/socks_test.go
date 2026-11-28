@@ -290,7 +290,7 @@ func TestSocksBridageUDPWithRouting(t *testing.T) {
 	serverPort := tcp.PickPort()
 	for {
 		serverConfig := &core.Config{
-			App: []*serial.TypedMessage{
+			App: []any{
 				serial.ToTypedMessage(&router.Config{
 					Rule: []*router.RoutingRule{
 						{

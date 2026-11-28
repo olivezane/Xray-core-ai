@@ -129,7 +129,7 @@ func TestUDPServerSubnet(t *testing.T) {
 	time.Sleep(time.Second)
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&Config{
 				NameServer: []*NameServer{
 					{
@@ -192,7 +192,7 @@ func TestUDPServer(t *testing.T) {
 	time.Sleep(time.Second)
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&Config{
 				NameServer: []*NameServer{
 					{
@@ -316,7 +316,7 @@ func TestPrioritizedDomain(t *testing.T) {
 	time.Sleep(time.Second)
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&Config{
 				NameServer: []*NameServer{
 					{
@@ -403,7 +403,7 @@ func TestUDPServerIPv6(t *testing.T) {
 	time.Sleep(time.Second)
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&Config{
 				NameServer: []*NameServer{
 					{
@@ -466,7 +466,7 @@ func TestStaticHostDomain(t *testing.T) {
 	time.Sleep(time.Second)
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&Config{
 				NameServer: []*NameServer{
 					{
@@ -538,7 +538,7 @@ func TestIPMatch(t *testing.T) {
 	time.Sleep(time.Second)
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&Config{
 				NameServer: []*NameServer{
 					// private dns, not match
@@ -630,7 +630,7 @@ func TestLocalDomain(t *testing.T) {
 	time.Sleep(time.Second)
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&Config{
 				NameServer: []*NameServer{
 					{
@@ -854,7 +854,7 @@ func TestMultiMatchPrioritizedDomain(t *testing.T) {
 	time.Sleep(time.Second)
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&Config{
 				NameServer: []*NameServer{
 					{

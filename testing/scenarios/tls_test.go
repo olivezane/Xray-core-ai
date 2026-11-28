@@ -47,8 +47,8 @@ func TestSimpleTLSConnection(t *testing.T) {
 					PortList: &net.PortList{Range: []*net.PortRange{net.SinglePortRange(serverPort)}},
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{tls.ParseCertificate(ct)},
 							}),
@@ -105,8 +105,8 @@ func TestSimpleTLSConnection(t *testing.T) {
 				}),
 				SenderSettings: serial.ToTypedMessage(&proxyman.SenderConfig{
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								PinnedPeerCertSha256: [][]byte{ctHash[:]},
 							}),
@@ -156,8 +156,8 @@ func TestAutoIssuingCertificate(t *testing.T) {
 					PortList: &net.PortList{Range: []*net.PortRange{net.SinglePortRange(serverPort)}},
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{{
 									Certificate: certPEM,
@@ -218,8 +218,8 @@ func TestAutoIssuingCertificate(t *testing.T) {
 				}),
 				SenderSettings: serial.ToTypedMessage(&proxyman.SenderConfig{
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								ServerName: "example.com",
 								Certificate: []*tls.Certificate{{
@@ -265,8 +265,8 @@ func TestTLSOverKCP(t *testing.T) {
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
 						ProtocolName: "mkcp",
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{tls.ParseCertificate(ct)},
 							}),
@@ -324,8 +324,8 @@ func TestTLSOverKCP(t *testing.T) {
 				SenderSettings: serial.ToTypedMessage(&proxyman.SenderConfig{
 					StreamSettings: &internet.StreamConfig{
 						ProtocolName: "mkcp",
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								PinnedPeerCertSha256: [][]byte{ctHash[:]},
 							}),
@@ -365,8 +365,8 @@ func TestTLSOverWebSocket(t *testing.T) {
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
 						ProtocolName: "websocket",
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{tls.ParseCertificate(ct)},
 							}),
@@ -430,8 +430,8 @@ func TestTLSOverWebSocket(t *testing.T) {
 								Settings:     serial.ToTypedMessage(&websocket.Config{}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								PinnedPeerCertSha256: [][]byte{ctHash[:]},
 							}),
@@ -481,8 +481,8 @@ func TestGRPC(t *testing.T) {
 								Settings:     serial.ToTypedMessage(&grpc.Config{ServiceName: "🍉"}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{tls.ParseCertificate(ct)},
 							}),
@@ -546,8 +546,8 @@ func TestGRPC(t *testing.T) {
 								Settings:     serial.ToTypedMessage(&grpc.Config{ServiceName: "🍉"}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								PinnedPeerCertSha256: [][]byte{ctHash[:]},
 							}),
@@ -597,8 +597,8 @@ func TestGRPCMultiMode(t *testing.T) {
 								Settings:     serial.ToTypedMessage(&grpc.Config{ServiceName: "🍉"}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{tls.ParseCertificate(ct)},
 							}),
@@ -662,8 +662,8 @@ func TestGRPCMultiMode(t *testing.T) {
 								Settings:     serial.ToTypedMessage(&grpc.Config{ServiceName: "🍉", MultiMode: true}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								PinnedPeerCertSha256: [][]byte{ctHash[:]},
 							}),
@@ -706,8 +706,8 @@ func TestSimpleTLSConnectionPinned(t *testing.T) {
 					PortList: &net.PortList{Range: []*net.PortRange{net.SinglePortRange(serverPort)}},
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{certificate},
 							}),
@@ -764,8 +764,8 @@ func TestSimpleTLSConnectionPinned(t *testing.T) {
 				}),
 				SenderSettings: serial.ToTypedMessage(&proxyman.SenderConfig{
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								PinnedPeerCertSha256: [][]byte{certHash},
 							}),
@@ -805,8 +805,8 @@ func TestSimpleTLSConnectionPinnedWrongCert(t *testing.T) {
 					PortList: &net.PortList{Range: []*net.PortRange{net.SinglePortRange(serverPort)}},
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{certificate},
 							}),
@@ -863,8 +863,8 @@ func TestSimpleTLSConnectionPinnedWrongCert(t *testing.T) {
 				}),
 				SenderSettings: serial.ToTypedMessage(&proxyman.SenderConfig{
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								PinnedPeerCertSha256: [][]byte{certHash},
 							}),
@@ -903,8 +903,8 @@ func TestUTLSConnectionPinned(t *testing.T) {
 					PortList: &net.PortList{Range: []*net.PortRange{net.SinglePortRange(serverPort)}},
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{certificate},
 							}),
@@ -961,8 +961,8 @@ func TestUTLSConnectionPinned(t *testing.T) {
 				}),
 				SenderSettings: serial.ToTypedMessage(&proxyman.SenderConfig{
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Fingerprint:          "random",
 								PinnedPeerCertSha256: [][]byte{certHash},
@@ -1003,8 +1003,8 @@ func TestUTLSConnectionPinnedWrongCert(t *testing.T) {
 					PortList: &net.PortList{Range: []*net.PortRange{net.SinglePortRange(serverPort)}},
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{certificate},
 							}),
@@ -1061,8 +1061,8 @@ func TestUTLSConnectionPinnedWrongCert(t *testing.T) {
 				}),
 				SenderSettings: serial.ToTypedMessage(&proxyman.SenderConfig{
 					StreamSettings: &internet.StreamConfig{
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Fingerprint:          "random",
 								PinnedPeerCertSha256: [][]byte{certHash},

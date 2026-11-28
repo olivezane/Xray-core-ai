@@ -4,7 +4,6 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/net/cnc"
 	"github.com/xtls/xray-core/transport/internet/finalmask"
@@ -58,12 +57,20 @@ func ToMemoryStreamConfig(s *StreamConfig) (*MemoryStreamConfig, error) {
 		var tcpMasks []finalmask.TCPMask
 		var udpMasks []finalmask.UDPMask
 
-		for i := range s.Tcpmasks {
-			instance := common.Must2(s.Tcpmasks[i].GetInstance())
+		// A mask is a plain Go value; one that is still a message is read back the
+		// way protobuf reads it.
+		for _, mask := range s.Tcpmasks {
+			instance, err := UnwrapSettings(mask)
+			if err != nil {
+				return nil, err
+			}
 			tcpMasks = append(tcpMasks, instance.(finalmask.TCPMask))
 		}
-		for i := range s.Udpmasks {
-			instance := common.Must2(s.Udpmasks[i].GetInstance())
+		for _, mask := range s.Udpmasks {
+			instance, err := UnwrapSettings(mask)
+			if err != nil {
+				return nil, err
+			}
 			udpMasks = append(udpMasks, instance.(finalmask.UDPMask))
 		}
 

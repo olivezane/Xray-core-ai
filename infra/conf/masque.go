@@ -9,7 +9,6 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/masque"
-	"google.golang.org/protobuf/proto"
 )
 
 // MasqueClientConfig is the settings of a MASQUE outbound.
@@ -17,7 +16,7 @@ type MasqueClientConfig struct {
 	coreconfig.MasqueClient
 }
 
-func (c *MasqueClientConfig) Build() (proto.Message, error) {
+func (c *MasqueClientConfig) Build() (any, error) {
 	if c.Address == nil {
 		return nil, errors.New(`MASQUE: "address" is not set`)
 	}
@@ -46,7 +45,7 @@ type MasqueServerConfig struct {
 	coreconfig.MasqueServer
 }
 
-func (c *MasqueServerConfig) Build() (proto.Message, error) {
+func (c *MasqueServerConfig) Build() (any, error) {
 	if c.Clients != nil {
 		c.Users = c.Clients
 	}

@@ -43,11 +43,17 @@ func NewCommander(ctx context.Context, config *Config) (*Commander, error) {
 	}))
 
 	for _, rawConfig := range config.Service {
-		config, err := rawConfig.GetInstance()
-		if err != nil {
-			return nil, err
+		// A service is configured by a plain Go value now; one that is still a
+		// message is read the way protobuf reads it.
+		serviceConfig := common.UnwrapSettings(rawConfig)
+		if serviceConfig == any(rawConfig) {
+			message, err := rawConfig.GetInstance()
+			if err != nil {
+				return nil, err
+			}
+			serviceConfig = message
 		}
-		rawService, err := common.CreateObject(ctx, config)
+		rawService, err := common.CreateObject(ctx, serviceConfig)
 		if err != nil {
 			return nil, err
 		}

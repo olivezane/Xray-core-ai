@@ -16,9 +16,11 @@ import (
 	"github.com/xtls/xray-core/transport/internet/httpupgrade"
 	"github.com/xtls/xray-core/transport/internet/hysteria"
 	"github.com/xtls/xray-core/transport/internet/kcp"
+	"github.com/xtls/xray-core/transport/internet/reality"
 	"github.com/xtls/xray-core/transport/internet/masque"
 	"github.com/xtls/xray-core/transport/internet/splithttp"
 	"github.com/xtls/xray-core/transport/internet/tcp"
+	"github.com/xtls/xray-core/transport/internet/tls"
 	"github.com/xtls/xray-core/transport/internet/udp"
 	"github.com/xtls/xray-core/transport/internet/websocket"
 	"github.com/xtls/xray-core/transport/internet/xdrive"
@@ -40,6 +42,16 @@ var All = []internet.Transport{
 	{Name: "udp", Config: internet.ConfigOf(udp.NewConfig), Dial: udp.Dial},
 }
 
+// Security is every stream security layer of this build, one line each. A
+// security layer wraps a transport rather than being one, so it is listed here
+// beside the transports: its settings cross the API by name the same way.
+var Security = []interface{}{
+	(*tls.Config)(nil),
+	(*reality.Config)(nil),
+	(*xdrive.Config)(nil),
+}
+
 func init() {
 	common.Must(internet.SetTransports(All))
+	common.Must(internet.SetStreamSettings(Security))
 }

@@ -22,9 +22,9 @@ func BuildXray() error {
 	return cmd.Run()
 }
 
-func RunXrayProtobuf(config []byte) *exec.Cmd {
+func RunXrayConfig(config []byte) *exec.Cmd {
 	genTestBinaryPath()
-	proc := exec.Command(testBinaryPath, "-config=stdin:", "-format=pb")
+	proc := exec.Command(testBinaryPath, "-config=stdin:", "-format=json")
 	proc.Stdin = bytes.NewBuffer(config)
 	proc.Stderr = os.Stderr
 	proc.Stdout = os.Stdout

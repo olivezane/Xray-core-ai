@@ -6,6 +6,14 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet/finalmask"
 )
+// Config is the settings of the PROXY protocol mask.
+type Config struct {
+	Version uint32 `json:"version,omitempty"`
+}
+// SettingsName is what a configuration written for the API calls these settings.
+func (*Config) SettingsName() string {
+	return "xray.transport.internet.finalmask.proxyprotocol.Config"
+}
 
 func (c *Config) WrapConnClient(conn net.Conn, dest *net.Destination, dialer *finalmask.Dialer) (net.Conn, error) {
 	version := c.Version

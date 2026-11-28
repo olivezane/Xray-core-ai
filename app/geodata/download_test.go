@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xtls/xray-core/common"
 	commongeodata "github.com/xtls/xray-core/common/geodata"
 	xlua "github.com/xtls/xray-core/common/lua"
 	"github.com/xtls/xray-core/common/serial"
@@ -110,11 +111,13 @@ func TestProtobufConfigValidation(t *testing.T) {
 		{"directory", &Config{Cron: "@daily", Assets: []*Asset{{Url: "https://example.com/asset.dat", File: "directory.dat"}}}, "asset is not a regular file"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			config, err := serial.ToTypedMessage(tc.config).GetInstance()
-			if err != nil {
-				t.Fatal(err)
+			// The settings are a plain Go value, so they are read back the way a
+			// configuration carries them rather than through protobuf.
+			config := common.UnwrapSettings(serial.ToTypedMessage(tc.config))
+			if config == any(serial.ToTypedMessage(tc.config)) {
+				t.Fatal("settings were not read back")
 			}
-			_, err = core.CreateObject(server, config)
+			_, err := core.CreateObject(server, config)
 			if tc.wantError == "" {
 				if err != nil {
 					t.Fatal(err)

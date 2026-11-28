@@ -8,7 +8,6 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/http"
-	"google.golang.org/protobuf/proto"
 )
 
 // HTTPAccount is one user of an HTTP inbound, from the configuration model.
@@ -26,7 +25,7 @@ type HTTPServerConfig struct {
 	coreconfig.HTTPServer
 }
 
-func (c *HTTPServerConfig) Build() (proto.Message, error) {
+func (c *HTTPServerConfig) Build() (any, error) {
 	config := &http.ServerConfig{
 		AllowTransparent: c.Transparent,
 		UserLevel:        c.UserLevel,
@@ -54,7 +53,7 @@ type HTTPClientConfig struct {
 	coreconfig.HTTPClient
 }
 
-func (v *HTTPClientConfig) Build() (proto.Message, error) {
+func (v *HTTPClientConfig) Build() (any, error) {
 	config := new(http.ClientConfig)
 	if v.Address != nil {
 		v.Servers = []*HTTPRemoteConfig{

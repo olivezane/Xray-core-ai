@@ -53,7 +53,7 @@ func TestVMessClosing(t *testing.T) {
 	userID := protocol.NewID(uuid.New())
 	serverPort := tcp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&policy.Config{
 				Level: map[uint32]*policy.Policy{
 					0: {
@@ -93,7 +93,7 @@ func TestVMessClosing(t *testing.T) {
 
 	clientPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&policy.Config{
 				Level: map[uint32]*policy.Policy{
 					0: {
@@ -158,7 +158,7 @@ func TestZeroBuffer(t *testing.T) {
 	userID := protocol.NewID(uuid.New())
 	serverPort := tcp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&policy.Config{
 				Level: map[uint32]*policy.Policy{
 					0: {
@@ -201,7 +201,7 @@ func TestZeroBuffer(t *testing.T) {
 
 	clientPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,

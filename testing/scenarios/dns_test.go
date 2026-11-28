@@ -30,7 +30,7 @@ func TestResolveIP(t *testing.T) {
 
 	serverPort := tcp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dns.Config{
 				StaticHosts: []*dns.Config_HostMapping{
 					{

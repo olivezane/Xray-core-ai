@@ -6,6 +6,15 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet/finalmask"
 )
+// Config is the settings of the xicmp mask.
+type Config struct {
+	DGRAM bool     `json:"DGRAM,omitempty"`
+	IPs   []string `json:"IPs,omitempty"`
+}
+// SettingsName is what a configuration written for the API calls these settings.
+func (*Config) SettingsName() string {
+	return "xray.transport.internet.finalmask.xicmp.Config"
+}
 
 func (c *Config) HandleDial() {}
 

@@ -16,7 +16,6 @@ import (
 	"github.com/xtls/xray-core/transport/internet/reality"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/transport/internet/tls"
-	"google.golang.org/protobuf/proto"
 )
 
 // LimitFallback is the limiter of a fallback, from the configuration model.
@@ -27,7 +26,7 @@ type REALITYConfig struct {
 	coreconfig.Reality
 }
 
-func (c *REALITYConfig) Build() (proto.Message, error) {
+func (c *REALITYConfig) Build() (any, error) {
 	config := new(reality.Config)
 	config.MasterKeyLog = c.MasterKeyLog
 	config.Show = c.Show
@@ -274,7 +273,7 @@ type TLSConfig struct {
 func (c *TLSConfig) Model() *coreconfig.TLS { return &c.TLS }
 
 // Build implements Buildable.
-func (c *TLSConfig) Build() (proto.Message, error) {
+func (c *TLSConfig) Build() (any, error) {
 	config := new(tls.Config)
 	config.Certificate = make([]*tls.Certificate, len(c.Certs))
 	for idx, certConf := range c.Certs {

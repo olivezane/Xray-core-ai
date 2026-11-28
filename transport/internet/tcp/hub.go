@@ -73,7 +73,7 @@ func ListenTCP(ctx context.Context, address net.Address, port net.Port, streamSe
 	}
 
 	if tcpSettings.HeaderSettings != nil {
-		headerConfig, err := tcpSettings.HeaderSettings.GetInstance()
+		headerConfig, err := internet.UnwrapSettings(tcpSettings.HeaderSettings)
 		if err != nil {
 			return nil, errors.New("invalid header settings").Base(err)
 		}

@@ -89,7 +89,7 @@ var verifyDNSRouting = func(ctx context.Context, inboundTag, source, address str
 	if handler == nil {
 		return errors.New("outbound ", route.GetOutboundTag(), " does not exist")
 	}
-	if settings := handler.ProxySettings(); settings == nil || settings.Type != serial.GetMessageType(&dns.Config{}) {
+	if settings := handler.ProxySettings(); settings == nil || settings.Type != serial.NameOf(&dns.Config{}) {
 		return errors.New("outbound ", route.GetOutboundTag(), " does not handle DNS")
 	}
 	return nil

@@ -8,7 +8,6 @@ import (
 	"github.com/xtls/xray-core/app/geodata"
 	"github.com/xtls/xray-core/common/errors"
 	coreconfig "github.com/xtls/xray-core/core/config"
-	"google.golang.org/protobuf/proto"
 )
 
 // GeodataAssetConfig is one asset of the geodata section. It carries the model
@@ -61,7 +60,7 @@ type GeodataConfig struct {
 }
 
 // Build converts the geodata section to its message.
-func (c *GeodataConfig) Build() (proto.Message, error) {
+func (c *GeodataConfig) Build() (any, error) {
 	config := &geodata.Config{}
 
 	if c.Cron != nil {

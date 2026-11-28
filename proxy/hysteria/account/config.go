@@ -7,7 +7,6 @@ import (
 	"github.com/xtls/xray-core/common/protocol"
 
 	"github.com/google/uuid"
-	"google.golang.org/protobuf/proto"
 )
 
 func (a *Account) AsAccount() (protocol.Account, error) {
@@ -33,7 +32,7 @@ func (a *MemoryAccount) Equals(other protocol.Account) bool {
 	return false
 }
 
-func (a *MemoryAccount) ToProto() proto.Message {
+func (a *MemoryAccount) ToProto() any {
 	return &Account{
 		Auth: a.Auth,
 	}

@@ -20,6 +20,8 @@ import (
 	"github.com/xtls/xray-core/common/geodata"
 	"github.com/xtls/xray-core/common/log"
 	"github.com/xtls/xray-core/common/net"
+	"github.com/xtls/xray-core/common/serial"
+	"google.golang.org/protobuf/proto"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/dns"
 	"github.com/xtls/xray-core/features/outbound"
@@ -171,7 +173,7 @@ func executeLookup(cmd *base.Command, args []string) {
 	if *lookupInbound != "" {
 		found := false
 		for _, in := range c.Inbound {
-			if in.GetTag() == *lookupInbound {
+			if in.Tag == *lookupInbound {
 				found = true
 				break
 			}
@@ -182,7 +184,7 @@ func executeLookup(cmd *base.Command, args []string) {
 			os.Exit(2)
 		}
 	}
-	if rc := routerConfig(c); rc != nil && rc.GetScript() != "" {
+	if rc := routerConfig(c); rc != nil && rc.Script != "" {
 		// Router.Start only compiles the routing script, no listener is opened.
 		r, _ := inst.GetFeature(routing.RouterType()).(*router.Router)
 		if r == nil {
@@ -311,7 +313,7 @@ func lookup(inst *core.Instance, c *core.Config, target string, network net.Netw
 		result.fillDNS(inst, c, ctx.TargetDomain)
 	}
 	if rc := routerConfig(c); rc != nil {
-		if rc.GetScript() != "" {
+		if rc.Script != "" {
 			result.Notes = append(result.Notes, "routing.script decides the outbound, the matched rule may be bypassed")
 		}
 		for _, i := range unverifiableRules(rc) {
@@ -374,15 +376,11 @@ func (r *lookupResult) fillOutbound(inst *core.Instance, c *core.Config, route r
 
 // senderConfig returns the outbound's stream settings, nil when it has none.
 func senderConfig(ob *core.OutboundHandlerConfig) *proxyman.SenderConfig {
-	settings := ob.GetSenderSettings()
+	settings := ob.SenderSettings
 	if settings == nil {
 		return nil
 	}
-	inst, err := settings.GetInstance()
-	if err != nil {
-		return nil
-	}
-	sc, _ := inst.(*proxyman.SenderConfig)
+	sc, _ := common.UnwrapSettings(settings).(*proxyman.SenderConfig)
 	return sc
 }
 
@@ -401,29 +399,28 @@ func allIPs(values []string) bool {
 // needs nothing beyond the outbound tag.
 func (r *lookupResult) fillFinal(c *core.Config) {
 	for _, ob := range c.Outbound {
-		if ob.GetTag() != r.Outbound {
+		if ob.Tag != r.Outbound {
 			continue
 		}
-		if ob.GetProxySettings() == nil {
+		if ob.ProxySettings == nil {
 			return
 		}
-		inst, err := ob.GetProxySettings().GetInstance()
-		if err != nil {
-			return
-		}
-		fc, ok := inst.(*freedom.Config)
+		fc, ok := common.UnwrapSettings(ob.ProxySettings).(*freedom.Config)
 		if !ok {
 			return
 		}
-		domainStrategy := fc.GetDomainStrategy()
-		if sc := senderConfig(ob); sc != nil {
-			if sc.GetStreamSettings().GetSocketSettings().GetDialerProxy() != "" {
-				r.note("freedom is not the final outbound (dialerProxy), the firewall is ignored")
-				return
-			}
-			// The runtime prefers the socket settings over the legacy alias.
-			if ds := sc.GetStreamSettings().GetSocketSettings().GetDomainStrategy(); ds != internet.DomainStrategy_AS_IS {
-				domainStrategy = ds
+		domainStrategy := fc.DomainStrategy
+		if sc := senderConfig(ob); sc != nil && sc.StreamSettings != nil {
+			socket := sc.StreamSettings.SocketSettings
+			if socket != nil {
+				if socket.DialerProxy != "" {
+					r.note("freedom is not the final outbound (dialerProxy), the firewall is ignored")
+					return
+				}
+				// The runtime prefers the socket settings over the legacy alias.
+				if ds := socket.DomainStrategy; ds != internet.DomainStrategy_AS_IS {
+					domainStrategy = ds
+				}
 			}
 		}
 		network := net.Network_TCP
@@ -434,8 +431,8 @@ func (r *lookupResult) fillFinal(c *core.Config) {
 		inbound := inboundProtocol(c, *lookupInbound)
 		if *lookupInbound == "" {
 			for _, in := range c.Inbound {
-				if kind := inboundProtocol(c, in.GetTag()); kind != "" && freedom.HasImplicitFinalRule(kind) {
-					r.note(fmt.Sprintf("inbound %s brings an implicit firewall rule, pass -inbound %s to apply it", in.GetTag(), in.GetTag()))
+				if kind := inboundProtocol(c, in.Tag); kind != "" && freedom.HasImplicitFinalRule(kind) {
+					r.note(fmt.Sprintf("inbound %s brings an implicit firewall rule, pass -inbound %s to apply it", in.Tag, in.Tag))
 					break
 				}
 			}
@@ -444,13 +441,13 @@ func (r *lookupResult) fillFinal(c *core.Config) {
 		if verdict.Total > 0 || verdict.Default {
 			r.Final = &lookupFinal{Index: verdict.Index, Block: verdict.Block, Total: verdict.Total, Default: verdict.Default, Inbound: inbound}
 		}
-		if r.Final != nil && r.Final.Block && verdict.Index >= 0 && unconditionalFirewallRule(fc.GetFirewall()[verdict.Index]) {
+		if r.Final != nil && r.Final.Block && verdict.Index >= 0 && unconditionalFirewallRule(fc.Firewall[verdict.Index]) {
 			// A block rule without any condition is what a legacy "blackhole" outbound builds.
 			r.note("the blocking rule has no condition: it is a catch-all firewall, as a legacy blackhole outbound builds")
 		}
 		if address.Family().IsDomain() && domainStrategy != internet.DomainStrategy_AS_IS {
-			for _, rc := range fc.GetFirewall() {
-				if len(rc.GetIp()) > 0 {
+			for _, rc := range fc.Firewall {
+				if len(rc.Ip) > 0 {
 					r.note("freedom resolves the domain before matching ip firewall rules, so ip rules above are not applied here")
 					break
 				}
@@ -462,7 +459,7 @@ func (r *lookupResult) fillFinal(c *core.Config) {
 
 // unconditionalFirewallRule reports whether a block rule matches every destination.
 func unconditionalFirewallRule(rc *freedom.FirewallConfig) bool {
-	return rc != nil && len(rc.GetNetworks()) == 0 && rc.GetPortList() == nil && len(rc.GetIp()) == 0
+	return rc != nil && len(rc.Networks) == 0 && rc.PortList == nil && len(rc.Ip) == 0
 }
 
 // note appends a note once.
@@ -492,10 +489,10 @@ func (r *lookupResult) fillDNS(inst *core.Instance, c *core.Config, domain strin
 		}
 	}
 	dc := dnsConfig(c)
-	if dc != nil && dc.GetQueryStrategy() != appdns.QueryStrategy_USE_IP {
-		r.DNS.QueryStrategy = dc.GetQueryStrategy().String()
+	if dc != nil && dc.QueryStrategy != appdns.QueryStrategy_USE_IP {
+		r.DNS.QueryStrategy = dc.QueryStrategy.String()
 	}
-	if dc != nil && dc.GetScript() != "" {
+	if dc != nil && dc.Script != "" {
 		r.Notes = append(r.Notes, "dns.script picks the servers, the list above may not apply")
 	}
 	if *lookupResolve {
@@ -527,10 +524,10 @@ func (r *lookupResult) fillAnswers(client *appdns.DNS, domain string) {
 // ever needs its own block-everything verdict.
 func inboundProtocol(c *core.Config, tag string) string {
 	for _, in := range c.Inbound {
-		if in.GetTag() != tag || in.GetProxySettings() == nil {
+		if in.Tag != tag || in.ProxySettings == nil {
 			continue
 		}
-		kind := strings.ToLower(in.GetProxySettings().GetType())
+		kind := strings.ToLower(proxySettingsTypeName(in.ProxySettings))
 		for _, name := range []string{"vless", "vmess", "trojan", "hysteria", "wireguard", "masque", "shadowsocks"} {
 			if strings.Contains(kind, name) {
 				return name
@@ -544,19 +541,15 @@ func inboundProtocol(c *core.Config, tag string) string {
 func sniffingNotes(c *core.Config) []string {
 	var notes []string
 	for _, in := range c.Inbound {
-		if in.GetTag() != *lookupInbound || in.GetReceiverSettings() == nil {
+		if in.Tag != *lookupInbound || in.ReceiverSettings == nil {
 			continue
 		}
-		rs, err := in.GetReceiverSettings().GetInstance()
-		if err != nil {
-			continue
-		}
-		sc, ok := rs.(*proxyman.ReceiverConfig)
+		sc, ok := common.UnwrapSettings(in.ReceiverSettings).(*proxyman.ReceiverConfig)
 		if !ok || !sc.GetSniffingSettings().GetEnabled() {
 			continue
 		}
 		if n := len(sc.GetSniffingSettings().GetDestinationOverride()); n > 0 {
-			notes = append(notes, fmt.Sprintf("sniffing on %s overrides the target with %d protocol(s) before routing", in.GetTag(), n))
+			notes = append(notes, fmt.Sprintf("sniffing on %s overrides the target with %d protocol(s) before routing", in.Tag, n))
 		}
 	}
 	return notes
@@ -566,8 +559,8 @@ func sniffingNotes(c *core.Config) []string {
 func unverifiableRules(rc *router.Config) []int {
 	var indices []int
 	for i, rule := range rc.Rule {
-		if rule.GetProcess() != nil || rule.GetLocalOs() != nil || rule.GetSourcePortList() != nil ||
-			rule.GetLocalPortList() != nil || rule.GetVlessRouteList() != nil {
+		if rule.Process != nil || rule.LocalOs != nil || rule.SourcePortList != nil ||
+			rule.LocalPortList != nil || rule.VlessRouteList != nil {
 			indices = append(indices, i)
 		}
 	}
@@ -688,24 +681,24 @@ func describeRule(r *router.RoutingRule) string {
 	}
 	add("outbound", r.GetTag())
 	add("balancer", r.GetBalancingTag())
-	add("domain", describeAll(r.GetDomain(), geodata.FormatDomainRule))
-	add("ip", describeAll(r.GetIp(), geodata.FormatIPRule))
-	add("sourceIp", describeAll(r.GetSourceIp(), geodata.FormatIPRule))
-	add("localIp", describeAll(r.GetLocalIp(), geodata.FormatIPRule))
-	add("port", describePortList(r.GetPortList()))
-	add("sourcePort", describePortList(r.GetSourcePortList()))
-	add("localPort", describePortList(r.GetLocalPortList()))
-	add("vlessRoute", describePortList(r.GetVlessRouteList()))
-	add("network", describeAll(r.GetNetworks(), func(n net.Network) string { return strings.ToLower(n.String()) }))
-	add("inboundTag", strings.Join(r.GetInboundTag(), ","))
-	add("protocol", strings.Join(r.GetProtocol(), ","))
-	add("user", strings.Join(r.GetUserEmail(), ","))
-	add("process", strings.Join(r.GetProcess(), ","))
-	add("localOS", strings.Join(r.GetLocalOs(), ","))
+	add("domain", describeAll(r.Domain, geodata.FormatDomainRule))
+	add("ip", describeAll(r.Ip, geodata.FormatIPRule))
+	add("sourceIp", describeAll(r.SourceIp, geodata.FormatIPRule))
+	add("localIp", describeAll(r.LocalIp, geodata.FormatIPRule))
+	add("port", describePortList(r.PortList))
+	add("sourcePort", describePortList(r.SourcePortList))
+	add("localPort", describePortList(r.LocalPortList))
+	add("vlessRoute", describePortList(r.VlessRouteList))
+	add("network", describeAll(r.Networks, func(n net.Network) string { return strings.ToLower(n.String()) }))
+	add("inboundTag", strings.Join(r.InboundTag, ","))
+	add("protocol", strings.Join(r.Protocol, ","))
+	add("user", strings.Join(r.UserEmail, ","))
+	add("process", strings.Join(r.Process, ","))
+	add("localOS", strings.Join(r.LocalOs, ","))
 	if r.GetWebhook() != nil {
 		kv = append(kv, "webhook")
 	}
-	if attrs := r.GetAttributes(); len(attrs) > 0 {
+	if attrs := r.Attributes; len(attrs) > 0 {
 		pairs := make([]string, 0, len(attrs))
 		for k, v := range attrs {
 			pairs = append(pairs, k+"="+v)
@@ -742,29 +735,41 @@ func balancingRule(c *core.Config, tag string) *lookupBalanc {
 		return nil
 	}
 	for _, br := range rc.BalancingRule {
-		if br.GetTag() != tag {
+		if br.Tag != tag {
 			continue
 		}
-		strategy := br.GetStrategy()
+		strategy := br.Strategy
 		if strategy == "" {
 			strategy = "random" // same default as app/router BalancingRule.Build
 		}
 		return &lookupBalanc{
 			Tag:      tag,
 			Strategy: strategy,
-			Fallback: br.GetFallbackTag(),
-			Members:  br.GetOutboundSelector(),
+			Fallback: br.FallbackTag,
+			Members:  br.OutboundSelector,
 		}
 	}
 	return nil
 }
 
+// proxySettingsTypeName names the protocol of a proxy setting: the name the
+// setting gives itself, which is the message name while a setting is a protobuf
+// message and the name it says for itself once it is a plain Go value.
+func proxySettingsTypeName(settings any) string {
+	settings = common.UnwrapSettings(settings)
+	if named, ok := settings.(serial.SettingsNamer); ok {
+		return named.SettingsName()
+	}
+	if message, ok := settings.(proto.Message); ok {
+		return string(proto.MessageName(message))
+	}
+	return fmt.Sprintf("%T", settings)
+}
+
 func routerConfig(c *core.Config) *router.Config {
 	for _, app := range c.App {
-		if inst, err := app.GetInstance(); err == nil {
-			if rc, ok := inst.(*router.Config); ok {
-				return rc
-			}
+		if rc, ok := common.UnwrapSettings(app).(*router.Config); ok {
+			return rc
 		}
 	}
 	return nil
@@ -772,10 +777,8 @@ func routerConfig(c *core.Config) *router.Config {
 
 func dnsConfig(c *core.Config) *appdns.Config {
 	for _, app := range c.App {
-		if inst, err := app.GetInstance(); err == nil {
-			if dc, ok := inst.(*appdns.Config); ok {
-				return dc
-			}
+		if dc, ok := common.UnwrapSettings(app).(*appdns.Config); ok {
+			return dc
 		}
 	}
 	return nil

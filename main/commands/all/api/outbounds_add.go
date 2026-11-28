@@ -67,7 +67,7 @@ func executeAddOutbounds(cmd *base.Command, args []string) {
 			base.Fatalf("failed to build conf: %s", err)
 		}
 		r := &handlerService.AddOutboundRequest{
-			Outbound: o,
+			Outbound: handlerService.OutboundToWire(o),
 		}
 		resp, err := client.AddOutbound(ctx, r)
 		if err != nil {

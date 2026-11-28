@@ -53,7 +53,7 @@ func (l *Loopback) Process(ctx context.Context, link *transport.Link, _ internet
 func (l *Loopback) init(config *Config, dispatcherInstance routing.Dispatcher) error {
 	l.dispatcherInstance = dispatcherInstance
 	l.inboundTag = config.InboundTag
-	if config.Sniffing.GetEnabled() {
+	if config.Sniffing != nil && config.Sniffing.Enabled {
 		request, err := proxyman.BuildSniffingRequest(config.Sniffing)
 		if err != nil {
 			return errors.New("failed to build loopback sniffing request").Base(err)

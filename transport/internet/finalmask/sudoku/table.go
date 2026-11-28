@@ -70,7 +70,7 @@ func getTables(config *Config) ([]*table, error) {
 		return nil, fmt.Errorf("nil sudoku config")
 	}
 
-	mode, err := normalizeASCII(config.GetAscii())
+	mode, err := normalizeASCII(config.Ascii)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func getTables(config *Config) ([]*table, error) {
 	}
 
 	cacheKey := tableCacheKey{
-		password:    config.GetPassword(),
+		password:    config.Password,
 		ascii:       mode,
 		customTable: strings.Join(patterns, "\x00"),
 	}
@@ -95,7 +95,7 @@ func getTables(config *Config) ([]*table, error) {
 		if err != nil {
 			return nil, err
 		}
-		t, err := buildTable(config.GetPassword(), layout)
+		t, err := buildTable(config.Password, layout)
 		if err != nil {
 			return nil, err
 		}
@@ -114,9 +114,9 @@ func normalizedCustomPatterns(config *Config, mode string) ([]string, error) {
 		return []string{""}, nil
 	}
 
-	rawPatterns := config.GetCustomTables()
+	rawPatterns := config.CustomTables
 	if len(rawPatterns) == 0 {
-		rawPatterns = []string{config.GetCustomTable()}
+		rawPatterns = []string{config.CustomTable}
 	}
 
 	patterns := make([]string, 0, len(rawPatterns))
@@ -149,8 +149,8 @@ func normalizedPadding(config *Config) (int, int) {
 		return 0, 0
 	}
 
-	pMin := int(config.GetPaddingMin())
-	pMax := int(config.GetPaddingMax())
+	pMin := int(config.PaddingMin)
+	pMax := int(config.PaddingMax)
 
 	if pMin > 100 {
 		pMin = 100

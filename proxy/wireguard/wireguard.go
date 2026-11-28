@@ -12,6 +12,9 @@ import (
 var ConfigObjects = []common.ConfigObject{
 	{
 		Config: (*DeviceConfig)(nil),
+		// A peer is not created from a configuration, but it crosses the API by
+		// name like one: it is the account of a wireguard user.
+		Also: []interface{}{(*PeerConfig)(nil)},
 		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		deviceConfig := config.(*DeviceConfig)
 		if deviceConfig.IsClient {

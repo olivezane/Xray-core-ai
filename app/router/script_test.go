@@ -381,7 +381,7 @@ function HandleRoute(ctx, inbound, sourcePort, targetPort, localPort, domain, ne
     return "direct", "outer-route"
 end`)
 	instance, err := core.New(&core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&appdns.Config{
 				Tag: "dns", Script: dnsScript, DisableCache: true,
 				NameServer: []*appdns.NameServer{{

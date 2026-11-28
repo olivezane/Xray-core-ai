@@ -12,7 +12,6 @@ import (
 	"github.com/xtls/xray-core/common/task"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/wireguard"
-	"google.golang.org/protobuf/proto"
 )
 
 // WireGuardPeerConfig is one peer of a WireGuard tunnel.
@@ -56,7 +55,7 @@ type WireGuardConfig struct {
 	coreconfig.WireGuard
 }
 
-func (c *WireGuardConfig) Build() (proto.Message, error) {
+func (c *WireGuardConfig) Build() (any, error) {
 	config := new(wireguard.DeviceConfig)
 
 	var err error

@@ -96,7 +96,7 @@ func TestUDPDNSTunnel(t *testing.T) {
 
 	serverPort := udp.PickPort()
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dnsapp.Config{
 				NameServer: []*dnsapp.NameServer{
 					{
@@ -215,7 +215,7 @@ func TestTCPDNSTunnel(t *testing.T) {
 
 	serverPort := tcp.PickPort()
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dnsapp.Config{
 				NameServer: []*dnsapp.NameServer{
 					{
@@ -301,7 +301,7 @@ func TestUDP2TCPDNSTunnel(t *testing.T) {
 
 	serverPort := tcp.PickPort()
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dnsapp.Config{
 				NameServer: []*dnsapp.NameServer{
 					{
@@ -391,7 +391,7 @@ func TestDNSRules(t *testing.T) {
 
 	serverPort := udp.PickPort()
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dnsapp.Config{
 				NameServer: []*dnsapp.NameServer{
 					{

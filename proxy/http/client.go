@@ -223,7 +223,7 @@ func setUpHTTPTunnel(ctx context.Context, dest net.Destination, target string, u
 
 	if user != nil && user.Account != nil {
 		account := user.Account.(*Account)
-		auth := account.GetUsername() + ":" + account.GetPassword()
+		auth := account.Username + ":" + account.Password
 		req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(auth)))
 	}
 
@@ -409,6 +409,9 @@ func (c *earlyDataConn) Read(p []byte) (int, error) {
 var ConfigObjectsHttpClient = []common.ConfigObject{
 	{
 		Config: (*ClientConfig)(nil),
+		// The account of this proxy is not created from a configuration, but it
+		// crosses the API by name like one.
+		Also: []interface{}{(*Account)(nil)},
 		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return NewClient(ctx, config.(*ClientConfig))
 	},

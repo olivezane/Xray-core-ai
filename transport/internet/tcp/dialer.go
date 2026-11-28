@@ -99,7 +99,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 
 	tcpSettings := streamSettings.ProtocolSettings.(*Config)
 	if tcpSettings.HeaderSettings != nil {
-		headerConfig, err := tcpSettings.HeaderSettings.GetInstance()
+		headerConfig, err := internet.UnwrapSettings(tcpSettings.HeaderSettings)
 		if err != nil {
 			return nil, errors.New("failed to get header settings").Base(err)
 		}

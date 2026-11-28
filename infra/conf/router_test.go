@@ -13,12 +13,11 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	. "github.com/xtls/xray-core/infra/conf"
 
-	"google.golang.org/protobuf/proto"
 )
 
 func TestRouterConfig(t *testing.T) {
-	createParser := func() func(string) (proto.Message, error) {
-		return func(s string) (proto.Message, error) {
+	createParser := func() func(string) (any, error) {
+		return func(s string) (any, error) {
 			config := new(RouterConfig)
 			if err := json.Unmarshal([]byte(s), config); err != nil {
 				return nil, err

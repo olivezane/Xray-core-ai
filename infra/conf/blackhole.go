@@ -8,7 +8,6 @@ import (
 	"github.com/xtls/xray-core/common/log"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/freedom"
-	"google.golang.org/protobuf/proto"
 )
 
 // BlackholeConfig is the settings of a blackhole outbound.
@@ -20,7 +19,7 @@ type BlackholeConfig struct {
 type ResponseConfig = coreconfig.Response
 
 // Build converts the settings of a blackhole outbound to its message.
-func (v *BlackholeConfig) Build() (proto.Message, error) {
+func (v *BlackholeConfig) Build() (any, error) {
 	errors.PrintDeprecatedFeatureWarning(`"blackhole" outbound`, `"freedom" outbound with a blocking "firewall" rule`)
 	rule := &freedom.FirewallConfig{
 		Action:   freedom.RuleAction_Block,

@@ -8,7 +8,6 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/socks"
-	"google.golang.org/protobuf/proto"
 )
 
 // SocksAccount is one user of a socks inbound, from the configuration model.
@@ -31,7 +30,7 @@ type SocksServerConfig struct {
 	coreconfig.SocksServer
 }
 
-func (v *SocksServerConfig) Build() (proto.Message, error) {
+func (v *SocksServerConfig) Build() (any, error) {
 	config := new(socks.ServerConfig)
 	switch v.AuthMethod {
 	case AuthMethodNoAuth:
@@ -70,7 +69,7 @@ type SocksClientConfig struct {
 	coreconfig.SocksClient
 }
 
-func (v *SocksClientConfig) Build() (proto.Message, error) {
+func (v *SocksClientConfig) Build() (any, error) {
 	config := new(socks.ClientConfig)
 	if v.Address != nil {
 		v.Servers = []*SocksRemoteConfig{

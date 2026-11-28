@@ -2,21 +2,29 @@ package conf_test
 
 import (
 	"encoding/json"
+	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/xtls/xray-core/app/dns"
 	"github.com/xtls/xray-core/common/geodata"
 	"github.com/xtls/xray-core/common/net"
 	. "github.com/xtls/xray-core/infra/conf"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/testing/protocmp"
 )
 
+func sortHostMappings(hosts []*dns.Config_HostMapping) {
+	sort.Slice(hosts, func(i, j int) bool {
+		if hosts[i].ProxiedDomain != hosts[j].ProxiedDomain {
+			return hosts[i].ProxiedDomain < hosts[j].ProxiedDomain
+		}
+		return fmt.Sprint(hosts[i].Domain) < fmt.Sprint(hosts[j].Domain)
+	})
+}
+
 func TestDNSConfigParsing(t *testing.T) {
-	parserCreator := func() func(string) (proto.Message, error) {
-		return func(s string) (proto.Message, error) {
+	parserCreator := func() func(string) (any, error) {
+		return func(s string) (any, error) {
 			config := new(DNSConfig)
 			if err := json.Unmarshal([]byte(s), config); err != nil {
 				return nil, err
@@ -113,13 +121,16 @@ func TestDNSConfigParsing(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if diff := cmp.Diff(
-			testCase.Output,
-			actual,
-			protocmp.Transform(),
-			protocmp.SortRepeatedFields(&dns.Config{}, "static_hosts"),
-		); diff != "" {
-			t.Fatalf("Failed in test case:\n%s\nDiff (-want +got):\n%s", testCase.Input, diff)
+		// The settings are a plain Go value now, so they are compared the way the
+		// rest of this package compares a built configuration. Static hosts are a
+		// slice, so the order they were written in is not the order they are read.
+		if a, ok := actual.(*dns.Config); ok {
+			e := testCase.Output.(*dns.Config)
+			sortHostMappings(a.StaticHosts)
+			sortHostMappings(e.StaticHosts)
+		}
+		if !equalConfig(actual, testCase.Output) {
+			t.Fatalf("Failed in test case:\n%s\nwant: %s\ngot:  %s", testCase.Input, configJSON(testCase.Output), configJSON(actual))
 		}
 	}
 }

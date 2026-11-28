@@ -8,7 +8,6 @@ import (
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/hysteria"
 	"github.com/xtls/xray-core/proxy/hysteria/account"
-	"google.golang.org/protobuf/proto"
 )
 
 // HysteriaClientConfig is the settings of a HYSTERIA outbound.
@@ -16,7 +15,7 @@ type HysteriaClientConfig struct {
 	coreconfig.HysteriaClient
 }
 
-func (c *HysteriaClientConfig) Build() (proto.Message, error) {
+func (c *HysteriaClientConfig) Build() (any, error) {
 	if c.Version != 2 {
 		return nil, errors.New("version != 2")
 	}
@@ -38,7 +37,7 @@ type HysteriaServerConfig struct {
 	coreconfig.HysteriaServer
 }
 
-func (c *HysteriaServerConfig) Build() (proto.Message, error) {
+func (c *HysteriaServerConfig) Build() (any, error) {
 	if c.Version != 2 {
 		return nil, errors.New("version != 2")
 	}

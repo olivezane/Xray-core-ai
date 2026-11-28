@@ -1,6 +1,7 @@
 package internet
 
 import (
+	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/serial"
@@ -43,8 +44,34 @@ func CreateTransportConfig(name string) (interface{}, error) {
 	return config(), nil
 }
 
+// UnwrapSettings reads a setting a stream transport or a stream header carries:
+// a plain Go value as it stands, and a protobuf message the way protobuf reads it.
+func UnwrapSettings(settings any) (interface{}, error) {
+	typed, ok := settings.(*serial.TypedMessage)
+	if !ok {
+		return settings, nil
+	}
+	if typed == nil {
+		return nil, nil
+	}
+	if configType, found := transportConfigTypes[typed.Type]; found {
+		if value, ok := common.UnwrapSettingsOf(typed, configType); ok {
+			return value, nil
+		}
+	}
+	if value := common.UnwrapSettings(typed); value != any(typed) {
+		return value, nil
+	}
+	return typed.GetInstance()
+}
+
 func (c *TransportConfig) GetTypedSettings() (interface{}, error) {
-	return c.Settings.GetInstance()
+	if c.Settings == nil {
+		return nil, nil
+	}
+	// Settings are carried as a message while they are protobuf messages and as
+	// JSON once they are plain Go values; common knows how to read either.
+	return UnwrapSettings(c.Settings)
 }
 
 func (c *TransportConfig) GetUnifiedProtocolName() string {
@@ -78,8 +105,10 @@ func (c *StreamConfig) GetTransportSettingsFor(protocol string) (interface{}, er
 
 func (c *StreamConfig) GetEffectiveSecuritySettings() (interface{}, error) {
 	for _, settings := range c.SecuritySettings {
-		if settings.Type == c.SecurityType {
-			return settings.GetInstance()
+		// A security setting names itself, whether it is a plain Go value or a
+		// message carried as one.
+		if serial.NameOf(settings) == c.SecurityType {
+			return UnwrapSettings(settings)
 		}
 	}
 	return serial.GetInstance(c.SecurityType)

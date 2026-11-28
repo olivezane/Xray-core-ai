@@ -142,7 +142,7 @@ var File_app_observatory_command_command_proto protoreflect.FileDescriptor
 
 const file_app_observatory_command_command_proto_rawDesc = "" +
 	"\n" +
-	"%app/observatory/command/command.proto\x12!xray.core.app.observatory.command\x1a\x1capp/observatory/config.proto\"\x1a\n" +
+	"%app/observatory/command/command.proto\x12!xray.core.app.observatory.command\x1a\x1capp/observatory/status.proto\"\x1a\n" +
 	"\x18GetOutboundStatusRequest\"a\n" +
 	"\x19GetOutboundStatusResponse\x12D\n" +
 	"\x06status\x18\x01 \x01(\v2,.xray.core.app.observatory.ObservationResultR\x06status\"\b\n" +

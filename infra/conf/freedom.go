@@ -15,7 +15,6 @@ import (
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/freedom"
 	"github.com/xtls/xray-core/transport/internet"
-	"google.golang.org/protobuf/proto"
 )
 
 // The types below are the freedom section of the configuration model. The ones
@@ -59,7 +58,7 @@ func BuildFreedomReply(c *coreconfig.FreedomReply) (*freedom.Reply, error) {
 }
 
 // Build implements Buildable
-func (c *FreedomConfig) Build() (proto.Message, error) {
+func (c *FreedomConfig) Build() (any, error) {
 	if c.IPsBlocked != nil {
 		// todo: remove legacy
 		errors.LogWarning(context.Background(), `The feature "ipsBlocked" has been removed and migrated to "firewall". Please update your config(s) according to release note and documentation.`)

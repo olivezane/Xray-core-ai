@@ -47,15 +47,18 @@ func TestRunConfigCommands(t *testing.T) {
 		{"format override", []string{"run", "-test", "-format", "json", "-c", config}, 0, nil},
 		{"invalid extension", []string{"run", "-test", "-format", "json", "-c", script}, 23, nil},
 		{"default command", []string{"-test", "-format", "json", "-c", script}, 23, nil},
-		{"protobuf config", []string{"run", "-test", "-c", binary}, 0, nil},
-		{"protobuf error", []string{"run", "-test", "-format", "protobuf", "-c", script}, 23, nil},
+		// Protobuf is not a configuration format: it is the shape a value takes
+		// when it crosses the API, so a protobuf config is refused the way any
+		// other unreadable configuration is.
+		{"protobuf config refused", []string{"run", "-test", "-c", binary}, 23, nil},
+		{"protobuf format refused", []string{"run", "-test", "-format", "protobuf", "-c", script}, 23, nil},
 		{"merged source", []string{"run", "-test", "-format", "json", "-c", config, "-c", script}, 23, nil},
 		{"dump", []string{"run", "-dump", "-c", config}, 0, nil},
 		{"stdin pipe", []string{"run", "-test", "-c", "stdin:"}, 0, nil},
 		{"stdin file", []string{"run", "-test", "-c", "stdin:"}, 0, file},
 		{"convert json", []string{"convert", "json", message}, 0, nil},
-		{"convert pb", []string{"convert", "pb", "-debug", config}, 0, nil},
-		{"convert pb stdin", []string{"convert", "pb", "-debug", "stdin:"}, 0, file},
+		{"convert pb refused", []string{"convert", "pb", "-debug", config}, 1, nil},
+		{"convert pb stdin refused", []string{"convert", "pb", "-debug", "stdin:"}, 1, file},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

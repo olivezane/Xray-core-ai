@@ -193,6 +193,9 @@ func (m *Manager) Select(selectors []string) []string {
 var ConfigObjects = []common.ConfigObject{
 	{
 		Config: (*proxyman.OutboundConfig)(nil),
+		// A sender is not created from a configuration, but it crosses the API by
+		// name like one.
+		Also: []interface{}{(*proxyman.SenderConfig)(nil)},
 		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return New(ctx, config.(*proxyman.OutboundConfig))
 	},

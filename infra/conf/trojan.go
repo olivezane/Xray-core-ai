@@ -15,7 +15,6 @@ import (
 	"github.com/xtls/xray-core/common/task"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/trojan"
-	"google.golang.org/protobuf/proto"
 )
 
 // TrojanServerTarget is configuration of a single trojan server
@@ -28,7 +27,7 @@ type TrojanClientConfig struct {
 }
 
 // Build implements Buildable
-func (c *TrojanClientConfig) Build() (proto.Message, error) {
+func (c *TrojanClientConfig) Build() (any, error) {
 	errors.PrintNonRemovalDeprecatedFeatureWarning("Trojan (with no Flow, etc.)", "VLESS with Flow & Seed")
 
 	if c.Address != nil {
@@ -90,7 +89,7 @@ type TrojanServerConfig struct {
 }
 
 // Build implements Buildable
-func (c *TrojanServerConfig) Build() (proto.Message, error) {
+func (c *TrojanServerConfig) Build() (any, error) {
 	errors.PrintNonRemovalDeprecatedFeatureWarning("Trojan (with no Flow, etc.)", "VLESS with Flow & Seed")
 
 	if c.Clients != nil {

@@ -5,6 +5,16 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet/finalmask"
 )
+// Config is the settings of the filter mask: which source addresses it lets
+// through.
+type Config struct {
+	BlockedSourceIps []*geodata.IPRule `json:"blocked_source_ips,omitempty"`
+	AllowedSourceIps []*geodata.IPRule `json:"allowed_source_ips,omitempty"`
+}
+// SettingsName is what a configuration written for the API calls these settings.
+func (*Config) SettingsName() string {
+	return "xray.transport.internet.finalmask.filter.Config"
+}
 
 func (c *Config) buildFilter() (*filter, error) {
 	if len(c.BlockedSourceIps) == 0 && len(c.AllowedSourceIps) == 0 {

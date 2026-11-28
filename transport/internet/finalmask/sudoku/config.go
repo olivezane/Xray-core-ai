@@ -4,6 +4,19 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/transport/internet/finalmask"
 )
+// Config is the settings of the sudoku mask.
+type Config struct {
+	Password     string   `json:"password,omitempty"`
+	Ascii        string   `json:"ascii,omitempty"`
+	CustomTable  string   `json:"custom_table,omitempty"`
+	PaddingMin   uint32   `json:"padding_min,omitempty"`
+	PaddingMax   uint32   `json:"padding_max,omitempty"`
+	CustomTables []string `json:"custom_tables,omitempty"`
+}
+// SettingsName is what a configuration written for the API calls these settings.
+func (*Config) SettingsName() string {
+	return "xray.transport.internet.finalmask.sudoku.Config"
+}
 
 // Sudoku in finalmask mode is a pure appearance transform with no standalone handshake.
 // TCP always keeps classic sudoku on uplink and uses packed downlink optimization on server writes.

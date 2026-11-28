@@ -104,8 +104,8 @@ type Handler struct {
 
 func buildRule(config *FirewallConfig) (*Firewall, error) {
 	rule := &Firewall{
-		action:   config.GetAction(),
-		delay:    config.GetDelay(),
+		action:   config.Action,
+		delay:    config.Delay,
 		logLevel: config.LogLevel,
 	}
 
@@ -219,7 +219,7 @@ type FinalVerdict struct {
 // inferred from the outbound alone.
 func FinalRuleVerdict(config *Config, inboundName string, network net.Network, address net.Address, port net.Port) FinalVerdict {
 	verdict := FinalVerdict{Index: -1}
-	for i, rc := range config.GetFirewall() {
+	for i, rc := range config.Firewall {
 		rule, err := buildRule(rc)
 		if err != nil {
 			continue

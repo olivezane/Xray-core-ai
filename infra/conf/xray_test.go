@@ -12,6 +12,7 @@ import (
 	"github.com/xtls/xray-core/app/log"
 	"github.com/xtls/xray-core/app/proxyman"
 	"github.com/xtls/xray-core/app/router"
+	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/geodata"
 	clog "github.com/xtls/xray-core/common/log"
 	"github.com/xtls/xray-core/common/net"
@@ -20,17 +21,19 @@ import (
 	core "github.com/xtls/xray-core/core"
 	. "github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/proxy/vless"
+	vlessoutbound "github.com/xtls/xray-core/proxy/vless/outbound"
+	vmessoutbound "github.com/xtls/xray-core/proxy/vmess/outbound"
+	"github.com/xtls/xray-core/testing/configs"
 	"github.com/xtls/xray-core/proxy/vmess"
 	"github.com/xtls/xray-core/proxy/vmess/inbound"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/tls"
 	"github.com/xtls/xray-core/transport/internet/websocket"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestXrayConfig(t *testing.T) {
-	createParser := func() func(string) (proto.Message, error) {
-		return func(s string) (proto.Message, error) {
+	createParser := func() func(string) (any, error) {
+		return func(s string) (any, error) {
 			config := new(Config)
 			if err := json.Unmarshal([]byte(s), config); err != nil {
 				return nil, err
@@ -83,17 +86,17 @@ func TestXrayConfig(t *testing.T) {
 			}`,
 			Parser: createParser(),
 			Output: &core.Config{
-				App: []*serial.TypedMessage{
-					serial.ToTypedMessage(&log.Config{
+				App: []any{
+					&log.Config{
 						ErrorLogType:  log.LogType_File,
 						ErrorLogPath:  "/var/log/xray/error.log",
 						ErrorLogLevel: clog.Severity_Error,
 						AccessLogType: log.LogType_File,
 						AccessLogPath: "/var/log/xray/access.log",
-					}),
-					serial.ToTypedMessage(&dispatcher.Config{}),
-					serial.ToTypedMessage(&proxyman.OutboundConfig{}),
-					serial.ToTypedMessage(&router.Config{
+					},
+					&dispatcher.Config{},
+					&proxyman.OutboundConfig{},
+					&router.Config{
 						DomainStrategy: router.Config_AsIs,
 						Rule: []*router.RoutingRule{
 							{
@@ -111,12 +114,12 @@ func TestXrayConfig(t *testing.T) {
 								},
 							},
 						},
-					}),
-					serial.ToTypedMessage(&proxyman.InboundConfig{}),
+					},
+					&proxyman.InboundConfig{},
 				},
 				Inbound: []*core.InboundHandlerConfig{
 					{
-						ReceiverSettings: serial.ToTypedMessage(&proxyman.ReceiverConfig{
+						ReceiverSettings: &proxyman.ReceiverConfig{
 							PortList: &net.PortList{Range: []*net.PortRange{{
 								From: 443,
 								To:   500,
@@ -126,20 +129,20 @@ func TestXrayConfig(t *testing.T) {
 								TransportSettings: []*internet.TransportConfig{
 									{
 										ProtocolName: "websocket",
-										Settings: serial.ToTypedMessage(&websocket.Config{
+										Settings: &websocket.Config{
 											Host: "example.domain",
-										}),
+										},
 									},
 								},
 								SecurityType: "xray.transport.internet.tls.Config",
-								SecuritySettings: []*serial.TypedMessage{
-									serial.ToTypedMessage(&tls.Config{
+								SecuritySettings: []any{
+									&tls.Config{
 										NextProtocol: []string{"h2"},
-									}),
+									},
 								},
 							},
-						}),
-						ProxySettings: serial.ToTypedMessage(&inbound.Config{
+						},
+						ProxySettings: &inbound.Config{
 							User: []*protocol.User{
 								{
 									Level: 0,
@@ -151,7 +154,7 @@ func TestXrayConfig(t *testing.T) {
 									}),
 								},
 							},
-						}),
+						},
 					},
 				},
 			},
@@ -248,7 +251,8 @@ func TestMultiplexConfig_Build(t *testing.T) {
 				t.Fatal(err)
 			}
 			got, err := BuildMultiplex(&config)
-			if (err != nil) != tc.bad || !proto.Equal(got, tc.want) {
+			// The settings are plain Go values now, so they are compared as values.
+			if (err != nil) != tc.bad || !cmp.Equal(got, tc.want) {
 				t.Fatalf("Build() = %v, %v, want config %v, error %t", got, err, tc.want, tc.bad)
 			}
 		})
@@ -278,6 +282,9 @@ func TestRemovedBlocks(t *testing.T) {
 }
 
 func TestOutboundMultiplexConfig(t *testing.T) {
+	// The settings of a vless outbound are a plain Go value now, so reading one
+	// back needs the name it says for itself.
+	configs.MustInstall(vlessoutbound.ConfigObjects, vmessoutbound.ConfigObjects)
 	tests := []struct {
 		name   string
 		legacy string
@@ -340,12 +347,17 @@ func TestOutboundMultiplexConfig(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				proxyConfig, err := built.ProxySettings.GetInstance()
-				if err != nil {
-					t.Fatal(err)
+				proxyConfig := common.UnwrapSettings(built.ProxySettings)
+				var got *vless.Multiplex
+				switch c := proxyConfig.(type) {
+				case *vlessoutbound.Config:
+					got = c.Multiplex
+				case *vmessoutbound.Config:
+					got = c.Multiplex
+				default:
+					t.Fatalf("unexpected settings type %T", proxyConfig)
 				}
-				got := proxyConfig.(interface{ GetMultiplex() *vless.Multiplex }).GetMultiplex()
-				if !proto.Equal(got, tc.want) {
+				if !cmp.Equal(got, tc.want) {
 					t.Errorf("multiplex = %v, want %v", got, tc.want)
 				}
 			})

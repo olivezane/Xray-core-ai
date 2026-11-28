@@ -32,7 +32,7 @@ const xrayKey core.XrayKey = 1
 
 func TestOutboundWithoutStatCounter(t *testing.T) {
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&stats.Config{}),
 			serial.ToTypedMessage(&policy.Config{
 				System: &policy.SystemPolicy{
@@ -61,7 +61,7 @@ func TestOutboundWithoutStatCounter(t *testing.T) {
 
 func TestOutboundWithStatCounter(t *testing.T) {
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&stats.Config{}),
 			serial.ToTypedMessage(&policy.Config{
 				System: &policy.SystemPolicy{
@@ -103,7 +103,7 @@ func TestTagsCache(t *testing.T) {
 		t.Error("failed to create outbound handler manager")
 	}
 	config := &core.Config{
-		App: []*serial.TypedMessage{},
+		App: []any{},
 	}
 	v, _ := core.New(config)
 	v.AddFeature(ohm)

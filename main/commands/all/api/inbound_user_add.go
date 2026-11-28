@@ -7,6 +7,7 @@ import (
 	"github.com/xtls/xray-core/common/protocol"
 
 	handlerService "github.com/xtls/xray-core/app/proxyman/command"
+	"github.com/xtls/xray-core/common"
 	cserial "github.com/xtls/xray-core/common/serial"
 
 	"github.com/xtls/xray-core/core"
@@ -74,9 +75,9 @@ func extractInboundUsers(inb *core.InboundHandlerConfig) []*protocol.User {
 	if inb == nil {
 		return nil
 	}
-	inst, err := inb.ProxySettings.GetInstance()
-	if err != nil || inst == nil {
-		fmt.Println("failed to get inbound instance:", err)
+	inst := common.UnwrapSettings(inb.ProxySettings)
+	if inst == nil {
+		fmt.Println("failed to get inbound instance")
 		return nil
 	}
 	switch ty := inst.(type) {

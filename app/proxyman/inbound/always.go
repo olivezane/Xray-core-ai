@@ -17,7 +17,6 @@ import (
 	"github.com/xtls/xray-core/features/stats"
 	"github.com/xtls/xray-core/proxy"
 	"github.com/xtls/xray-core/transport/internet"
-	"google.golang.org/protobuf/proto"
 )
 
 func getStatCounter(v *core.Instance, tag string) (stats.Counter, stats.Counter) {
@@ -259,10 +258,9 @@ func (h *AlwaysOnInboundHandler) ReceiverSettings() *serial.TypedMessage {
 	return serial.ToTypedMessage(h.receiverConfig)
 }
 
-// ProxySettings implements inbound.Handler.
+// ProxySettings implements inbound.Handler. The handler keeps the value it was
+// created from, which may be a plain Go configuration rather than a message;
+// serial knows how to carry either.
 func (h *AlwaysOnInboundHandler) ProxySettings() *serial.TypedMessage {
-	if v, ok := h.proxyConfig.(proto.Message); ok {
-		return serial.ToTypedMessage(v)
-	}
-	return nil
+	return serial.ToTypedMessage(h.proxyConfig)
 }

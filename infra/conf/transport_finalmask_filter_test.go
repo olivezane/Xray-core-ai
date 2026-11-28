@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/geodata"
 	. "github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/transport/internet"
@@ -43,10 +44,8 @@ func TestFinalMaskFilter(t *testing.T) {
 				if len(masks) != 1 {
 					t.Fatalf("expected one mask, got %d", len(masks))
 				}
-				instance, err := masks[0].GetInstance()
-				if err != nil {
-					t.Fatal(err)
-				}
+				// A mask is a plain Go value now, so it is read as it stands.
+				instance := common.UnwrapSettings(masks[0])
 				filter, ok := instance.(*filter.Config)
 				if !ok {
 					t.Fatalf("unexpected mask type: %T", instance)

@@ -7,7 +7,6 @@ import (
 
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/protocol"
-	"google.golang.org/protobuf/proto"
 )
 
 func (a *Account) AsAccount() (protocol.Account, error) {
@@ -23,7 +22,7 @@ func (a *MemoryAccount) Equals(other protocol.Account) bool {
 	return ok && a.Password == b.Password
 }
 
-func (a *MemoryAccount) ToProto() proto.Message {
+func (a *MemoryAccount) ToProto() any {
 	return &Account{Password: a.Password}
 }
 

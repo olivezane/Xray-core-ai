@@ -7,10 +7,8 @@ import (
 	"github.com/xtls/xray-core/app/router"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/geodata"
-	"github.com/xtls/xray-core/common/serial"
 	coreconfig "github.com/xtls/xray-core/core/config"
 
-	"google.golang.org/protobuf/proto"
 )
 
 // StrategyConfig is the strategy of a balancer, from the configuration model.
@@ -48,7 +46,7 @@ func (r *BalancingRule) Build() (*router.BalancingRule, error) {
 	if err != nil {
 		return nil, errors.New("failed to parse to strategy config.").Base(err)
 	}
-	var ts proto.Message
+	var ts any
 	if builder, ok := rawConfig.(Buildable); ok {
 		ts, err = builder.Build()
 		if err != nil {
@@ -58,7 +56,7 @@ func (r *BalancingRule) Build() (*router.BalancingRule, error) {
 
 	return &router.BalancingRule{
 		Strategy:         r.Strategy.Type,
-		StrategySettings: serial.ToTypedMessage(ts),
+		StrategySettings: ts,
 		FallbackTag:      r.FallbackTag,
 		OutboundSelector: r.Selectors,
 		Tag:              r.Tag,

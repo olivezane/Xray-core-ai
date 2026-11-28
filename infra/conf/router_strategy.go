@@ -3,7 +3,6 @@ package conf
 import (
 	"strings"
 
-	"google.golang.org/protobuf/proto"
 
 	"github.com/xtls/xray-core/app/observatory/burst"
 	coreconfig "github.com/xtls/xray-core/core/config"
@@ -26,7 +25,7 @@ var strategyConfigLoader = NewJSONConfigLoader(ConfigCreatorCache{
 
 type strategyEmptyConfig struct{}
 
-func (v *strategyEmptyConfig) Build() (proto.Message, error) {
+func (v *strategyEmptyConfig) Build() (any, error) {
 	return nil, nil
 }
 
@@ -41,7 +40,7 @@ type strategyLeastLoadConfig struct {
 type HealthCheckSettings = coreconfig.HealthCheck
 
 // BuildHealthCheck converts the health check section to its message.
-func BuildHealthCheck(h *coreconfig.HealthCheck) (proto.Message, error) {
+func BuildHealthCheck(h *coreconfig.HealthCheck) (any, error) {
 	var httpMethod string
 	if h.HttpMethod == "" {
 		httpMethod = "HEAD"
@@ -59,7 +58,7 @@ func BuildHealthCheck(h *coreconfig.HealthCheck) (proto.Message, error) {
 }
 
 // Build implements Buildable.
-func (v *strategyLeastLoadConfig) Build() (proto.Message, error) {
+func (v *strategyLeastLoadConfig) Build() (any, error) {
 	config := &router.StrategyLeastLoadConfig{}
 	config.Costs = v.Costs
 	config.Tolerance = float32(v.Tolerance)

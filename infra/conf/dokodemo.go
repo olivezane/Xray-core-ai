@@ -5,7 +5,6 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/dokodemo"
-	"google.golang.org/protobuf/proto"
 )
 
 // DokodemoConfig is the settings of a dokodemo-door inbound.
@@ -13,7 +12,7 @@ type DokodemoConfig struct {
 	coreconfig.Dokodemo
 }
 
-func (v *DokodemoConfig) Build() (proto.Message, error) {
+func (v *DokodemoConfig) Build() (any, error) {
 	if v.Network != nil {
 		v.AllowedNetwork = v.Network
 	}

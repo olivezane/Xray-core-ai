@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/serial"
 )
@@ -10,9 +11,14 @@ func (u *User) GetTypedAccount() (Account, error) {
 		return nil, errors.New("Account is missing")
 	}
 
-	rawAccount, err := u.Account.GetInstance()
-	if err != nil {
-		return nil, err
+	// An account crosses the API as a message while it is a protobuf message and
+	// as JSON once it is a plain Go value; common knows how to read either.
+	rawAccount := common.UnwrapSettings(u.Account)
+	if rawAccount == any(u.Account) {
+		var err error
+		if rawAccount, err = u.Account.GetInstance(); err != nil {
+			return nil, err
+		}
 	}
 	if asAccount, ok := rawAccount.(AsAccount); ok {
 		return asAccount.AsAccount()

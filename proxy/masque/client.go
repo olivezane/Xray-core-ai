@@ -396,6 +396,9 @@ func (t *tunnel) close() {
 var ConfigObjectsMasqueClient = []common.ConfigObject{
 	{
 		Config: (*ClientConfig)(nil),
+		// The account of this proxy is not created from a configuration, but it
+		// crosses the API by name like one.
+		Also: []interface{}{(*Account)(nil)},
 		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return NewClient(ctx, config.(*ClientConfig))
 	},

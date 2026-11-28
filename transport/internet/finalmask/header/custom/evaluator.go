@@ -162,10 +162,10 @@ func evaluateItem(randLen, randMin, randMax int32, packet []byte, save, varName 
 }
 
 func evaluateExpr(expr *Expr, ctx *evalContext) (evalValue, error) {
-	switch expr.GetOp() {
+	switch expr.Op {
 	case "concat":
 		var out []byte
-		for _, arg := range expr.GetArgs() {
+		for _, arg := range expr.Args {
 			value, err := evaluateExprArg(arg, ctx)
 			if err != nil {
 				return evalValue{}, err
@@ -178,18 +178,18 @@ func evaluateExpr(expr *Expr, ctx *evalContext) (evalValue, error) {
 		}
 		return evalValue{bytes: out, isBytes: true}, nil
 	case "slice":
-		if len(expr.GetArgs()) != 3 {
+		if len(expr.Args) != 3 {
 			return evalValue{}, errors.New("slice expects 3 args")
 		}
-		source, err := evaluateExprArg(expr.GetArgs()[0], ctx)
+		source, err := evaluateExprArg(expr.Args[0], ctx)
 		if err != nil {
 			return evalValue{}, err
 		}
-		offset, err := evaluateExprArg(expr.GetArgs()[1], ctx)
+		offset, err := evaluateExprArg(expr.Args[1], ctx)
 		if err != nil {
 			return evalValue{}, err
 		}
-		length, err := evaluateExprArg(expr.GetArgs()[2], ctx)
+		length, err := evaluateExprArg(expr.Args[2], ctx)
 		if err != nil {
 			return evalValue{}, err
 		}
@@ -211,47 +211,47 @@ func evaluateExpr(expr *Expr, ctx *evalContext) (evalValue, error) {
 		}
 		return evalValue{bytes: append([]byte(nil), sourceBytes[offsetU64:end]...), isBytes: true}, nil
 	case "xor16":
-		return evaluateXor(expr.GetArgs(), 0xFFFF, 2, ctx)
+		return evaluateXor(expr.Args, 0xFFFF, 2, ctx)
 	case "xor32":
-		return evaluateXor(expr.GetArgs(), 0xFFFFFFFF, 4, ctx)
+		return evaluateXor(expr.Args, 0xFFFFFFFF, 4, ctx)
 	case "be16":
-		return evaluatePack(expr.GetArgs(), "be16", 2, binary.BigEndian, ctx)
+		return evaluatePack(expr.Args, "be16", 2, binary.BigEndian, ctx)
 	case "be32":
-		return evaluatePack(expr.GetArgs(), "be32", 4, binary.BigEndian, ctx)
+		return evaluatePack(expr.Args, "be32", 4, binary.BigEndian, ctx)
 	case "le16":
-		return evaluatePack(expr.GetArgs(), "le16", 2, binary.LittleEndian, ctx)
+		return evaluatePack(expr.Args, "le16", 2, binary.LittleEndian, ctx)
 	case "le32":
-		return evaluatePack(expr.GetArgs(), "le32", 4, binary.LittleEndian, ctx)
+		return evaluatePack(expr.Args, "le32", 4, binary.LittleEndian, ctx)
 	case "le64":
-		return evaluatePack(expr.GetArgs(), "le64", 8, binary.LittleEndian, ctx)
+		return evaluatePack(expr.Args, "le64", 8, binary.LittleEndian, ctx)
 	case "pad":
-		return evaluatePad(expr.GetArgs(), ctx)
+		return evaluatePad(expr.Args, ctx)
 	case "truncate":
-		return evaluateTruncate(expr.GetArgs(), ctx)
+		return evaluateTruncate(expr.Args, ctx)
 	case "add":
-		return evaluateBinaryU64Op(expr.GetArgs(), "add", ctx, func(left, right uint64) (uint64, error) {
+		return evaluateBinaryU64Op(expr.Args, "add", ctx, func(left, right uint64) (uint64, error) {
 			if left > ^uint64(0)-right {
 				return 0, errors.New("add overflow")
 			}
 			return left + right, nil
 		})
 	case "sub":
-		return evaluateBinaryU64Op(expr.GetArgs(), "sub", ctx, func(left, right uint64) (uint64, error) {
+		return evaluateBinaryU64Op(expr.Args, "sub", ctx, func(left, right uint64) (uint64, error) {
 			if left < right {
 				return 0, errors.New("sub underflow")
 			}
 			return left - right, nil
 		})
 	case "and":
-		return evaluateBinaryU64Op(expr.GetArgs(), "and", ctx, func(left, right uint64) (uint64, error) {
+		return evaluateBinaryU64Op(expr.Args, "and", ctx, func(left, right uint64) (uint64, error) {
 			return left & right, nil
 		})
 	case "or":
-		return evaluateBinaryU64Op(expr.GetArgs(), "or", ctx, func(left, right uint64) (uint64, error) {
+		return evaluateBinaryU64Op(expr.Args, "or", ctx, func(left, right uint64) (uint64, error) {
 			return left | right, nil
 		})
 	case "shl":
-		return evaluateShift(expr.GetArgs(), "shl", ctx, func(value uint64, shift uint) (uint64, error) {
+		return evaluateShift(expr.Args, "shl", ctx, func(value uint64, shift uint) (uint64, error) {
 			if shift >= 64 {
 				return 0, errors.New("shift out of range")
 			}
@@ -261,14 +261,14 @@ func evaluateExpr(expr *Expr, ctx *evalContext) (evalValue, error) {
 			return value << shift, nil
 		})
 	case "shr":
-		return evaluateShift(expr.GetArgs(), "shr", ctx, func(value uint64, shift uint) (uint64, error) {
+		return evaluateShift(expr.Args, "shr", ctx, func(value uint64, shift uint) (uint64, error) {
 			if shift >= 64 {
 				return 0, errors.New("shift out of range")
 			}
 			return value >> shift, nil
 		})
 	default:
-		return evalValue{}, errors.New("unsupported expr op: ", expr.GetOp())
+		return evalValue{}, errors.New("unsupported expr op: ", expr.Op)
 	}
 }
 
@@ -470,10 +470,10 @@ func evaluateXor(args []*ExprArg, mask uint64, width int, ctx *evalContext) (eva
 }
 
 func measureExpr(expr *Expr, sizeCtx map[string]int) (int, error) {
-	switch expr.GetOp() {
+	switch expr.Op {
 	case "concat":
 		total := 0
-		for _, arg := range expr.GetArgs() {
+		for _, arg := range expr.Args {
 			size, err := measureExprArg(arg, sizeCtx)
 			if err != nil {
 				return 0, err
@@ -482,11 +482,11 @@ func measureExpr(expr *Expr, sizeCtx map[string]int) (int, error) {
 		}
 		return total, nil
 	case "slice":
-		if len(expr.GetArgs()) != 3 {
+		if len(expr.Args) != 3 {
 			return 0, errors.New("slice expects 3 args")
 		}
-		lengthArg := expr.GetArgs()[2]
-		if value, ok := lengthArg.GetValue().(*ExprArg_U64); ok {
+		lengthArg := expr.Args[2]
+		if value, ok := lengthArg.Value.(*ExprArg_U64); ok {
 			return int(value.U64), nil
 		}
 		return 0, errors.New("slice length must be u64")
@@ -501,30 +501,30 @@ func measureExpr(expr *Expr, sizeCtx map[string]int) (int, error) {
 	case "le64":
 		return 8, nil
 	case "pad":
-		if len(expr.GetArgs()) != 3 {
+		if len(expr.Args) != 3 {
 			return 0, errors.New("pad expects 3 args")
 		}
-		lengthArg := expr.GetArgs()[1]
-		if value, ok := lengthArg.GetValue().(*ExprArg_U64); ok {
+		lengthArg := expr.Args[1]
+		if value, ok := lengthArg.Value.(*ExprArg_U64); ok {
 			return int(value.U64), nil
 		}
 		return 0, errors.New("pad length must be u64")
 	case "truncate":
-		if len(expr.GetArgs()) != 2 {
+		if len(expr.Args) != 2 {
 			return 0, errors.New("truncate expects 2 args")
 		}
-		lengthArg := expr.GetArgs()[1]
-		if value, ok := lengthArg.GetValue().(*ExprArg_U64); ok {
+		lengthArg := expr.Args[1]
+		if value, ok := lengthArg.Value.(*ExprArg_U64); ok {
 			return int(value.U64), nil
 		}
 		return 0, errors.New("truncate length must be u64")
 	default:
-		return 0, errors.New("expr size is not bytes for op: ", expr.GetOp())
+		return 0, errors.New("expr size is not bytes for op: ", expr.Op)
 	}
 }
 
 func evaluateExprArg(arg *ExprArg, ctx *evalContext) (evalValue, error) {
-	switch value := arg.GetValue().(type) {
+	switch value := arg.Value.(type) {
 	case *ExprArg_Bytes:
 		return evalValue{bytes: append([]byte(nil), value.Bytes...), isBytes: true}, nil
 	case *ExprArg_U64:
@@ -549,7 +549,7 @@ func evaluateExprArg(arg *ExprArg, ctx *evalContext) (evalValue, error) {
 }
 
 func measureExprArg(arg *ExprArg, sizeCtx map[string]int) (int, error) {
-	switch value := arg.GetValue().(type) {
+	switch value := arg.Value.(type) {
 	case *ExprArg_Bytes:
 		return len(value.Bytes), nil
 	case *ExprArg_U64:

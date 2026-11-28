@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"sync"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -16,6 +17,7 @@ import (
 	"strings"
 
 	googleuuid "github.com/google/uuid"
+	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/geodata"
 	xlua "github.com/xtls/xray-core/common/lua"
@@ -40,7 +42,6 @@ import (
 	"github.com/xtls/xray-core/transport/internet/finalmask/xmc"
 	"github.com/xtls/xray-core/transport/internet/hysteria/congestion/bbr"
 	"github.com/xtls/xray-core/transport/internet/tls"
-	"google.golang.org/protobuf/proto"
 )
 
 func PraseByteSlice(data json.RawMessage, typ string) ([]byte, error) {
@@ -109,11 +110,37 @@ type ProxyProtocol struct {
 }
 
 // Build converts the setting to its message.
-func (c *ProxyProtocol) Build() (proto.Message, error) {
+func (c *ProxyProtocol) Build() (any, error) {
 	return buildProxyProtocol(&c.ProxyProtocol)
 }
 
-func buildProxyProtocol(c *coreconfig.ProxyProtocol) (proto.Message, error) {
+var maskSettingsTypesOnce sync.Once
+
+// installMaskSettingsTypes makes the masks whose settings are a plain Go value
+// readable by name. Building a mask needs it, so it is done here rather than
+// only where a whole build is composed.
+func installMaskSettingsTypes() {
+	maskSettingsTypesOnce.Do(func() {
+		common.Must(common.SetSettingsTypes(MaskSettingsTypes()))
+	})
+}
+
+// MaskSettingsTypes is every mask whose settings are a plain Go value: a mask
+// creates its settings itself, so the name each one crosses the API by is listed
+// here rather than in the configuration table.
+func MaskSettingsTypes() []common.SettingsType {
+	return []common.SettingsType{
+		{Config: (*filter.Config)(nil)},
+		{Config: (*proxyprotocol.Config)(nil)},
+		{Config: (*sudoku.Config)(nil)},
+		{Config: (*xicmp.Config)(nil)},
+		{Config: (*original.Config)(nil)},
+		{Config: (*aes128gcm.Config)(nil)},
+		{Config: (*header.Config)(nil)},
+	}
+}
+
+func buildProxyProtocol(c *coreconfig.ProxyProtocol) (any, error) {
 	version := c.Version
 	if version == 0 {
 		version = 2
@@ -125,9 +152,9 @@ func buildProxyProtocol(c *coreconfig.ProxyProtocol) (proto.Message, error) {
 }
 
 func addProxyProtocolMask(config *internet.StreamConfig, version uint32) {
-	mask := serial.ToTypedMessage(&proxyprotocol.Config{Version: version})
+	mask := &proxyprotocol.Config{Version: version}
 	for _, existing := range config.Tcpmasks {
-		if existing.Type == mask.Type {
+		if serial.NameOf(existing) == serial.NameOf(mask) {
 			return
 		}
 	}
@@ -141,11 +168,11 @@ type Filter struct {
 }
 
 // Build converts the filter to its message.
-func (c *Filter) Build() (proto.Message, error) {
+func (c *Filter) Build() (any, error) {
 	return buildFilter(&c.Filter)
 }
 
-func buildFilter(c *coreconfig.Filter) (proto.Message, error) {
+func buildFilter(c *coreconfig.Filter) (any, error) {
 	rules, err := geodata.ParseIPRules(c.BlockedSourceIPs)
 	if err != nil {
 		return nil, errors.New(`invalid "blockedSourceIPs"`).Base(err)
@@ -166,11 +193,11 @@ type HeaderCustomTCP struct {
 }
 
 // Build converts the mask to its message.
-func (c *HeaderCustomTCP) Build() (proto.Message, error) {
+func (c *HeaderCustomTCP) Build() (any, error) {
 	return buildHeaderCustomTCP(&c.HeaderCustomTCP)
 }
 
-func buildHeaderCustomTCP(c *coreconfig.HeaderCustomTCP) (proto.Message, error) {
+func buildHeaderCustomTCP(c *coreconfig.HeaderCustomTCP) (any, error) {
 	for _, value := range c.Clients {
 		for _, item := range value {
 			if err := validateCustomItemSpec(item.Capture, item.Packet, item.Rand, item.Reuse, item.Transform); err != nil {
@@ -304,11 +331,11 @@ type FragmentMask struct {
 }
 
 // Build converts the mask to its message.
-func (c *FragmentMask) Build() (proto.Message, error) {
+func (c *FragmentMask) Build() (any, error) {
 	return buildFragmentMask(&c.FragmentMask)
 }
 
-func buildFragmentMask(c *coreconfig.FragmentMask) (proto.Message, error) {
+func buildFragmentMask(c *coreconfig.FragmentMask) (any, error) {
 
 	config := &fragment.Config{}
 
@@ -370,11 +397,11 @@ type NoiseMask struct {
 }
 
 // Build converts the mask to its message.
-func (c *NoiseMask) Build() (proto.Message, error) {
+func (c *NoiseMask) Build() (any, error) {
 	return buildNoiseMask(&c.NoiseMask)
 }
 
-func buildNoiseMask(c *coreconfig.NoiseMask) (proto.Message, error) {
+func buildNoiseMask(c *coreconfig.NoiseMask) (any, error) {
 	if c.Script != "" {
 		if len(c.Noise) > 0 {
 			return nil, errors.New(`"script" and "noise" can't be used together`)
@@ -670,11 +697,11 @@ type HeaderCustomUDP struct {
 }
 
 // Build converts the mask to its message.
-func (c *HeaderCustomUDP) Build() (proto.Message, error) {
+func (c *HeaderCustomUDP) Build() (any, error) {
 	return buildHeaderCustomUDP(&c.HeaderCustomUDP)
 }
 
-func buildHeaderCustomUDP(c *coreconfig.HeaderCustomUDP) (proto.Message, error) {
+func buildHeaderCustomUDP(c *coreconfig.HeaderCustomUDP) (any, error) {
 	switch c.Mode {
 	case "", "prefix", "standalone":
 	default:
@@ -765,11 +792,11 @@ type MkcpLegacy struct {
 }
 
 // Build converts the setting to its message.
-func (c *MkcpLegacy) Build() (proto.Message, error) {
+func (c *MkcpLegacy) Build() (any, error) {
 	return buildMkcpLegacy(&c.MkcpLegacy)
 }
 
-func buildMkcpLegacy(c *coreconfig.MkcpLegacy) (proto.Message, error) {
+func buildMkcpLegacy(c *coreconfig.MkcpLegacy) (any, error) {
 	if len(c.Header) == 0 {
 		if len(c.Value) == 0 {
 			return &original.Config{}, nil
@@ -805,11 +832,11 @@ type Salamander struct {
 }
 
 // Build converts the setting to its message.
-func (c *Salamander) Build() (proto.Message, error) {
+func (c *Salamander) Build() (any, error) {
 	return buildSalamander(&c.Salamander)
 }
 
-func buildSalamander(c *coreconfig.Salamander) (proto.Message, error) {
+func buildSalamander(c *coreconfig.Salamander) (any, error) {
 	if c.PacketSize.To > 0 {
 		if c.PacketSize.From <= 0 || c.PacketSize.To > 2048 {
 			return nil, errors.New("gecko: invalid min/max packet size")
@@ -831,11 +858,11 @@ type Sudoku struct {
 }
 
 // Build converts the mask to its message.
-func (c *Sudoku) Build() (proto.Message, error) {
+func (c *Sudoku) Build() (any, error) {
 	return buildSudoku(&c.Sudoku)
 }
 
-func buildSudoku(c *coreconfig.Sudoku) (proto.Message, error) {
+func buildSudoku(c *coreconfig.Sudoku) (any, error) {
 	customTable := c.CustomTable
 	if customTable == "" {
 		customTable = c.LegacyCustomTable
@@ -876,11 +903,11 @@ type XDNS struct {
 }
 
 // Build converts the mask to its message.
-func (c *XDNS) Build() (proto.Message, error) {
+func (c *XDNS) Build() (any, error) {
 	return buildXDNS(&c.XDNS)
 }
 
-func buildXDNS(c *coreconfig.XDNS) (proto.Message, error) {
+func buildXDNS(c *coreconfig.XDNS) (any, error) {
 	var domains []*xdns.DomainProto
 	var resolvers []*xdns.ResolverProto
 	for i := range c.Domains {
@@ -1005,11 +1032,11 @@ func buildXMCProfile(c *coreconfig.XMCProfile) (*xmc.Profile, error) {
 }
 
 // Build converts the mask to its message.
-func (c *XMC) Build() (proto.Message, error) {
+func (c *XMC) Build() (any, error) {
 	return buildXMC(&c.XMC)
 }
 
-func buildXMC(c *coreconfig.XMC) (proto.Message, error) {
+func buildXMC(c *coreconfig.XMC) (any, error) {
 	// An explicit empty array is different from an absent field: json leaves
 	// Paddings nil when it is absent, so the user can turn padding off without
 	// a second switch.
@@ -1149,11 +1176,11 @@ type Xicmp struct {
 }
 
 // Build converts the mask to its message.
-func (c *Xicmp) Build() (proto.Message, error) {
+func (c *Xicmp) Build() (any, error) {
 	return buildXicmp(&c.Xicmp)
 }
 
-func buildXicmp(c *coreconfig.Xicmp) (proto.Message, error) {
+func buildXicmp(c *coreconfig.Xicmp) (any, error) {
 
 	for _, ip := range c.IPs {
 		if _, err := netip.ParseAddr(ip); err != nil {
@@ -1175,11 +1202,11 @@ type Realm struct {
 }
 
 // Build converts the mask to its message.
-func (c *Realm) Build() (proto.Message, error) {
+func (c *Realm) Build() (any, error) {
 	return buildRealm(&c.Realm)
 }
 
-func buildRealm(c *coreconfig.Realm) (proto.Message, error) {
+func buildRealm(c *coreconfig.Realm) (any, error) {
 	var scheme, host, port, token, id string
 	var stunServers []string
 	var tlsConfig *tls.Config
@@ -1267,11 +1294,11 @@ type UDPHop struct {
 }
 
 // Build converts the mask to its message.
-func (c *UDPHop) Build() (proto.Message, error) {
+func (c *UDPHop) Build() (any, error) {
 	return buildUDPHop(&c.UDPHop)
 }
 
-func buildUDPHop(c *coreconfig.UDPHop) (proto.Message, error) {
+func buildUDPHop(c *coreconfig.UDPHop) (any, error) {
 
 	var local, remote, remoteOnce bool
 	for _, mode := range strings.Split(c.Mode, ",") {
@@ -1322,7 +1349,8 @@ func buildUDPHop(c *coreconfig.UDPHop) (proto.Message, error) {
 type Mask = coreconfig.Mask
 
 // buildMask converts one mask entry to its message.
-func buildMask(c *coreconfig.Mask, tcp bool) (proto.Message, error) {
+func buildMask(c *coreconfig.Mask, tcp bool) (any, error) {
+	installMaskSettingsTypes()
 	loader := udpmaskLoader
 	if tcp {
 		loader = tcpmaskLoader
@@ -1369,7 +1397,7 @@ type quicParamsFields struct {
 	DisableStatelessReset         bool      `json:"disableStatelessReset"`
 }
 
-func (config *QuicParamsConfig) Build() (proto.Message, error) {
+func (config *QuicParamsConfig) Build() (any, error) {
 	profile := strings.ToLower(config.BbrProfile)
 	switch profile {
 	case "", string(bbr.ProfileConservative), string(bbr.ProfileStandard), string(bbr.ProfileAggressive):

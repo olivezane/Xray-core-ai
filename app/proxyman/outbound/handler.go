@@ -27,7 +27,6 @@ import (
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/stat"
-	"google.golang.org/protobuf/proto"
 )
 
 func getStatCounter(v *core.Instance, tag string) (stats.Counter, stats.Counter) {
@@ -64,7 +63,7 @@ type Handler struct {
 	tag             string
 	senderSettings  *proxyman.SenderConfig
 	streamSettings  *internet.MemoryStreamConfig
-	proxyConfig     proto.Message
+	proxyConfig     any
 	proxy           proxy.Outbound
 	uplinkCounter   stats.Counter
 	downlinkCounter stats.Counter
@@ -89,11 +88,7 @@ func NewHandler(ctx context.Context, config *core.OutboundHandlerConfig) (outbou
 	}
 
 	if config.SenderSettings != nil {
-		senderSettings, err := config.SenderSettings.GetInstance()
-		if err != nil {
-			return nil, err
-		}
-		switch s := senderSettings.(type) {
+		switch s := common.UnwrapSettings(config.SenderSettings).(type) {
 		case *proxyman.SenderConfig:
 			h.senderSettings = s
 			mss, err := internet.ToMemoryStreamConfig(s.StreamSettings)
@@ -106,11 +101,7 @@ func NewHandler(ctx context.Context, config *core.OutboundHandlerConfig) (outbou
 		}
 	}
 
-	proxyConfig, err := config.ProxySettings.GetInstance()
-	if err != nil {
-		return nil, err
-	}
-	h.proxyConfig = proxyConfig
+	h.proxyConfig = common.UnwrapSettings(config.ProxySettings)
 
 	ctx = session.ContextWithFullHandler(ctx, h)
 
@@ -118,7 +109,7 @@ func NewHandler(ctx context.Context, config *core.OutboundHandlerConfig) (outbou
 		ctx = session.ContextWithStreamSettings(ctx, h.streamSettings)
 	}
 
-	rawProxyHandler, err := common.CreateObject(ctx, proxyConfig)
+	rawProxyHandler, err := common.CreateObject(ctx, common.UnwrapSettings(h.proxyConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -325,14 +316,28 @@ func (h *Handler) Close() error {
 	return nil
 }
 
-// SenderSettings implements outbound.Handler.
+// SenderSettings implements outbound.Handler. The handler keeps model values, so
+// the message the API asks for is made here, at the boundary.
 func (h *Handler) SenderSettings() *serial.TypedMessage {
-	return serial.ToTypedMessage(h.senderSettings)
+	return toWireMessage(h.senderSettings)
 }
 
 // ProxySettings implements outbound.Handler.
 func (h *Handler) ProxySettings() *serial.TypedMessage {
-	return serial.ToTypedMessage(h.proxyConfig)
+	return toWireMessage(h.proxyConfig)
+}
+
+// toWireMessage renders a setting as the message the API carries. A setting is
+// kept as the value the handler was created from, which may be a plain Go
+// configuration rather than a message; serial knows how to carry either.
+func toWireMessage(settings any) *serial.TypedMessage {
+	if settings == nil {
+		return nil
+	}
+	if message, ok := settings.(*serial.TypedMessage); ok {
+		return message
+	}
+	return serial.ToTypedMessage(settings)
 }
 
 func ParseRandomIP(addr net.Address, prefix string) net.Address {

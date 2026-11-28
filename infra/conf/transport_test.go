@@ -5,18 +5,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/xtls/xray-core/common/log"
+	vlessinbound "github.com/xtls/xray-core/proxy/vless/inbound"
+	vlessoutbound "github.com/xtls/xray-core/proxy/vless/outbound"
+	"github.com/xtls/xray-core/testing/configs"
 	. "github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/transport/internet"
 	finalmaskcustom "github.com/xtls/xray-core/transport/internet/finalmask/header/custom"
 	"github.com/xtls/xray-core/transport/internet/splithttp"
 	"github.com/xtls/xray-core/transport/internet/xdrive"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestSocketConfig(t *testing.T) {
-	createParser := func() func(string) (proto.Message, error) {
-		return func(s string) (proto.Message, error) {
+	createParser := func() func(string) (any, error) {
+		return func(s string) (any, error) {
 			config := new(SocketConfig)
 			if err := json.Unmarshal([]byte(s), config); err != nil {
 				return nil, err
@@ -490,7 +493,9 @@ func TestXDriveH3Connections(t *testing.T) {
 		if err != nil {
 			t.Fatalf("alpn %s: %v", c.alpn, err)
 		}
-		xs, err := built.TransportSettings[0].Settings.GetInstance()
+		// A stream transport setting is a plain Go value, so it is read back by
+		// the name it says for itself, which is what a stream settings entry does.
+		xs, err := built.TransportSettings[0].GetTypedSettings()
 		if err != nil {
 			t.Fatalf("alpn %s: %v", c.alpn, err)
 		}
@@ -519,6 +524,9 @@ const (
 )
 
 func TestXDriveOutboundConfig(t *testing.T) {
+	// The settings of a vless outbound are plain Go values now, so reading one back
+	// needs the names its build has.
+	configs.MustInstall(vlessoutbound.ConfigObjects, vlessinbound.ConfigObjects)
 	build := func(s string) error {
 		c := new(OutboundDetourConfig)
 		if err := json.Unmarshal([]byte(s), c); err != nil {
@@ -619,7 +627,8 @@ func TestXDriveXmux(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: Build: %v", c.input, err)
 		}
-		if got := built.(*xdrive.Config).Xmux; !proto.Equal(got, c.want) {
+		// The settings are plain Go values now, so they are compared as values.
+		if got := built.(*xdrive.Config).Xmux; !cmp.Equal(got, c.want) {
 			t.Errorf("%s: xmux is %v, want %v", c.input, got, c.want)
 		}
 	}

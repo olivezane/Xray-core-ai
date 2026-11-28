@@ -26,4 +26,11 @@ var All = []internet.Header{
 
 func init() {
 	common.Must(internet.SetHeaders(All))
+	// A header's settings cross the API by name like a transport's, so the names
+	// of this build are installed beside the headers.
+	settings := make([]interface{}, 0, len(All))
+	for _, header := range All {
+		settings = append(settings, header.Config)
+	}
+	common.Must(internet.SetStreamSettings(settings))
 }

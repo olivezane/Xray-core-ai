@@ -18,6 +18,7 @@ import (
 	"github.com/xtls/xray-core/common/task"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/policy"
+	"github.com/xtls/xray-core/proxy/hysteria/account"
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/hysteria"
@@ -309,6 +310,9 @@ func (r *UDPReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 var ConfigObjectsHysteriaClient = []common.ConfigObject{
 	{
 		Config: (*ClientConfig)(nil),
+		// The account of this proxy is not created from a configuration, but it
+		// crosses the API by name like one.
+		Also: []interface{}{(*account.Account)(nil)},
 		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return NewClient(ctx, config.(*ClientConfig))
 	},

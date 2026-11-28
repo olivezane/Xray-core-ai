@@ -85,7 +85,7 @@ func testVlessTCP(t *testing.T, nativeMux bool) {
 	userID := protocol.NewID(uuid.New())
 	serverPort := tcp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -127,7 +127,7 @@ func testVlessTCP(t *testing.T, nativeMux bool) {
 	}
 	clientPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -200,7 +200,7 @@ func TestVlessTls(t *testing.T) {
 	userID := protocol.NewID(uuid.New())
 	serverPort := tcp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -213,8 +213,8 @@ func TestVlessTls(t *testing.T) {
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
 						ProtocolName: "tcp",
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{tls.ParseCertificate(ct)},
 							}),
@@ -243,7 +243,7 @@ func TestVlessTls(t *testing.T) {
 
 	clientPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -284,8 +284,8 @@ func TestVlessTls(t *testing.T) {
 								Settings:     serial.ToTypedMessage(&transtcp.Config{}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								PinnedPeerCertSha256: [][]byte{ctHash[:]},
 							}),
@@ -322,7 +322,7 @@ func TestVlessXtlsVision(t *testing.T) {
 	userID := protocol.NewID(uuid.New())
 	serverPort := tcp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -335,8 +335,8 @@ func TestVlessXtlsVision(t *testing.T) {
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
 						ProtocolName: "tcp",
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								Certificate: []*tls.Certificate{tls.ParseCertificate(ct)},
 							}),
@@ -366,7 +366,7 @@ func TestVlessXtlsVision(t *testing.T) {
 
 	clientPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -408,8 +408,8 @@ func TestVlessXtlsVision(t *testing.T) {
 								Settings:     serial.ToTypedMessage(&transtcp.Config{}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&tls.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&tls.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&tls.Config{
 								PinnedPeerCertSha256: [][]byte{ctHash[:]},
 							}),
@@ -449,7 +449,7 @@ func TestVlessXtlsVisionReality(t *testing.T) {
 	shortIds[0] = make([]byte, 8)
 	hex.Decode(shortIds[0], []byte("0123456789abcdef"))
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -462,8 +462,8 @@ func TestVlessXtlsVisionReality(t *testing.T) {
 					Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					StreamSettings: &internet.StreamConfig{
 						ProtocolName: "tcp",
-						SecurityType: serial.GetMessageType(&reality.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&reality.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&reality.Config{
 								Show:        true,
 								Dest:        "www.google.com:443", // use google for now, may fail in some region
@@ -498,7 +498,7 @@ func TestVlessXtlsVisionReality(t *testing.T) {
 
 	clientPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -540,8 +540,8 @@ func TestVlessXtlsVisionReality(t *testing.T) {
 								Settings:     serial.ToTypedMessage(&transtcp.Config{}),
 							},
 						},
-						SecurityType: serial.GetMessageType(&reality.Config{}),
-						SecuritySettings: []*serial.TypedMessage{
+						SecurityType: serial.NameOf(&reality.Config{}),
+						SecuritySettings: []any{
 							serial.ToTypedMessage(&reality.Config{
 								Show:        true,
 								Fingerprint: "chrome",
@@ -590,7 +590,7 @@ func TestVlessRealityFingerprints(t *testing.T) {
 		shortIds[0] = make([]byte, 8)
 		hex.Decode(shortIds[0], []byte("0123456789abcdef"))
 		serverConfig := &core.Config{
-			App: []*serial.TypedMessage{
+			App: []any{
 				serial.ToTypedMessage(&log.Config{
 					ErrorLogType: log.LogType_None,
 				}),
@@ -602,8 +602,8 @@ func TestVlessRealityFingerprints(t *testing.T) {
 						Listen:   net.NewIPOrDomain(net.LocalHostIP),
 						StreamSettings: &internet.StreamConfig{
 							ProtocolName: "tcp",
-							SecurityType: serial.GetMessageType(&reality.Config{}),
-							SecuritySettings: []*serial.TypedMessage{
+							SecurityType: serial.NameOf(&reality.Config{}),
+							SecuritySettings: []any{
 								serial.ToTypedMessage(&reality.Config{
 									Show:        false,
 									Dest:        "www.google.com:443", // use google for now, may fail in some region
@@ -637,7 +637,7 @@ func TestVlessRealityFingerprints(t *testing.T) {
 
 		clientPort := tcp.PickPort()
 		clientConfig := &core.Config{
-			App: []*serial.TypedMessage{
+			App: []any{
 				serial.ToTypedMessage(&log.Config{
 					ErrorLogType: log.LogType_None,
 				}),
@@ -677,8 +677,8 @@ func TestVlessRealityFingerprints(t *testing.T) {
 									Settings:     serial.ToTypedMessage(&transtcp.Config{}),
 								},
 							},
-							SecurityType: serial.GetMessageType(&reality.Config{}),
-							SecuritySettings: []*serial.TypedMessage{
+							SecurityType: serial.NameOf(&reality.Config{}),
+							SecuritySettings: []any{
 								serial.ToTypedMessage(&reality.Config{
 									Show:        false,
 									Fingerprint: fingerprint,

@@ -473,6 +473,9 @@ func (h *Handler) process(ctx context.Context, link *transport.Link, dialer inte
 var ConfigObjects = []common.ConfigObject{
 	{
 		Config: (*Config)(nil),
+		// An account is not created from a configuration, but it crosses the API by
+		// name like one.
+		Also: []interface{}{(*vless.Account)(nil)},
 		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return New(ctx, config.(*Config))
 	},

@@ -8,7 +8,6 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/dns"
-	"google.golang.org/protobuf/proto"
 )
 
 // DNSOutboundRuleConfig is one rule of a DNS outbound.
@@ -66,7 +65,7 @@ type DNSOutboundConfig struct {
 	coreconfig.DNSOutbound
 }
 
-func (c *DNSOutboundConfig) Build() (proto.Message, error) {
+func (c *DNSOutboundConfig) Build() (any, error) {
 	if len(c.Network) > 0 {
 		c.RewriteNetwork = c.Network
 	}

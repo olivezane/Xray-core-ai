@@ -93,9 +93,8 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		if err != nil {
 			return nil, errors.New("Failed to build TLS config.").Base(err)
 		}
-		tm := serial.ToTypedMessage(ts)
-		config.SecuritySettings = append(config.SecuritySettings, tm)
-		config.SecurityType = tm.Type
+		config.SecuritySettings = append(config.SecuritySettings, ts)
+		config.SecurityType = serial.NameOf(ts)
 		xdriveH3 = config.ProtocolName == "xdrive" && tlsSettings.ALPN != nil && slices.Equal(*tlsSettings.ALPN, StringList{"h3"})
 		if config.ProtocolName == "xdrive" && tlsSettings.ALPN != nil && slices.Equal(*tlsSettings.ALPN, StringList{"http/1.1"}) && tlsSettings.ECHConfigList == "" {
 			// a fingerprint puts its own ALPN into the hello, except Go TLS and the
@@ -116,9 +115,8 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		if err != nil {
 			return nil, errors.New("Failed to build REALITY config.").Base(err)
 		}
-		tm := serial.ToTypedMessage(ts)
-		config.SecuritySettings = append(config.SecuritySettings, tm)
-		config.SecurityType = tm.Type
+		config.SecuritySettings = append(config.SecuritySettings, ts)
+		config.SecurityType = serial.NameOf(ts)
 	case "xtls":
 		return nil, errors.PrintRemovedFeatureError(`Legacy XTLS`, `xtls-rprx-vision with TLS or REALITY`)
 	default:
@@ -135,7 +133,7 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		}
 		config.TransportSettings = append(config.TransportSettings, &internet.TransportConfig{
 			ProtocolName: "tcp",
-			Settings:     serial.ToTypedMessage(ts),
+			Settings:     ts,
 		})
 	}
 	if c.XHTTPSettings != nil {
@@ -148,7 +146,7 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		}
 		config.TransportSettings = append(config.TransportSettings, &internet.TransportConfig{
 			ProtocolName: "splithttp",
-			Settings:     serial.ToTypedMessage(hs),
+			Settings:     hs,
 		})
 	}
 	if c.KCPSettings != nil {
@@ -158,7 +156,7 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		}
 		config.TransportSettings = append(config.TransportSettings, &internet.TransportConfig{
 			ProtocolName: "mkcp",
-			Settings:     serial.ToTypedMessage(ts),
+			Settings:     ts,
 		})
 	}
 	if c.GRPCSettings != nil {
@@ -168,7 +166,7 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		}
 		config.TransportSettings = append(config.TransportSettings, &internet.TransportConfig{
 			ProtocolName: "grpc",
-			Settings:     serial.ToTypedMessage(gs),
+			Settings:     gs,
 		})
 	}
 	if c.WSSettings != nil {
@@ -178,7 +176,7 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		}
 		config.TransportSettings = append(config.TransportSettings, &internet.TransportConfig{
 			ProtocolName: "websocket",
-			Settings:     serial.ToTypedMessage(ts),
+			Settings:     ts,
 		})
 	}
 	if c.HTTPUPGRADESettings != nil {
@@ -188,7 +186,7 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		}
 		config.TransportSettings = append(config.TransportSettings, &internet.TransportConfig{
 			ProtocolName: "httpupgrade",
-			Settings:     serial.ToTypedMessage(hs),
+			Settings:     hs,
 		})
 	}
 	if c.HysteriaSettings != nil {
@@ -198,7 +196,7 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		}
 		config.TransportSettings = append(config.TransportSettings, &internet.TransportConfig{
 			ProtocolName: "hysteria",
-			Settings:     serial.ToTypedMessage(hs),
+			Settings:     hs,
 		})
 	}
 	if c.MASQUESettings != nil {
@@ -208,7 +206,7 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		}
 		config.TransportSettings = append(config.TransportSettings, &internet.TransportConfig{
 			ProtocolName: "masque",
-			Settings:     serial.ToTypedMessage(ms),
+			Settings:     ms,
 		})
 	}
 	if c.XDRIVESettings != nil {
@@ -220,7 +218,7 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 		}
 		config.TransportSettings = append(config.TransportSettings, &internet.TransportConfig{
 			ProtocolName: "xdrive",
-			Settings:     serial.ToTypedMessage(xs),
+			Settings:     xs,
 		})
 	}
 	if c.SocketSettings != nil {
@@ -237,14 +235,14 @@ func buildStream(c *coreconfig.Stream) (*internet.StreamConfig, error) {
 			if err != nil {
 				return nil, errors.New("failed to build mask with type ", mask.Type).Base(err)
 			}
-			config.Tcpmasks = append(config.Tcpmasks, serial.ToTypedMessage(proto))
+			config.Tcpmasks = append(config.Tcpmasks, proto)
 		}
 		for _, mask := range c.FinalMask.Udp {
 			proto, err := buildMask(&mask, false)
 			if err != nil {
 				return nil, errors.New("failed to build mask with type ", mask.Type).Base(err)
 			}
-			config.Udpmasks = append(config.Udpmasks, serial.ToTypedMessage(proto))
+			config.Udpmasks = append(config.Udpmasks, proto)
 		}
 		if c.FinalMask.QuicParams != nil {
 			proto, err := (&QuicParamsConfig{*c.FinalMask.QuicParams}).Build()

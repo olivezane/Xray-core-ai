@@ -18,7 +18,6 @@ import (
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/platform/filesystem"
-	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/utils"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/transport/internet"
@@ -34,12 +33,11 @@ import (
 	"github.com/xtls/xray-core/transport/internet/websocket"
 	"github.com/xtls/xray-core/transport/internet/xdrive"
 	"golang.org/x/net/http/httpguts"
-	"google.golang.org/protobuf/proto"
 )
 
 type NoOpConnectionAuthenticator struct{}
 
-func (NoOpConnectionAuthenticator) Build() (proto.Message, error) {
+func (NoOpConnectionAuthenticator) Build() (any, error) {
 	return new(noop.ConnectionConfig), nil
 }
 
@@ -226,7 +224,7 @@ type Authenticator struct {
 	coreconfig.HTTPHeader
 }
 
-func (v *Authenticator) Build() (proto.Message, error) {
+func (v *Authenticator) Build() (any, error) {
 	config := new(http.Config)
 	requestConfig, err := buildAuthenticatorRequest(&v.Request)
 	if err != nil {
@@ -254,7 +252,7 @@ type TCPConfig struct {
 }
 
 // Build implements Buildable.
-func (c *TCPConfig) Build() (proto.Message, error) {
+func (c *TCPConfig) Build() (any, error) {
 	config := new(tcp.Config)
 	if len(c.HeaderConfig) > 0 {
 		headerConfig, _, err := tcpHeaderLoader.Load(c.HeaderConfig)
@@ -265,7 +263,7 @@ func (c *TCPConfig) Build() (proto.Message, error) {
 		if err != nil {
 			return nil, errors.New("invalid TCP header config").Base(err)
 		}
-		config.HeaderSettings = serial.ToTypedMessage(ts)
+		config.HeaderSettings = ts
 	}
 	if c.AcceptProxyProtocol {
 		config.AcceptProxyProtocol = c.AcceptProxyProtocol
@@ -290,11 +288,11 @@ func newRangeConfig(input Int32Range) *splithttp.RangeConfig {
 
 // Build implements Buildable.
 // Build converts the settings to their message.
-func (c *SplitHTTPConfig) Build() (proto.Message, error) {
+func (c *SplitHTTPConfig) Build() (any, error) {
 	return buildSplitHTTP(&c.SplitHTTP)
 }
 
-func buildSplitHTTP(c *coreconfig.SplitHTTP) (proto.Message, error) {
+func buildSplitHTTP(c *coreconfig.SplitHTTP) (any, error) {
 	if c.Extra != nil {
 		var extra coreconfig.SplitHTTP
 		if err := json.Unmarshal(c.Extra, &extra); err != nil {
@@ -517,7 +515,7 @@ type KCPConfig struct {
 }
 
 // Build implements Buildable.
-func (c *KCPConfig) Build() (proto.Message, error) {
+func (c *KCPConfig) Build() (any, error) {
 	config := common.Must2(internet.CreateTransportConfig(kcp.ProtocolName)).(*kcp.Config)
 
 	if c.Mtu != nil {
@@ -560,7 +558,7 @@ type GRPCConfig struct {
 	coreconfig.GRPC
 }
 
-func (g *GRPCConfig) Build() (proto.Message, error) {
+func (g *GRPCConfig) Build() (any, error) {
 	if g.IdleTimeout <= 0 {
 		g.IdleTimeout = 0
 	}
@@ -590,7 +588,7 @@ type WebSocketConfig struct {
 }
 
 // Build implements Buildable.
-func (c *WebSocketConfig) Build() (proto.Message, error) {
+func (c *WebSocketConfig) Build() (any, error) {
 	path := c.Path
 	var ed uint32
 	if u, err := url.Parse(path); err == nil {
@@ -629,7 +627,7 @@ type HttpUpgradeConfig struct {
 }
 
 // Build implements Buildable.
-func (c *HttpUpgradeConfig) Build() (proto.Message, error) {
+func (c *HttpUpgradeConfig) Build() (any, error) {
 	path := c.Path
 	var ed uint32
 	if u, err := url.Parse(path); err == nil {
@@ -718,7 +716,7 @@ type HysteriaConfig struct {
 	coreconfig.Hysteria
 }
 
-func (c *HysteriaConfig) Build() (proto.Message, error) {
+func (c *HysteriaConfig) Build() (any, error) {
 	if c.Version != 2 {
 		return nil, errors.New("version != 2")
 	}
@@ -756,11 +754,11 @@ type MasqueConfig struct {
 }
 
 // Build converts the settings to their message.
-func (c *MasqueConfig) Build() (proto.Message, error) {
+func (c *MasqueConfig) Build() (any, error) {
 	return buildMasque(&c.Masque)
 }
 
-func buildMasque(c *coreconfig.Masque) (proto.Message, error) {
+func buildMasque(c *coreconfig.Masque) (any, error) {
 	var warp *masque.Warp
 	host := c.Host
 	path := c.Path
@@ -951,11 +949,11 @@ type XDriveS3Config struct {
 
 // Build implements Buildable.
 // Build converts the settings to their message.
-func (c *XDriveConfig) Build() (proto.Message, error) {
+func (c *XDriveConfig) Build() (any, error) {
 	return buildXDrive(&c.XDrive, c.h3)
 }
 
-func buildXDrive(c *coreconfig.XDrive, h3 bool) (proto.Message, error) {
+func buildXDrive(c *coreconfig.XDrive, h3 bool) (any, error) {
 	switch c.Service {
 	case "local":
 	case "Google Drive":

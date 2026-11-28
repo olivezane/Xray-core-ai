@@ -35,6 +35,7 @@ import (
 )
 
 func TestCommanderListenConfigurationItem(t *testing.T) {
+
 	tcpServer := tcp.Server{
 		MsgProcessor: xor,
 	}
@@ -45,7 +46,7 @@ func TestCommanderListenConfigurationItem(t *testing.T) {
 	clientPort := tcp.PickPort()
 	cmdPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&commander.Config{
 				Tag:    "api",
 				Listen: fmt.Sprintf("127.0.0.1:%d", cmdPort),
@@ -119,7 +120,7 @@ func TestCommanderRemoveHandler(t *testing.T) {
 	clientPort := tcp.PickPort()
 	cmdPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&commander.Config{
 				Tag: "api",
 				Service: []*serial.TypedMessage{
@@ -214,7 +215,7 @@ func TestCommanderListHandlers(t *testing.T) {
 	clientPort := tcp.PickPort()
 	cmdPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&commander.Config{
 				Tag: "api",
 				Service: []*serial.TypedMessage{
@@ -286,11 +287,17 @@ func TestCommanderListHandlers(t *testing.T) {
 		t.Error("unexpected nil response")
 	}
 
+	// The API answers with its own messages: a handler crosses it as a wire
+	// message, so the config is written the same way before comparing.
+	expectedInbounds := make([]*command.InboundHandlerConfig, 0, len(clientConfig.Inbound))
+	for _, in := range clientConfig.Inbound {
+		expectedInbounds = append(expectedInbounds, command.InboundToWire(in))
+	}
 	if diff := cmp.Diff(
 		inboundResp.Inbounds,
-		clientConfig.Inbound,
+		expectedInbounds,
 		protocmp.Transform(),
-		cmpopts.SortSlices(func(a, b *core.InboundHandlerConfig) bool {
+		cmpopts.SortSlices(func(a, b *command.InboundHandlerConfig) bool {
 			return a.Tag < b.Tag
 		}),
 	); diff != "" {
@@ -303,11 +310,15 @@ func TestCommanderListHandlers(t *testing.T) {
 		t.Error("unexpected nil response")
 	}
 
+	expectedOutbounds := make([]*command.OutboundHandlerConfig, 0, len(clientConfig.Outbound))
+	for _, out := range clientConfig.Outbound {
+		expectedOutbounds = append(expectedOutbounds, command.OutboundToWire(out))
+	}
 	if diff := cmp.Diff(
 		outboundResp.Outbounds,
-		clientConfig.Outbound,
+		expectedOutbounds,
 		protocmp.Transform(),
-		cmpopts.SortSlices(func(a, b *core.InboundHandlerConfig) bool {
+		cmpopts.SortSlices(func(a, b *command.OutboundHandlerConfig) bool {
 			return a.Tag < b.Tag
 		}),
 	); diff != "" {
@@ -329,7 +340,7 @@ func TestCommanderAddRemoveUser(t *testing.T) {
 	cmdPort := tcp.PickPort()
 	serverPort := tcp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&commander.Config{
 				Tag: "api",
 				Service: []*serial.TypedMessage{
@@ -398,7 +409,7 @@ func TestCommanderAddRemoveUser(t *testing.T) {
 
 	clientPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&policy.Config{
 				Level: map[uint32]*policy.Policy{
 					0: {
@@ -504,7 +515,7 @@ func TestCommanderStats(t *testing.T) {
 	cmdPort := tcp.PickPort()
 
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&stats.Config{}),
 			serial.ToTypedMessage(&commander.Config{
 				Tag: "api",

@@ -384,8 +384,8 @@ func masqueStreamSettings(tlsConfig *tls.Config, config *transmasque.Config) *in
 				Settings:     serial.ToTypedMessage(config),
 			},
 		},
-		SecurityType:     serial.GetMessageType(&tls.Config{}),
-		SecuritySettings: []*serial.TypedMessage{serial.ToTypedMessage(tlsConfig)},
+		SecurityType:     serial.NameOf(&tls.Config{}),
+		SecuritySettings: []any{serial.ToTypedMessage(tlsConfig)},
 	}
 }
 
@@ -420,7 +420,7 @@ func masqueOutbound(serverPort net.Port, certHash [32]byte, h2 bool, authorizati
 
 func masqueClientConfig(serverPort net.Port, certHash [32]byte, h2 bool, authorization string, tcpPort, tcp6Port, udpPort net.Port, v4, v6 netip.Addr) *core.Config {
 	return &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -504,7 +504,7 @@ func masqueServerConfig(serverPort net.Port, certificate *tls.Certificate, h2 bo
 		}
 	}
 	return &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,

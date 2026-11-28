@@ -10,10 +10,15 @@ import (
 	"github.com/xtls/xray-core/app/observatory/burst"
 	"github.com/xtls/xray-core/app/stats"
 	statsservice "github.com/xtls/xray-core/app/stats/command"
+	"github.com/xtls/xray-core/testing/configs"
+	"github.com/xtls/xray-core/common"
 	. "github.com/xtls/xray-core/infra/conf"
 )
 
 func TestAPIConfigBuildsStatsAndCommander(t *testing.T) {
+	// The apps of this build are plain Go values now, so reading them back needs
+	// the names their settings give themselves.
+	configs.MustInstall(commander.ConfigObjectsCommander, commander.ConfigObjectsCommanderService, stats.ConfigObjects, observatory.ConfigObjects, burst.ConfigObjects, metrics.ConfigObjects)
 	tests := []struct {
 		name        string
 		raw         string
@@ -83,10 +88,9 @@ func TestAPIConfigBuildsStatsAndCommander(t *testing.T) {
 				hasStats        bool
 			)
 			for _, app := range built.App {
-				instance, err := app.GetInstance()
-				if err != nil {
-					t.Fatal(err)
-				}
+				// A configuration carries its settings as plain values, which the
+				// API boundary wraps: unwrap it here.
+				instance := common.UnwrapSettings(app)
 				switch v := instance.(type) {
 				case *commander.Config:
 					commanderConf = v

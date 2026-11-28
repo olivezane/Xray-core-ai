@@ -10,10 +10,10 @@ import (
 	"github.com/xtls/xray-core/app/dispatcher"
 	"github.com/xtls/xray-core/app/proxyman"
 	"github.com/xtls/xray-core/app/stats"
+	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/geodata"
 	"github.com/xtls/xray-core/common/net"
-	"github.com/xtls/xray-core/common/serial"
 	core "github.com/xtls/xray-core/core"
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/freedom"
@@ -22,7 +22,6 @@ import (
 	"github.com/xtls/xray-core/proxy/vless/inbound"
 	"github.com/xtls/xray-core/proxy/vless/outbound"
 	"github.com/xtls/xray-core/transport/internet"
-	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -187,8 +186,8 @@ func (c *InboundDetourConfig) Build() (*core.InboundHandlerConfig, error) {
 
 	return &core.InboundHandlerConfig{
 		Tag:              c.Tag,
-		ReceiverSettings: serial.ToTypedMessage(receiverSettings),
-		ProxySettings:    serial.ToTypedMessage(ts),
+		ReceiverSettings: receiverSettings,
+		ProxySettings:    ts,
 	}, nil
 }
 
@@ -211,7 +210,7 @@ func requiresTransportSecurity(address *Address) bool {
 }
 
 func validateOutboundTransportSecurity(rawConfig interface{}, senderSettings *proxyman.SenderConfig) error {
-	if senderSettings.StreamSettings != nil && senderSettings.StreamSettings.GetSecurityType() != "" {
+	if senderSettings.StreamSettings != nil && senderSettings.StreamSettings.SecurityType != "" {
 		return nil
 	}
 
@@ -234,17 +233,18 @@ func validateOutboundTransportSecurity(rawConfig interface{}, senderSettings *pr
 }
 
 // validateXDrive allows only encrypted VLESS on xdrive, with native multiplex on every client connection.
-func validateXDrive(ts proto.Message, ss *internet.StreamConfig, pl *net.PortList) error {
+func validateXDrive(ts any, ss *internet.StreamConfig, pl *net.PortList) error {
 	if ss == nil || ss.ProtocolName != "xdrive" {
 		return nil
 	}
 	switch c := ts.(type) {
 	case *outbound.Config:
-		a, err := c.Vnext.User.Account.GetInstance()
-		if err != nil {
-			return err
+		// An account is a plain Go value now, so it is read back by the name it
+		// says for itself.
+		account, ok := common.UnwrapSettings(c.Vnext.User.Account).(*vless.Account)
+		if !ok {
+			return errors.New("not a vless account")
 		}
-		account := a.(*vless.Account)
 		if account.Flow != "" {
 			return errors.New(`the xdrive transport doesn't support VLESS "flow"`)
 		}
@@ -268,11 +268,11 @@ func validateXDrive(ts proto.Message, ss *internet.StreamConfig, pl *net.PortLis
 			return errors.New(`the xdrive transport needs VLESS "decryption", run "xray vlessenc" to get one`)
 		}
 		for _, user := range c.Users {
-			a, err := user.Account.GetInstance()
-			if err != nil {
-				return err
+			account, ok := common.UnwrapSettings(user.Account).(*vless.Account)
+			if !ok {
+				return errors.New("not a vless account")
 			}
-			if a.(*vless.Account).Flow != "" {
+			if account.Flow != "" {
 				return errors.New(`the xdrive transport doesn't support VLESS "flow"`)
 			}
 		}
@@ -411,9 +411,9 @@ func (c *OutboundDetourConfig) Build() (*core.OutboundHandlerConfig, error) {
 	}
 
 	return &core.OutboundHandlerConfig{
-		SenderSettings: serial.ToTypedMessage(senderSettings),
+		SenderSettings: senderSettings,
 		Tag:            c.Tag,
-		ProxySettings:  serial.ToTypedMessage(ts),
+		ProxySettings:  ts,
 	}, nil
 }
 
@@ -562,9 +562,9 @@ func (c *Config) Build() (*core.Config, error) {
 	}
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
-			serial.ToTypedMessage(&dispatcher.Config{}),
-			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
+		App: []any{
+			&dispatcher.Config{},
+			&proxyman.OutboundConfig{},
 		},
 	}
 
@@ -583,44 +583,44 @@ func (c *Config) Build() (*core.Config, error) {
 	}
 	// The gRPC stats service and the /debug/vars endpoint both read the stats manager.
 	if c.API != nil {
-		config.App = append(config.App, serial.ToTypedMessage(&stats.Config{}))
+		config.App = append(config.App, &stats.Config{})
 		apiConf, err := BuildAPI(c.API)
 		if err != nil {
 			return nil, errors.New("failed to build API configuration").Base(err)
 		}
-		config.App = append(config.App, serial.ToTypedMessage(apiConf))
+		config.App = append(config.App, apiConf)
 		if c.API.Observatory != nil {
 			r, err := BuildObservatory(c.API.Observatory)
 			if err != nil {
 				return nil, errors.New("failed to build observatory configuration").Base(err)
 			}
-			config.App = append(config.App, serial.ToTypedMessage(r))
+			config.App = append(config.App, r)
 		}
 		if c.API.BurstObservatory != nil {
 			r, err := BuildBurstObservatory(c.API.BurstObservatory)
 			if err != nil {
 				return nil, errors.New("failed to build burst observatory configuration").Base(err)
 			}
-			config.App = append(config.App, serial.ToTypedMessage(r))
+			config.App = append(config.App, r)
 		}
 	}
 
-	var logConfMsg *serial.TypedMessage
+	var logConf any
 	if c.LogConfig != nil {
-		logConfMsg = serial.ToTypedMessage(BuildLog(c.LogConfig))
+		logConf = BuildLog(c.LogConfig)
 	} else {
-		logConfMsg = serial.ToTypedMessage(DefaultLogConfig())
+		logConf = DefaultLogConfig()
 	}
 	// let logger module be the first App to start,
 	// so that other modules could print log during initiating
-	config.App = append([]*serial.TypedMessage{logConfMsg}, config.App...)
+	config.App = append([]any{logConf}, config.App...)
 
 	if c.RouterConfig != nil {
 		routerConfig, err := c.RouterConfig.Build()
 		if err != nil {
 			return nil, errors.New("failed to build routing configuration").Base(err)
 		}
-		config.App = append(config.App, serial.ToTypedMessage(routerConfig))
+		config.App = append(config.App, routerConfig)
 	}
 
 	if c.DNSConfig != nil {
@@ -628,7 +628,7 @@ func (c *Config) Build() (*core.Config, error) {
 		if err != nil {
 			return nil, errors.New("failed to build DNS configuration").Base(err)
 		}
-		config.App = append(config.App, serial.ToTypedMessage(dnsApp))
+		config.App = append(config.App, dnsApp)
 	}
 
 	if c.Policy != nil {
@@ -636,7 +636,7 @@ func (c *Config) Build() (*core.Config, error) {
 		if err != nil {
 			return nil, errors.New("failed to build policy configuration").Base(err)
 		}
-		config.App = append(config.App, serial.ToTypedMessage(pc))
+		config.App = append(config.App, pc)
 	}
 
 	if c.DNSConfig != nil && c.DNSConfig.FakeDNS != nil {
@@ -644,7 +644,7 @@ func (c *Config) Build() (*core.Config, error) {
 		if err != nil {
 			return nil, errors.New("failed to build fake DNS configuration").Base(err)
 		}
-		config.App = append([]*serial.TypedMessage{serial.ToTypedMessage(r)}, config.App...)
+		config.App = append([]any{r}, config.App...)
 	}
 
 	if c.Version != nil {
@@ -652,7 +652,7 @@ func (c *Config) Build() (*core.Config, error) {
 		if err != nil {
 			return nil, errors.New("failed to build version configuration").Base(err)
 		}
-		config.App = append(config.App, serial.ToTypedMessage(r))
+		config.App = append(config.App, r)
 	}
 
 	if c.Geodata != nil {
@@ -660,11 +660,11 @@ func (c *Config) Build() (*core.Config, error) {
 		if err != nil {
 			return nil, errors.New("failed to build geodata configuration").Base(err)
 		}
-		config.App = append(config.App, serial.ToTypedMessage(r))
+		config.App = append(config.App, r)
 	}
 
 	// Initialize the inbound module last to ensure inbound connections are handled correctly.
-	config.App = append(config.App, serial.ToTypedMessage(&proxyman.InboundConfig{}))
+	config.App = append(config.App, &proxyman.InboundConfig{})
 
 	var inbounds []InboundDetourConfig
 

@@ -7,7 +7,6 @@ import (
 	"crypto/sha1"
 	"io"
 
-	"google.golang.org/protobuf/proto"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
@@ -36,7 +35,7 @@ func (a *MemoryAccount) Equals(another protocol.Account) bool {
 	return false
 }
 
-func (a *MemoryAccount) ToProto() proto.Message {
+func (a *MemoryAccount) ToProto() any {
 	return &Account{
 		CipherType: a.CipherType,
 		Password:   a.Password,

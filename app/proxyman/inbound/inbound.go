@@ -192,14 +192,8 @@ func (m *Manager) Close() error {
 
 // NewHandler creates a new inbound.Handler based on the given config.
 func NewHandler(ctx context.Context, config *core.InboundHandlerConfig) (inbound.Handler, error) {
-	rawReceiverSettings, err := config.ReceiverSettings.GetInstance()
-	if err != nil {
-		return nil, err
-	}
-	proxySettings, err := config.ProxySettings.GetInstance()
-	if err != nil {
-		return nil, err
-	}
+	rawReceiverSettings := common.UnwrapSettings(config.ReceiverSettings)
+	proxySettings := common.UnwrapSettings(config.ProxySettings)
 	tag := config.Tag
 
 	receiverSettings, ok := rawReceiverSettings.(*proxyman.ReceiverConfig)
@@ -223,6 +217,9 @@ func NewHandler(ctx context.Context, config *core.InboundHandlerConfig) (inbound
 var ConfigObjects = []common.ConfigObject{
 	{
 		Config: (*proxyman.InboundConfig)(nil),
+		// A receiver is not created from a configuration, but it crosses the API
+		// by name like one.
+		Also: []interface{}{(*proxyman.ReceiverConfig)(nil), (*proxyman.SniffingConfig)(nil)},
 		New: func(ctx context.Context, config interface{}) (interface{}, error) {
 		return New(ctx, config.(*proxyman.InboundConfig))
 	},

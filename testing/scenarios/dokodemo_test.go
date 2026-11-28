@@ -34,7 +34,7 @@ func TestDokodemoTCP(t *testing.T) {
 	userID := protocol.NewID(uuid.New())
 	serverPort := tcp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -74,7 +74,7 @@ func TestDokodemoTCP(t *testing.T) {
 	clientPort := uint32(tcp.PickPort())
 	for {
 		clientConfig := &core.Config{
-			App: []*serial.TypedMessage{
+			App: []any{
 				serial.ToTypedMessage(&log.Config{
 					ErrorLogLevel: clog.Severity_Debug,
 					ErrorLogType:  log.LogType_Console,

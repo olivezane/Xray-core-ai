@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/xtls/xray-core/common"
 	cnet "github.com/xtls/xray-core/common/net"
 	cserial "github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/infra/conf"
@@ -36,7 +37,26 @@ func marshalTypedMessage(v *cserial.TypedMessage, ignoreNullValue bool, insertTy
 	}
 	tmsg, err := v.GetInstance()
 	if err != nil {
-		return nil
+		// A setting that is a plain Go value is not a message, so it is carried
+		// as JSON. Reading it as the type it names needs the table of the package
+		// that owns it, which this one does not have, so the JSON is rendered as
+		// it stands: what a reader of this output needs is the value, not its type.
+		value := common.UnwrapSettings(v)
+		if value == v {
+			var rendered map[string]interface{}
+			if err := json.Unmarshal(v.Value, &rendered); err != nil {
+				return nil
+			}
+			if insertTypeInfo {
+				rendered["_TypedMessage_"] = v.Type
+			}
+			return rendered
+		}
+		r := marshalInterface(value, ignoreNullValue, insertTypeInfo)
+		if msg, ok := r.(map[string]interface{}); ok && insertTypeInfo {
+			msg["_TypedMessage_"] = v.Type
+		}
+		return r
 	}
 	r := marshalInterface(tmsg, ignoreNullValue, insertTypeInfo)
 	if msg, ok := r.(map[string]interface{}); ok && insertTypeInfo {

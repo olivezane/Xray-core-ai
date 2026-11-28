@@ -13,7 +13,6 @@ import (
 	"github.com/xtls/xray-core/proxy/vmess"
 	"github.com/xtls/xray-core/proxy/vmess/inbound"
 	"github.com/xtls/xray-core/proxy/vmess/outbound"
-	"google.golang.org/protobuf/proto"
 )
 
 // VMessAccount is one user of a VMess inbound or outbound.
@@ -57,7 +56,7 @@ type VMessInboundConfig struct {
 }
 
 // Build implements Buildable
-func (c *VMessInboundConfig) Build() (proto.Message, error) {
+func (c *VMessInboundConfig) Build() (any, error) {
 	errors.PrintNonRemovalDeprecatedFeatureWarning("VMess (with no Forward Secrecy, etc.)", "VLESS Encryption")
 
 	config := &inbound.Config{}
@@ -107,7 +106,7 @@ type VMessOutboundConfig struct {
 }
 
 // Build implements Buildable
-func (c *VMessOutboundConfig) Build() (proto.Message, error) {
+func (c *VMessOutboundConfig) Build() (any, error) {
 	errors.PrintNonRemovalDeprecatedFeatureWarning("VMess (with no Forward Secrecy, etc.)", "VLESS Encryption")
 
 	multiplex, err := BuildMultiplex(c.Multiplex)

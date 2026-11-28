@@ -19,15 +19,18 @@ import (
 
 // NormalizeConfig validates the pool settings and returns nil when both pools are off.
 func NormalizeConfig(config *vless.Multiplex) (*vless.Multiplex, error) {
-	if config.GetConcurrency() < 0 || config.GetXudpConcurrency() < 0 {
+	if config == nil {
+		return nil, nil
+	}
+	if config.Concurrency < 0 || config.XudpConcurrency < 0 {
 		return nil, errors.New(`multiplex "concurrency" and "xudpConcurrency" must be non-negative`)
 	}
-	switch config.GetXudpProxyUDP443() {
+	switch config.XudpProxyUDP443 {
 	case "", "reject", "allow", "skip":
 	default:
-		return nil, errors.New(`unknown "xudpProxyUDP443": `, config.GetXudpProxyUDP443())
+		return nil, errors.New(`unknown "xudpProxyUDP443": `, config.XudpProxyUDP443)
 	}
-	if config.GetConcurrency() == 0 && config.GetXudpConcurrency() == 0 {
+	if config.Concurrency == 0 && config.XudpConcurrency == 0 {
 		return nil, nil
 	}
 	return config, nil
@@ -73,7 +76,7 @@ func (c *Client) Dispatch(ctx context.Context, link *transport.Link) (bool, erro
 		return false, nil
 	}
 	if target.Network == net.Network_UDP && target.Port == 443 {
-		switch c.config.GetXudpProxyUDP443() {
+		switch c.config.XudpProxyUDP443 {
 		case "reject", "":
 			proxy.DropUDP(ctx, link.Reader)
 			return true, errors.New("XUDP rejected UDP/443 traffic")

@@ -1,7 +1,6 @@
 package vless
 
 import (
-	"google.golang.org/protobuf/proto"
 
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/protocol"
@@ -54,7 +53,7 @@ func (a *MemoryAccount) Equals(account protocol.Account) bool {
 	return a.ID.Equals(vlessAccount.ID)
 }
 
-func (a *MemoryAccount) ToProto() proto.Message {
+func (a *MemoryAccount) ToProto() any {
 	return &Account{
 		Id:         a.ID.String(),
 		Flow:       a.Flow,

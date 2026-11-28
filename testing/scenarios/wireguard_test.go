@@ -67,7 +67,7 @@ func TestWireguard(t *testing.T) {
 	}
 	serverPort := udp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Warning,
 				ErrorLogType:  log.LogType_Console,
@@ -123,7 +123,7 @@ func TestWireguard(t *testing.T) {
 		}
 	}
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Warning,
 				ErrorLogType:  log.LogType_Console,

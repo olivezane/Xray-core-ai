@@ -7,6 +7,7 @@ import (
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/protocol"
+	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/inbound"
 	"github.com/xtls/xray-core/features/outbound"
@@ -76,6 +77,81 @@ func (op *RemoveUserOperation) ApplyInbound(ctx context.Context, handler inbound
 	return nil
 }
 
+// The messages of this service are its own: a handler crosses the API as a wire
+// message, and is turned into the configuration the instance reads here, at the
+// edge. The messages keep the field numbers of the configuration, so a handler
+// crosses the API unchanged.
+
+func InboundFromWire(wire *InboundHandlerConfig) *core.InboundHandlerConfig {
+	if wire == nil {
+		return nil
+	}
+	return &core.InboundHandlerConfig{
+		Tag:              wire.Tag,
+		ReceiverSettings: fromWireMessage(wire.ReceiverSettings),
+		ProxySettings:    fromWireMessage(wire.ProxySettings),
+	}
+}
+
+func InboundToWire(inbound *core.InboundHandlerConfig) *InboundHandlerConfig {
+	if inbound == nil {
+		return nil
+	}
+	return &InboundHandlerConfig{
+		Tag:              inbound.Tag,
+		ReceiverSettings: toWireMessage(inbound.ReceiverSettings),
+		ProxySettings:    toWireMessage(inbound.ProxySettings),
+	}
+}
+
+// toWireMessage renders a setting as the message the API carries. A setting is a
+// plain value of the configuration model, and most of them are still messages of
+// their own, so this is the one place where a configuration becomes a message.
+func toWireMessage(settings any) *serial.TypedMessage {
+	if settings == nil {
+		return nil
+	}
+	if message, ok := settings.(*serial.TypedMessage); ok {
+		return message
+	}
+	// A handler keeps the value it was created from, which may be a plain Go
+	// configuration rather than a message; serial knows how to carry either.
+	return serial.ToTypedMessage(settings)
+}
+
+func fromWireMessage(message *serial.TypedMessage) any {
+	if message == nil {
+		return nil
+	}
+	return message
+}
+
+func OutboundFromWire(wire *OutboundHandlerConfig) *core.OutboundHandlerConfig {
+	if wire == nil {
+		return nil
+	}
+	return &core.OutboundHandlerConfig{
+		Tag:            wire.Tag,
+		SenderSettings: fromWireMessage(wire.SenderSettings),
+		ProxySettings:  fromWireMessage(wire.ProxySettings),
+		Expire:         wire.Expire,
+		Comment:        wire.Comment,
+	}
+}
+
+func OutboundToWire(outbound *core.OutboundHandlerConfig) *OutboundHandlerConfig {
+	if outbound == nil {
+		return nil
+	}
+	return &OutboundHandlerConfig{
+		Tag:            outbound.Tag,
+		SenderSettings: toWireMessage(outbound.SenderSettings),
+		ProxySettings:  toWireMessage(outbound.ProxySettings),
+		Expire:         outbound.Expire,
+		Comment:        outbound.Comment,
+	}
+}
+
 type handlerServer struct {
 	s   *core.Instance
 	ihm inbound.Manager
@@ -83,7 +159,7 @@ type handlerServer struct {
 }
 
 func (s *handlerServer) AddInbound(ctx context.Context, request *AddInboundRequest) (*AddInboundResponse, error) {
-	if err := core.AddInboundHandler(s.s, request.Inbound); err != nil {
+	if err := core.AddInboundHandler(s.s, InboundFromWire(request.Inbound)); err != nil {
 		return nil, err
 	}
 
@@ -117,17 +193,17 @@ func (s *handlerServer) ListInbounds(ctx context.Context, request *ListInboundsR
 	response := &ListInboundsResponse{}
 	if request.GetIsOnlyTags() {
 		for _, handler := range handlers {
-			response.Inbounds = append(response.Inbounds, &core.InboundHandlerConfig{
+			response.Inbounds = append(response.Inbounds, InboundToWire(&core.InboundHandlerConfig{
 				Tag: handler.Tag(),
-			})
+			}))
 		}
 	} else {
 		for _, handler := range handlers {
-			response.Inbounds = append(response.Inbounds, &core.InboundHandlerConfig{
+			response.Inbounds = append(response.Inbounds, InboundToWire(&core.InboundHandlerConfig{
 				Tag:              handler.Tag(),
 				ReceiverSettings: handler.ReceiverSettings(),
 				ProxySettings:    handler.ProxySettings(),
-			})
+			}))
 		}
 	}
 
@@ -175,7 +251,7 @@ func (s *handlerServer) GetInboundUsersCount(ctx context.Context, request *GetIn
 }
 
 func (s *handlerServer) AddOutbound(ctx context.Context, request *AddOutboundRequest) (*AddOutboundResponse, error) {
-	if err := core.AddOutboundHandler(s.s, request.Outbound); err != nil {
+	if err := core.AddOutboundHandler(s.s, OutboundFromWire(request.Outbound)); err != nil {
 		return nil, err
 	}
 	return &AddOutboundResponse{}, nil
@@ -207,11 +283,11 @@ func (s *handlerServer) ListOutbounds(ctx context.Context, request *ListOutbound
 		if _, ok := handler.(*commander.Outbound); ok {
 			continue
 		}
-		response.Outbounds = append(response.Outbounds, &core.OutboundHandlerConfig{
+		response.Outbounds = append(response.Outbounds, OutboundToWire(&core.OutboundHandlerConfig{
 			Tag:            handler.Tag(),
 			SenderSettings: handler.SenderSettings(),
 			ProxySettings:  handler.ProxySettings(),
-		})
+		}))
 	}
 	return response, nil
 }

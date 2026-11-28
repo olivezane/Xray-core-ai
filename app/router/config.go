@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/features/outbound"
 	"github.com/xtls/xray-core/features/routing"
@@ -139,11 +140,9 @@ func (br *BalancingRule) Build(ohm outbound.Manager, dispatcher routing.Dispatch
 			ohm:         ohm,
 		}, nil
 	case "leastload":
-		i, err := br.StrategySettings.GetInstance()
-		if err != nil {
-			return nil, err
-		}
-		s, ok := i.(*StrategyLeastLoadConfig)
+		// The strategy settings are a plain Go value now, so they are read back by
+		// the name they say for themselves.
+		s, ok := common.UnwrapSettings(br.StrategySettings).(*StrategyLeastLoadConfig)
 		if !ok {
 			return nil, errors.New("not a StrategyLeastLoadConfig")
 		}

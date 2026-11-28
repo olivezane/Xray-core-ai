@@ -1,7 +1,6 @@
 package socks
 
 import (
-	"google.golang.org/protobuf/proto"
 
 	"github.com/xtls/xray-core/common/protocol"
 )
@@ -13,7 +12,7 @@ func (a *Account) Equals(another protocol.Account) bool {
 	return false
 }
 
-func (a *Account) ToProto() proto.Message {
+func (a *Account) ToProto() any {
 	return a
 }
 

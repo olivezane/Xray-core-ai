@@ -2,10 +2,12 @@ package internet
 
 import (
 	"context"
+	"reflect"
 	"sort"
 
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
+	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/transport/internet/stat"
 )
 
@@ -52,7 +54,37 @@ type Listener interface {
 	Addr() net.Addr
 }
 
-var transports = make(map[string]Transport)
+var (
+	transports           = make(map[string]Transport)
+	transportConfigTypes = make(map[string]reflect.Type)
+)
+
+// SetStreamSettings adds settings types of the stream layer that are not a
+// transport: a security layer wraps a transport and a header is carried by one, so
+// they are listed beside the transports rather than among them. Their settings
+// cross the API by name like a transport's.
+func SetStreamSettings(list []interface{}) error {
+	installedTypes := make(map[string]reflect.Type, len(transportConfigTypes)+len(list))
+	for name, configType := range transportConfigTypes {
+		installedTypes[name] = configType
+	}
+	for _, settings := range list {
+		if settings == nil {
+			return errors.New("security settings without a type")
+		}
+		named, ok := settings.(serial.SettingsNamer)
+		if !ok {
+			return errors.New(reflect.TypeOf(settings).String(), " has no name")
+		}
+		name := named.SettingsName()
+		if name == "" {
+			return errors.New(reflect.TypeOf(settings).String(), " has no name")
+		}
+		installedTypes[name] = reflect.TypeOf(settings)
+	}
+	transportConfigTypes = installedTypes
+	return nil
+}
 
 // SetTransports installs list as the complete set of stream transports of this
 // build. It replaces whatever was installed before, so a transport that is not
@@ -74,6 +106,22 @@ func SetTransports(list []Transport) error {
 		}
 		installed[t.Name] = t
 	}
+	// Settings cross the API by name, so the type each name belongs to is kept
+	// beside the transports: a settings type that is a plain Go value says its own
+	// name, and this is where that name is read.
+	// Settings installed beside the transports, e.g. a security layer or a header,
+	// are kept: this replaces the transports, not the names of the stream layer.
+	installedTypes := make(map[string]reflect.Type, len(list)+len(transportConfigTypes))
+	for name, configType := range transportConfigTypes {
+		installedTypes[name] = configType
+	}
+	for _, t := range list {
+		settings := t.Config()
+		if named, ok := settings.(serial.SettingsNamer); ok {
+			installedTypes[named.SettingsName()] = reflect.TypeOf(settings)
+		}
+	}
+	transportConfigTypes = installedTypes
 	transports = installed
 	return nil
 }

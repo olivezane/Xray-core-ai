@@ -10,7 +10,6 @@ import (
 	coreconfig "github.com/xtls/xray-core/core/config"
 	"github.com/xtls/xray-core/proxy/shadowsocks"
 	"github.com/xtls/xray-core/proxy/shadowsocks_2022"
-	"google.golang.org/protobuf/proto"
 )
 
 func cipherFromString(c string) shadowsocks.CipherType {
@@ -36,7 +35,7 @@ type ShadowsocksServerConfig struct {
 	coreconfig.ShadowsocksServer
 }
 
-func (v *ShadowsocksServerConfig) Build() (proto.Message, error) {
+func (v *ShadowsocksServerConfig) Build() (any, error) {
 	errors.PrintNonRemovalDeprecatedFeatureWarning("Shadowsocks (with no Forward Secrecy, etc.)", "VLESS Encryption")
 
 	if v.Clients != nil {
@@ -98,7 +97,7 @@ func (v *ShadowsocksServerConfig) Build() (proto.Message, error) {
 	return config, nil
 }
 
-func buildShadowsocks2022(v *ShadowsocksServerConfig) (proto.Message, error) {
+func buildShadowsocks2022(v *ShadowsocksServerConfig) (any, error) {
 	v.Cipher = strings.ToLower(v.Cipher)
 	if len(v.Users) == 0 {
 		config := new(shadowsocks_2022.ServerConfig)
@@ -175,7 +174,7 @@ type ShadowsocksClientConfig struct {
 	coreconfig.ShadowsocksClient
 }
 
-func (v *ShadowsocksClientConfig) Build() (proto.Message, error) {
+func (v *ShadowsocksClientConfig) Build() (any, error) {
 	errors.PrintNonRemovalDeprecatedFeatureWarning("Shadowsocks (with no Forward Secrecy, etc.)", "VLESS Encryption")
 
 	if v.Address != nil {

@@ -91,7 +91,7 @@ func startMetricsTestServerWithMetricsConfig(t *testing.T, metricsConfig *Config
 
 func metricsTestConfig(metricsConfig *Config) *core.Config {
 	return &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dispatcher.Config{}),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),

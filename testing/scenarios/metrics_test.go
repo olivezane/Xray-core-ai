@@ -31,7 +31,7 @@ func TestMetrics(t *testing.T) {
 
 	metricsPort := tcp.PickPort()
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&metrics.Config{
 				Tag: "metrics_out",
 			}),

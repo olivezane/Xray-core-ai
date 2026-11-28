@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -29,13 +27,14 @@ import (
 	// the binary installs through main/distro/all's Wire.
 	_ "github.com/xtls/xray-core/transport/internet/headers"
 	_ "github.com/xtls/xray-core/transport/internet/transports"
-	"github.com/xtls/xray-core/transport/internet/tagged/taggedimpl"
-	"google.golang.org/protobuf/proto"
+	"github.com/xtls/xray-core/main/distro/all"
 )
 
 // init stands in for main, which calls all.Wire in the binary.
+// init stands in for main: a scenario builds instances in this process, so it
+// needs the same wiring the binary does.
 func init() {
-	taggedimpl.Install()
+	all.Wire()
 }
 
 func xor(b []byte) []byte {
@@ -68,8 +67,24 @@ func readFrom2(conn net.Conn, timeout time.Duration, length int) ([]byte, error)
 	return b[:n], nil
 }
 
-func InitializeServerConfigs(configs ...*core.Config) ([]*exec.Cmd, error) {
-	servers := make([]*exec.Cmd, 0, 10)
+// Server is a running instance a scenario talks to. It runs in this process:
+// a configuration is plain Go values now, and its settings are protobuf messages,
+// which no configuration file carries, so there is nothing to hand a subprocess.
+type Server struct {
+	instance *core.Instance
+}
+
+// Close stops the instance and releases what it holds.
+func (s *Server) Close() {
+	if s == nil || s.instance == nil {
+		return
+	}
+	s.instance.Close()
+	s.instance = nil
+}
+
+func InitializeServerConfigs(configs ...*core.Config) ([]*Server, error) {
+	servers := make([]*Server, 0, 10)
 
 	for _, config := range configs {
 		server, err := InitializeServerConfig(config)
@@ -85,24 +100,17 @@ func InitializeServerConfigs(configs ...*core.Config) ([]*exec.Cmd, error) {
 	return servers, nil
 }
 
-func InitializeServerConfig(config *core.Config) (*exec.Cmd, error) {
-	err := BuildXray()
-	if err != nil {
-		return nil, err
-	}
-
+func InitializeServerConfig(config *core.Config) (*Server, error) {
 	config = withDefaultApps(config)
-	configBytes, err := proto.Marshal(config)
+	instance, err := core.New(config)
 	if err != nil {
 		return nil, err
 	}
-	proc := RunXrayProtobuf(configBytes)
-
-	if err := proc.Start(); err != nil {
+	if err := instance.Start(); err != nil {
+		instance.Close()
 		return nil, err
 	}
-
-	return proc, nil
+	return &Server{instance: instance}, nil
 }
 
 var (
@@ -136,20 +144,13 @@ func GetSourcePath() string {
 	return filepath.Join("github.com", "xtls", "xray-core", "main")
 }
 
-func CloseAllServers(servers []*exec.Cmd) {
+func CloseAllServers(servers []*Server) {
 	log.Record(&log.GeneralMessage{
 		Severity: log.Severity_Info,
 		Content:  "Closing all servers.",
 	})
 	for _, server := range servers {
-		if runtime.GOOS == "windows" {
-			server.Process.Kill()
-		} else {
-			server.Process.Signal(syscall.SIGTERM)
-		}
-	}
-	for _, server := range servers {
-		server.Process.Wait()
+		server.Close()
 	}
 	log.Record(&log.GeneralMessage{
 		Severity: log.Severity_Info,
@@ -157,17 +158,12 @@ func CloseAllServers(servers []*exec.Cmd) {
 	})
 }
 
-func CloseServer(server *exec.Cmd) {
+func CloseServer(server *Server) {
 	log.Record(&log.GeneralMessage{
 		Severity: log.Severity_Info,
 		Content:  "Closing server.",
 	})
-	if runtime.GOOS == "windows" {
-		server.Process.Kill()
-	} else {
-		server.Process.Signal(syscall.SIGTERM)
-	}
-	server.Process.Wait()
+	server.Close()
 	log.Record(&log.GeneralMessage{
 		Severity: log.Severity_Info,
 		Content:  "Server closed.",
@@ -180,6 +176,7 @@ func withDefaultApps(config *core.Config) *core.Config {
 	config.App = append(config.App, serial.ToTypedMessage(&proxyman.OutboundConfig{}))
 	return config
 }
+
 
 func testTCPConn(port net.Port, payloadSize int, timeout time.Duration) func() error {
 	return func() error {

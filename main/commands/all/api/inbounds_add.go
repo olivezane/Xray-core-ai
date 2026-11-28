@@ -67,7 +67,7 @@ func executeAddInbounds(cmd *base.Command, args []string) {
 			base.Fatalf("failed to build conf: %s", err)
 		}
 		r := &handlerService.AddInboundRequest{
-			Inbound: i,
+			Inbound: handlerService.InboundToWire(i),
 		}
 		resp, err := client.AddInbound(ctx, r)
 		if err != nil {

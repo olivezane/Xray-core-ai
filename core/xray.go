@@ -193,11 +193,7 @@ func initInstanceWithConfig(config *Config, server *Instance) (bool, error) {
 		return true, errors.New("failed to reload environment settings").Base(err)
 	}
 
-	for _, appSettings := range config.App {
-		settings, err := appSettings.GetInstance()
-		if err != nil {
-			return true, err
-		}
+	for _, settings := range config.App {
 		obj, err := CreateObject(server, settings)
 		if err != nil {
 			return true, err

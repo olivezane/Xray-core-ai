@@ -33,11 +33,11 @@ func New(ctx context.Context, config *Config) (*Instance, error) {
 		return nil, errors.New("geodata supports at most 100 assets")
 	}
 	for _, asset := range config.Assets {
-		if !strings.EqualFold(filepath.Ext(asset.GetFile()), ".dat") {
+		if !strings.EqualFold(filepath.Ext(asset.File), ".dat") {
 			return nil, errors.New("geodata asset file extension must be .dat")
 		}
-		if _, err := filesystem.ResolveAsset(asset.GetFile()); err != nil {
-			return nil, errors.New("invalid geodata asset file: ", asset.GetFile()).Base(err)
+		if _, err := filesystem.ResolveAsset(asset.File); err != nil {
+			return nil, errors.New("invalid geodata asset file: ", asset.File).Base(err)
 		}
 	}
 	schedule, err := cron.ParseStandard(config.Cron)

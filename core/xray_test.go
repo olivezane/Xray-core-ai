@@ -19,7 +19,6 @@ import (
 	"github.com/xtls/xray-core/proxy/vmess"
 	"github.com/xtls/xray-core/proxy/vmess/outbound"
 	"github.com/xtls/xray-core/testing/servers/tcp"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestXrayDependency(t *testing.T) {
@@ -41,7 +40,7 @@ func TestXrayClose(t *testing.T) {
 
 	userID := uuid.New()
 	config := &Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dispatcher.Config{}),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
@@ -78,10 +77,7 @@ func TestXrayClose(t *testing.T) {
 		},
 	}
 
-	cfgBytes, err := proto.Marshal(config)
-	common.Must(err)
-
-	server, err := StartInstance("protobuf", cfgBytes)
+	server, err := New(config)
 	common.Must(err)
 	server.Close()
 }

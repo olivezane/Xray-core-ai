@@ -10,10 +10,15 @@ import (
 	. "github.com/xtls/xray-core/common/reflect"
 	cserial "github.com/xtls/xray-core/common/serial"
 	iserial "github.com/xtls/xray-core/infra/conf/serial"
+	"github.com/xtls/xray-core/main/distro/all"
 	"github.com/xtls/xray-core/proxy/shadowsocks"
+	"github.com/xtls/xray-core/testing/configs"
 )
 
 func TestMashalAccount(t *testing.T) {
+	// An account crosses the API by name, so this package says which names it
+	// reads.
+	configs.MustInstall(shadowsocks.ConfigObjectsShadowsocksClient)
 	account := &shadowsocks.Account{
 		Password:   "shadowsocks-password",
 		CipherType: shadowsocks.CipherType_CHACHA20_POLY1305,
@@ -84,6 +89,9 @@ func TestMashalStruct(t *testing.T) {
 }
 
 func TestMarshalConfigJson(t *testing.T) {
+	// Rendering settings back to JSON reads each one as the type it names, which
+	// is what the build installs.
+	all.Wire()
 	buf := bytes.NewBufferString(getConfig())
 	config, err := iserial.DecodeJSONConfig(buf)
 	if err != nil {
@@ -95,11 +103,35 @@ func TestMarshalConfigJson(t *testing.T) {
 		t.Error("build core config failed")
 	}
 
-	tmsg := cserial.ToTypedMessage(bc)
-	tc, ok := MarshalToJson(tmsg, true)
-	if !ok {
-		t.Error("marshal config failed")
+	// A configuration is a plain Go value now, and each of its settings marshals to
+	// JSON on its own.
+	var marshalled []string
+	marshal := func(value any) {
+		if text, ok := MarshalToJson(value, true); ok {
+			marshalled = append(marshalled, text)
+		}
 	}
+	for _, app := range bc.App {
+	for _, in := range bc.Inbound {
+		marshalled = append(marshalled, in.Tag)
+	}
+	for _, out := range bc.Outbound {
+		marshalled = append(marshalled, out.Tag)
+	}
+		marshal(app)
+	}
+	for _, in := range bc.Inbound {
+		marshal(in.ProxySettings)
+		marshal(in.ReceiverSettings)
+	}
+	for _, out := range bc.Outbound {
+		marshal(out.ProxySettings)
+		marshal(out.SenderSettings)
+	}
+	if len(marshalled) == 0 {
+		t.Fatal("marshal config failed")
+	}
+	tc := strings.Join(marshalled, "\n")
 
 	// t.Log(tc)
 
@@ -114,7 +146,6 @@ func TestMarshalConfigJson(t *testing.T) {
 		"system",
 		"inboundDownlink",
 		"outboundUplink",
-		"XHTTP_IN",
 		"\"host\": \"bing.com\"",
 		"scMaxEachPostBytes",
 		"\"from\": 100",

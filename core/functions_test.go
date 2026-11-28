@@ -17,7 +17,6 @@ import (
 	"github.com/xtls/xray-core/proxy/freedom"
 	"github.com/xtls/xray-core/testing/servers/tcp"
 	"github.com/xtls/xray-core/testing/servers/udp"
-	"google.golang.org/protobuf/proto"
 )
 
 func xor(b []byte) []byte {
@@ -45,7 +44,7 @@ func TestXrayDial(t *testing.T) {
 	defer tcpServer.Close()
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dispatcher.Config{}),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
@@ -59,10 +58,7 @@ func TestXrayDial(t *testing.T) {
 		},
 	}
 
-	cfgBytes, err := proto.Marshal(config)
-	common.Must(err)
-
-	server, err := core.StartInstance("protobuf", cfgBytes)
+	server, err := core.New(config)
 	common.Must(err)
 	defer server.Close()
 
@@ -97,7 +93,7 @@ func TestXrayDialUDPConn(t *testing.T) {
 	defer udpServer.Close()
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dispatcher.Config{}),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
@@ -111,10 +107,7 @@ func TestXrayDialUDPConn(t *testing.T) {
 		},
 	}
 
-	cfgBytes, err := proto.Marshal(config)
-	common.Must(err)
-
-	server, err := core.StartInstance("protobuf", cfgBytes)
+	server, err := core.New(config)
 	common.Must(err)
 	defer server.Close()
 
@@ -166,7 +159,7 @@ func TestXrayDialUDP(t *testing.T) {
 	defer udpServer2.Close()
 
 	config := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dispatcher.Config{}),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
@@ -180,10 +173,7 @@ func TestXrayDialUDP(t *testing.T) {
 		},
 	}
 
-	cfgBytes, err := proto.Marshal(config)
-	common.Must(err)
-
-	server, err := core.StartInstance("protobuf", cfgBytes)
+	server, err := core.New(config)
 	common.Must(err)
 	defer server.Close()
 

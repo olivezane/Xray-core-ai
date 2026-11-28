@@ -410,7 +410,7 @@ func TestBlackhole(t *testing.T) {
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Block, Delay: &freedom.Range{}}}}),
 			},
 		},
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&router.Config{
 				Rule: []*router.RoutingRule{
 					{
@@ -474,7 +474,7 @@ func TestSTUNSniffing(t *testing.T) {
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}}}),
 			},
 		},
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&router.Config{
 				Rule: []*router.RoutingRule{
 					{
@@ -549,7 +549,7 @@ func TestDNSSniffing(t *testing.T) {
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}}}),
 			},
 		},
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&router.Config{
 				Rule: []*router.RoutingRule{
 					{
@@ -742,7 +742,7 @@ func TestDomainSniffing(t *testing.T) {
 				ProxySettings: serial.ToTypedMessage(&freedom.Config{Firewall: []*freedom.FirewallConfig{{Action: freedom.RuleAction_Allow}}}),
 			},
 		},
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&router.Config{
 				Rule: []*router.RoutingRule{
 					{
@@ -800,7 +800,7 @@ func TestDialXray(t *testing.T) {
 	userID := protocol.NewID(uuid.New())
 	serverPort := tcp.PickPort()
 	serverConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&log.Config{
 				ErrorLogLevel: clog.Severity_Debug,
 				ErrorLogType:  log.LogType_Console,
@@ -833,7 +833,7 @@ func TestDialXray(t *testing.T) {
 	}
 
 	clientConfig := &core.Config{
-		App: []*serial.TypedMessage{
+		App: []any{
 			serial.ToTypedMessage(&dispatcher.Config{}),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
